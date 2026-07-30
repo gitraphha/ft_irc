@@ -1,0 +1,34 @@
+name: clang-format
+
+on:
+  pull_request:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21 all
+          sudo apt-get install -y clang-format-21
+          clang-format-21 --version
+
+      - name: Run clang-format check (srcs + includes only)
+        run: |
+          set -euo pipefail
+
+          find srcs includes \
+            -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
+            | xargs -0 clang-format-21 -i
+
+          if git diff --quiet; then
+            echo "clang-format check passed (no changes)."
+          else
+            echo "clang-format check failed (files would be reformatted)."
+            git --no-pager diff
+            exit 1
+          fi
+
