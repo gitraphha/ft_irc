@@ -78,3 +78,4 @@ https://wormav.github.io/42_eval/Cursus/Ft_irc/index.html
 
 # Reference implementation
 https://github.com/42YerevanProjects/ft_irc/blob/master/src/network/Server.cpp#L263
+https://deepwiki.com/42YerevanProjects/ft_irc/4-protocol-implementation
