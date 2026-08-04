@@ -1,4 +1,4 @@
-// # include "IRC.hpp"
+#include "IRC.hpp"
 
 /*
 	NAME:
@@ -41,4 +41,10 @@ int main(int argc, char **argv) {
     (void)argv;
     if (argc != 3)
         return (1);
+
+    try {
+        IRCServer srv;
+        srv.run();
+    } catch (std::exception const &e) {
+    }
 }

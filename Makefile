@@ -4,11 +4,12 @@ NAME			= ircserv
 
 # ---- Sources & Objects -------------------------------------------------------
 SRC_DIR			= srcs
+INC_DIR			= includes
 BUILD_DIR		= build
 
 SRCS_ROOT		= main
 
-# SRCS_SERVER 	= Server \
+SRCS_SERVER 	= IRCServer
 # 				  Client \
 # 				  Channel
 
@@ -29,8 +30,8 @@ SRCS_ROOT		= main
 # SRCS_BONUS		= DCC \
 # 				  Bot
 
-SRCS			= $(SRCS_ROOT)
-# 				  $(addprefix server/, $(SRCS_SERVER))
+SRCS			= $(SRCS_ROOT) \
+ 				  $(addprefix server/, $(SRCS_SERVER))
 
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
 
@@ -45,6 +46,7 @@ DEPS			= $(OBJS:.o=.d)
 
 CXX				= c++
 CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
+CPPFLAGS        = -I$(INC_DIR)
 DFLAGS			= -DDEBUG -g -fsanitize=address
 
 # ---- Rules -------------------------------------------------------------------
@@ -80,7 +82,7 @@ $(NAME): $(OBJS)
 
 $(BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 # $(BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
 # 	@mkdir -p $(@D)
