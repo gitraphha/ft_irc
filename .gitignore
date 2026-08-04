@@ -35,6 +35,7 @@
 *.lib
 
 # Executables
+playground/a.out
 *.exe
 *.out
 *.app
