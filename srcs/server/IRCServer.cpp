@@ -13,6 +13,7 @@ void                       IRCServer::g_handleStopSignals(int signal) {
 void IRCServer::_initSignalHandling() {
     g_stopServerLoop = 0;
     _stopSignals.push_back(SIGINT);
+	_stopSignals.push_back(SIGQUIT);
     _stopSignals.push_back(SIGTERM);
 
     if (!_setStopSignals(g_handleStopSignals))
