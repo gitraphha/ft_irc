@@ -4,15 +4,13 @@
 #include <vector>
 
 class IRCServer {
-  public:
-    volatile static std::sig_atomic_t g_stopServerLoop;
-    static std::vector<int>           g_signals;
-    static void                       g_handleSignal(int signal);
-    // static void                       _initSignalHandling();
-    // static void                       _resetSignalHandling();
   private:
-    void _initSignalHandling();
-    void _resetSignalHandling();
+    volatile static std::sig_atomic_t g_stopServerLoop;
+    static void                       g_handleStopSignals(int signal);
+    std::vector<int>                  _stopSignals;
+    void                              _initSignalHandling();
+    void                              _resetSignalHandling();
+    bool                              _setStopSignals(sighandler_t handler);
 
     IRCServer(IRCServer const &other);
     IRCServer &operator=(IRCServer const &other);
