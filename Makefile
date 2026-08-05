@@ -68,11 +68,11 @@ format:
 # Usage: make tidy FILE=srcs/main.cpp or make tidy FILE="srcs/a.cpp srcs/b.cpp"
 tidy:
 	@if [ -z "$(FILE)" ]; then echo "Usage: make tidy FILE=srcs/main.cpp"; exit 1; fi
-	@clang-tidy $(FILE) -- $(CXXFLAGS) -I.
+	@clang-tidy $(FILE) -- $(CXXFLAGS) -I$(INC_DIR)
 
 tidy-all:
 	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
-	  | xargs -0 clang-tidy -- $(CXXFLAGS) -I.
+	  | xargs -0 clang-tidy -- $(CXXFLAGS) -I$(INC_DIR)
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
