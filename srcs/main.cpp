@@ -47,4 +47,5 @@ int main(int argc, char **argv) {
         srv.run();
     } catch (std::exception const &e) {
     }
+    std::cout << "Clean exit." << std::endl;
 }
