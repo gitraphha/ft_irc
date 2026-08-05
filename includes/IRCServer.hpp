@@ -1,24 +1,29 @@
 #include <csignal>
 #include <exception>
 #include <iostream>
+#include <vector>
 
 class IRCServer {
+  public:
+    volatile static std::sig_atomic_t g_stopServerLoop;
+    static std::vector<int>           g_signals;
+    static void                       g_handleSignal(int signal);
+    // static void                       _initSignalHandling();
+    // static void                       _resetSignalHandling();
   private:
-    volatile static std::sig_atomic_t _stopServerLoop;
-    static void                       _handle_sigint(int signal);
+    void _initSignalHandling();
+    void _resetSignalHandling();
+
+    IRCServer(IRCServer const &other);
+    IRCServer &operator=(IRCServer const &other);
 
   public:
     IRCServer() {
-        _stopServerLoop = 0;
-        if (std::signal(SIGINT, _handle_sigint) == SIG_ERR) {
-            throw std::runtime_error("std::signal failed");
-        }
+        _initSignalHandling();
     }
 
     ~IRCServer() {
-        if (std::signal(SIGINT, SIG_DFL) == SIG_ERR) {
-            // throw std::runtime_error("std::signal failed");
-        }
+        _resetSignalHandling();
     }
 
     void run();
