@@ -15,7 +15,8 @@ Checks: >
   -cppcoreguidelines-macro-to-enum,
   -readability-braces-around-statements,
   -readability-implicit-bool-conversion,
-  -readability-identifier-length
+  -readability-identifier-length,
+  -performance-avoid-endl,
 
 WarningsAsErrors: true
 
@@ -38,6 +39,16 @@ CheckOptions:
     value:           camelBack
   - key:             readability-identifier-naming.VariableCase
     value:           camelBack
-
+  - key:             readability-identifier-naming.ClassMemberPrefix
+    value:           g_
+  - key:             readability-identifier-naming.ClassMethodPrefix
+    value:           g_
+  - key:             readability-identifier-naming.PrivateMemberPrefix
+    value:           _
+  - key:             readability-identifier-naming.PrivateMethodCase
+    value:           camelBack
+  - key:             readability-identifier-naming.PrivateMethodPrefix
+    value:           _
+  
   - key:             readability-identifier-naming.IgnoreMainLikeFunctions
     value:           1
