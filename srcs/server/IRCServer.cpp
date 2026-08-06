@@ -114,10 +114,10 @@ void IRCServer::run() {
             // print nice error message and exit the loop
             // or throw, but then have ressource cleanup after catch
             break;
-        } else if (pollResult == 0) {
+        } /* else if (pollResult == 0) {
             // no data ready to read
             continue;
-        }
+        } */
 
         // Check if server socket has activity
         struct pollfd &serverPollFds = _pollfds[0];
@@ -128,33 +128,51 @@ void IRCServer::run() {
             _acceptClient();
         }
 
-		// Clients
+        // Clients
         for (size_t idx = 1; idx < _pollfds.size(); ++idx) {
             pollfd &pfd = _pollfds.at(idx);
-            char    buffer[1024] = "";
-            int     bytesRead = read(pfd.fd, buffer, 1024);
-            if (bytesRead < 0) {
-                if (!(errno == EAGAIN || errno == EWOULDBLOCK))
-                    std::cerr << "[ERROR] Recv failed on FD " << pfd.fd
-                              << std::endl;
-            } else if (bytesRead == 0) {
-                // removeClient(fd, pollIndex, "Remote host closed the connection");
-                close(pfd.fd);
-                _pollfds.erase(_pollfds.begin() + idx);
-				std::cout << "Closed client #" << idx << " ("<<_pollfds.size() -1 << " remaining)"<< std::endl;
+            std::cout << "Idx: " << idx << std::endl;
+            if (pfd.revents & POLLERR) {
+                std::cerr << "[ERROR] Recv failed on FD " << pfd.fd
+                          << std::endl;
+                // } else if (pfd.revents & POLLHUP) {
+                //     // removeClient(fd, pollIndex, "Remote host closed the connection");
+                //     close(pfd.fd);
+                //     _pollfds.erase(_pollfds.begin() + idx);
+                //     std::cout << "Closed client #" << idx << " ("
+                //               << _pollfds.size() - 1 << " remaining)" << std::endl;
             } else {
-                std::cout << "Buffer read from client " << idx << ": \n"
-                          << std::string(buffer) << std::endl;
+                std::cout << " revents: " << std::hex << pfd.revents
+                          << std::endl;
+            }
+
+            if (pfd.revents & POLLIN) {
+                char buffer[1024] = "";
+                int  bytesRead = read(pfd.fd, buffer, 1024);
+                if (bytesRead > 0) {
+                    std::cout << "Buffer read from client " << idx << ": \n"
+                              << std::string(buffer) << std::endl;
+                }
+                if (bytesRead == 0) {
+                    // removeClient(fd, pollIndex, "Remote host closed the connection");
+                    close(pfd.fd);
+                    _pollfds.erase(_pollfds.begin() + idx);
+                    std::cout << "Closed client #" << idx << " ("
+                              << _pollfds.size() - 1 << " remaining)"
+                              << std::endl;
+                }
             }
         }
     }
-    close(_pollfds[0].fd);
-    for (size_t idx = 1; idx < _pollfds.size(); ++idx) {
+    for (size_t idx = 0; idx < _pollfds.size(); ++idx) {
         pollfd &pfd = _pollfds.at(idx);
         close(pfd.fd);
-        _pollfds.erase(_pollfds.begin() + idx);
-        std::cout << "Closed client #" << idx << " ("<<_pollfds.size() - 1 << " remaining)"<< std::endl;		
+        if (idx == 0)
+            std::cout << "Closed server";
+        else
+            std::cout << "Closed client #" << idx;
+        std::cout << " (" << _pollfds.size() - idx - 1 << " clients remaining)"
+                  << std::endl;
     }
-
     std::cout << "caught signal: " << g_stopServerLoop << "." << std::endl;
 }
