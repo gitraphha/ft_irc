@@ -1,3 +1,4 @@
-#include "IRCServer.hpp"
+#include "server/IRCServer.hpp"
 
 #include <exception>
+#include <iostream>
