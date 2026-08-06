@@ -4,6 +4,7 @@ NAME			= ircserv
 
 # ---- Sources & Objects -------------------------------------------------------
 SRC_DIR			= srcs
+INC_DIR			= includes
 BUILD_DIR		= build
 
 SRCS_ROOT		= main
@@ -21,7 +22,10 @@ SRCS_ROOT		= main
 # 				  Kick \
 # 				  Invite \
 # 				  Topic \
-# 				  Mode
+# 				  Mode \
+# 				  Privmsg \
+# 				  Notice \
+# 				  Ping
 
 # SRCS_UTILS		= Parser \
 # 				  Reply
@@ -45,6 +49,7 @@ DEPS			= $(OBJS:.o=.d)
 
 CXX				= c++
 CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
+IFLAGS			= -I$(INC_DIR)
 DFLAGS			= -DDEBUG -g -fsanitize=address
 
 # ---- Rules -------------------------------------------------------------------
@@ -61,16 +66,17 @@ debug: $(NAME)
 
 # clang-format
 format:
-	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 | xargs -0 clang-format -i
+	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
+	| xargs -0 clang-format -i
 
 # Usage: make tidy FILE=srcs/main.cpp or make tidy FILE="srcs/a.cpp srcs/b.cpp"
 tidy:
 	@if [ -z "$(FILE)" ]; then echo "Usage: make tidy FILE=srcs/main.cpp"; exit 1; fi
-	@clang-tidy $(FILE) -- $(CXXFLAGS) -I.
+	@clang-tidy $(FILE) -- $(CXXFLAGS) $(IFLAGS)
 
 tidy-all:
 	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
-	  | xargs -0 clang-tidy -- $(CXXFLAGS) -I.
+	  | xargs -0 clang-tidy -- $(CXXFLAGS) $(IFLAGS)
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
@@ -80,11 +86,11 @@ $(NAME): $(OBJS)
 
 $(BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c $< -o $@
 
 # $(BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
 # 	@mkdir -p $(@D)
-# 	$(CXX) $(CXXFLAGS) -MMD -MP -c -DBONUS $< -o $@
+# 	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
 
 # ---- Cleanup -----------------------------------------------------------------
 clean:
@@ -98,4 +104,4 @@ re: fclean all
 -include $(DEPS)
 # -include $(DEPS) $(BONUS_DEPS)
 
-.PHONY: all bonus clean fclean re debug debug_bonus format
+.PHONY: all bonus clean fclean re debug debug_bonus format tidy tidy-all
