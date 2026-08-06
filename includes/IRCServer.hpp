@@ -1,6 +1,9 @@
 #include <csignal>
 #include <exception>
 #include <iostream>
+// #include <netinet/in.h>
+// #include <sys/poll.h>
+// #include <sys/socket.h>
 #include <vector>
 
 class IRCServer {
@@ -12,17 +15,18 @@ class IRCServer {
     void                              _resetSignalHandling();
     bool                              _setStopSignals(sighandler_t handler);
 
+    std::vector<struct pollfd>        _pollfds;
+
     IRCServer(IRCServer const &other);
     IRCServer &operator=(IRCServer const &other);
 
-  public:
-    IRCServer() {
-        _initSignalHandling();
-    }
+    int        _createDummyServerSocket();
+    void       _acceptClient();
 
-    ~IRCServer() {
-        _resetSignalHandling();
-    }
+  public:
+    IRCServer();
+
+    ~IRCServer();
 
     void run();
 };
