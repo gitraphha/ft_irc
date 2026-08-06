@@ -1,9 +1,4 @@
 #include <csignal>
-#include <exception>
-#include <iostream>
-// #include <netinet/in.h>
-// #include <sys/poll.h>
-// #include <sys/socket.h>
 #include <vector>
 
 class IRCServer {
@@ -22,6 +17,7 @@ class IRCServer {
 
     int        _createDummyServerSocket();
     void       _acceptClient();
+    void       _disconnectClient(int const idx);
 
   public:
     IRCServer();
