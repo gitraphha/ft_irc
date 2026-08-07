@@ -17,7 +17,7 @@ class IRCServer {
 
     int        _createServerSocket();
     void       _acceptClient();
-    void       _disconnectClient(int const idx);
+    void       _disconnectClient(size_t const idx);
 
   public:
     IRCServer();
