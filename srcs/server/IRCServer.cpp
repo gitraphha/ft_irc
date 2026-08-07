@@ -6,12 +6,27 @@
 #include <iostream>
 #include <sys/poll.h>
 
+/*
+	Signal handling
+	will be refactored in a separate class
+*/
 volatile std::sig_atomic_t IRCServer::g_stopServerLoop = 0;
 
+/*
+	Signal callback function
+	Will set a static class member to the triggering signal,
+	i.e. != 0, so the state can be used as a bool value directly.
+	Will be refactored in a separate class, and with a more explicit
+	stop state request function
+*/
 void                       IRCServer::g_handleStopSignals(int signal) {
     g_stopServerLoop = signal;
 }
 
+/*
+	Setup all signal that should trigger the
+	IRCServer to stop.
+*/
 void IRCServer::_initSignalHandling() {
     g_stopServerLoop = 0;
     _stopSignals.push_back(SIGINT);
@@ -22,10 +37,19 @@ void IRCServer::_initSignalHandling() {
         throw std::runtime_error("std::signal failed");
 }
 
+/*
+	Reset all signal that should trigger the
+	IRCServer to stop to the default on server exit.
+*/
 void IRCServer::_resetSignalHandling() {
     _setStopSignals(SIG_DFL);
 }
 
+/*
+	Helper function to actually set the signal behaviour
+	on system level using sigaction, as this is the most
+	portable POSIX compliant way to do it.
+*/
 bool IRCServer::_setStopSignals(sighandler_t handler) {
     bool             success = true;
 
@@ -41,15 +65,31 @@ bool IRCServer::_setStopSignals(sighandler_t handler) {
     return success;
 }
 
+/*
+	IRCServer Constructor
+		* setup signal handling
+		* ...
+*/
 IRCServer::IRCServer() {
     _initSignalHandling();
 }
 
+/*
+	IRCServer Destructor
+		* reset signal handling to default
+		* ...
+*/
 IRCServer::~IRCServer() {
     _resetSignalHandling();
 }
 
-int IRCServer::_createDummyServerSocket() {
+/*
+	Dummy function to get a usable server socket
+	for mockup testing.
+	Implementation explicitely not exhaustive,
+	will be replaced by an "official" version anyways.
+*/
+int IRCServer::_createServerSocket() {
     // Create a TCP socket
     int serverSocket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (serverSocket == -1) {
@@ -73,6 +113,12 @@ int IRCServer::_createDummyServerSocket() {
     return serverSocket;
 }
 
+/*
+	Dummy function to get a usable client socket
+	on connect for mockup testing.
+	Implementation explicitely not exhaustive,
+	will be replaced by an "official" version anyways.
+*/
 void IRCServer::_acceptClient() {
     int                clientFd;
     struct pollfd      clientPollfd;
@@ -96,6 +142,14 @@ void IRCServer::_acceptClient() {
     std::cout << "Client connected, fd: " << clientFd << std::endl;
 }
 
+/*
+	Dummy function to disconnet aclient socket
+	for mockup testing.
+	Implementation explicitely not exhaustive,
+	will be replaced by an "official" version anyways.
+	There is more to be done than just closing and removing
+	the client socket.
+*/
 void IRCServer::_disconnectClient(int const idx) {
     pollfd &pfd = _pollfds.at(idx);
 
@@ -110,22 +164,28 @@ void IRCServer::_disconnectClient(int const idx) {
     _pollfds.erase(_pollfds.begin() + idx);
 }
 
-void IRCServer::run() {
-    _createDummyServerSocket();
+/*
+	Main server loop
 
-    // Event loop
+	* sets up its listening socket
+	* runs an infinit loop to listen for connections
+	* handles client connect and disconnect scenarios
+	* on server stop, disconnects all clients and closes
+		the server socket
+*/
+void IRCServer::run() {
+    _createServerSocket();
+
     while (!g_stopServerLoop) {
-        // std::cout << "running..." << std::endl;
         sleep(1);
 
         int pollResult = poll(_pollfds.data(), _pollfds.size(), 0);
         if (pollResult == -1) {
-            // print nice error message and exit the loop
+            // nice error message and exit the loop
             // or throw, but then have ressource cleanup after catch
             break;
         }
 
-        // Check if server socket has activity
         struct pollfd &serverPollFds = _pollfds[0];
         if (serverPollFds.revents & POLLERR) {
             std::cerr << "Server socket error\n";
@@ -133,13 +193,8 @@ void IRCServer::run() {
         } else if (serverPollFds.revents & POLLIN) {
             _acceptClient();
         }
-
-        // Clients
         for (size_t idx = 1; idx < _pollfds.size(); ++idx) {
             pollfd &pfd = _pollfds.at(idx);
-            // std::cout << "Idx: " << idx << std::endl;
-            // std::cout << " revents: " << std::hex << pfd.revents << std::endl;
-
             if (pfd.revents & POLLERR) {
                 std::cerr << "Client socket error on fd: " << pfd.fd
                           << std::endl;
@@ -148,14 +203,16 @@ void IRCServer::run() {
             } else if (pfd.revents & POLLIN) {
                 char buffer[1024] = "";
                 int  bytesRead = read(pfd.fd, buffer, 1024);
+                // for mockup only,
+                // this functionality will go to its own function of course
                 if (bytesRead > 0) {
                     std::cout << "Buffer read from client " << idx << ": \n"
                               << std::string(buffer) << std::endl;
                 }
                 if (bytesRead <= 0) {
+                    // Comment will be deleted later, kept for reference for now
                     // this means, the client closed the connection
                     // POLLHUP isn't useful, because
-
                     // When you kill netcat with Ctrl+C:
                     //     Netcat's OS kernel sent a FIN packet to your server
                     //     Your server's poll() detected this with POLLIN
@@ -169,7 +226,6 @@ void IRCServer::run() {
         }
     }
     while (!_pollfds.empty()) {
-        // disconnecting clients first
         _disconnectClient(_pollfds.size() - 1);
     }
     std::cout << "caught signal: " << g_stopServerLoop << "." << std::endl;

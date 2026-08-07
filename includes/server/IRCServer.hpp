@@ -15,13 +15,12 @@ class IRCServer {
     IRCServer(IRCServer const &other);
     IRCServer &operator=(IRCServer const &other);
 
-    int        _createDummyServerSocket();
+    int        _createServerSocket();
     void       _acceptClient();
     void       _disconnectClient(int const idx);
 
   public:
     IRCServer();
-
     ~IRCServer();
 
     void run();
