@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
         IRCServer srv;
         srv.run();
     } catch (std::exception const &e) {
+        std::cerr << e.what() << std::endl;
     }
     std::cout << "Clean exit." << std::endl;
 }

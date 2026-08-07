@@ -96,7 +96,7 @@ int IRCServer::_createServerSocket() {
         return -1;
     }
     // Bind
-    struct sockaddr_in serverAddr;
+    struct sockaddr_in serverAddr = {};
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(8082);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
@@ -120,15 +120,15 @@ int IRCServer::_createServerSocket() {
 	will be replaced by an "official" version anyways.
 */
 void IRCServer::_acceptClient() {
-    int                clientFd;
-    struct pollfd      clientPollfd;
-    struct sockaddr_in clientAI;
-    socklen_t          AISize = sizeof(clientAI);
+    int                clientFd = 0;
+    struct pollfd      clientPollfd = {};
+    struct sockaddr_in clientAI = {};
+    socklen_t          aiSize = sizeof(clientAI);
 
     // accept4, so we can directly set SOCK_NONBLOCK
     // the subject allows fcntl only on macOS
     clientFd = accept4(_pollfds.front().fd,
-                       reinterpret_cast<struct sockaddr *>(&clientAI), &AISize,
+                       reinterpret_cast<struct sockaddr *>(&clientAI), &aiSize,
                        SOCK_NONBLOCK);
 
     if (clientFd == -1) {
@@ -150,7 +150,7 @@ void IRCServer::_acceptClient() {
 	There is more to be done than just closing and removing
 	the client socket.
 */
-void IRCServer::_disconnectClient(int const idx) {
+void IRCServer::_disconnectClient(size_t const idx) {
     pollfd &pfd = _pollfds.at(idx);
 
     if (idx == 0) {
@@ -190,7 +190,9 @@ void IRCServer::run() {
         if (serverPollFds.revents & POLLERR) {
             std::cerr << "Server socket error\n";
             break;
-        } else if (serverPollFds.revents & POLLIN) {
+        }
+
+        if (serverPollFds.revents & POLLIN) {
             _acceptClient();
         }
         for (size_t idx = 1; idx < _pollfds.size(); ++idx) {
