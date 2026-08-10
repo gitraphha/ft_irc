@@ -39,6 +39,9 @@ en.subject.pdf
 
 # Executables
 ircserv
+ircserv_debug
+ircserv_bonus
+ircserv_bonus_debug
 ircserv_bonus
 *.exe
 *.out
@@ -46,6 +49,7 @@ ircserv_bonus
 
 # Build directories
 build/
+build_debug/
 Build/
 build-*/
 
