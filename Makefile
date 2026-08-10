@@ -30,7 +30,8 @@ SRCS_ROOT		= main
 # 				  Notice \
 # 				  Ping
 
-# SRCS_UTILS		= Parser \
+SRCS_UTILS		= MemberSet
+# 				  Parser \
 # 				  Reply
 
 # SRCS_BONUS		= DCC \
