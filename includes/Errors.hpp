@@ -32,7 +32,7 @@ class Error : public std::exception {
 
     // An internal error: no numeric reply is sent, what() is used for logging.
     explicit Error(const std::string &message)
-        : _hasReply(false), _reply(), _what(message) {}
+        : _hasReply(false), _what(message) {}
 
     virtual ~Error() throw() {}
 

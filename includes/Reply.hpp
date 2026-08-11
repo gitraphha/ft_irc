@@ -200,7 +200,7 @@ struct Message {
     int         code;
     std::string body;
 
-    Message() {}
+    Message() : code() {}
 
     Message(int c, const std::string &b) : code(c), body(b) {}
 };
@@ -219,7 +219,7 @@ inline Message reply(Code code, const std::string &params) {
 }
 
 // reply() with caller-supplied trailing text.
-//   reply(RPL_TOPIC, "#chan", topic) -> code=332, body="#chan :<topic>"
+// reply(RPL_TOPIC, "#chan", topic) -> code=332, body="#chan :<topic>"
 inline Message reply(Code code, const std::string &params,
                      const std::string &trailing) {
     std::string body = params;
