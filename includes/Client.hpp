@@ -2,7 +2,7 @@
 
 #include <string>
 
-// draft to be completed by blunez-
+// draft: to be completed by blunez-
 
 class Client {
     std::string nick;

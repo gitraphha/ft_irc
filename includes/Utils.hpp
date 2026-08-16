@@ -9,8 +9,9 @@ static inline unsigned char toLower(unsigned char c) {
     return std::tolower(c);
 }
 
-static inline std::string caseFolded(std::string name) {
-    std::transform(name.begin(), name.end(), name.begin(), toLower);
-    return name;
+static inline std::string foldCase(const std::string &name) {
+	std::string folded(name);
+    std::transform(folded.begin(), folded.end(), folded.begin(), toLower);
+    return folded;
 }
 } // namespace Utils

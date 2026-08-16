@@ -5,75 +5,77 @@
 
 ChannelManager::ChannelManager() {}
 
-Channel &ChannelManager::get(const std::string &name) {
-    std::map<std::string, Channel>::iterator it =
-        channels.find(Utils::caseFolded(name));
-    if (it != channels.end())
-        return it->second;
-    throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+std::map<std::string, Channel>::iterator ChannelManager::findChannel(const std::string &name) {
+    return channels.find(Utils::foldCase(name));
 }
 
-const Channel &ChannelManager::get(const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it =
-        channels.find(Utils::caseFolded(name));
-    if (it != channels.end())
-        return it->second;
-    throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+std::map<std::string, Channel>::const_iterator ChannelManager::findChannel(const std::string &name) const {
+    return channels.find(Utils::foldCase(name));
 }
 
-bool ChannelManager::has(const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it =
-        channels.find(Utils::caseFolded(name));
-    return it != channels.end();
-}
 
-bool ChannelManager::has(Client *client, const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it =
-        channels.find(Utils::caseFolded(name));
+// 'at' returns an existing channel with name equivalent to `name`,
+// or throw an error
+Channel &ChannelManager::at(const std::string &name) {
+    std::map<std::string, Channel>::iterator it = findChannel(name);
     if (it == channels.end())
-        return false;
-    return it->second.has(client);
+		throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+    return it->second;
 }
 
+bool ChannelManager::hasChannel(const std::string &name) const {
+    return findChannel(name) != channels.end();
+}
+
+bool ChannelManager::isMember(Client *client, const std::string &name) const {
+    std::map<std::string, Channel>::const_iterator it = findChannel(name);
+    return (it != channels.end() && it->second.hasMember(client));
+}
+
+// Join causes `client` to join the channel named `name`, creating it if needed.
 void ChannelManager::join(Client *client, const std::string &name,
                           const std::string &key) {
-    if (!has(name)) {
-        std::string nameCaseFolded = Utils::caseFolded(name);
-        channels.insert(
-            std::make_pair(nameCaseFolded, Channel(name, nameCaseFolded)));
+	std::string folded = Utils::foldCase(name);
+	std::map<std::string, Channel>::iterator it = channels.find(folded);
+    if (it == channels.end()) {
+		Channel newChannel(name, folded, key);
+		newChannel.join(client, key);
+		channels.insert(std::make_pair(folded, newChannel));
+		return ;
     }
-    Channel &channel = get(name);
-    channel.join(client, key);
+	it->second.join(client, key);
 }
 
+// Part parts `client` from the channel named `name`, deleting it if it's empty.
 void ChannelManager::part(Client *client, const std::string &name) {
-    Channel &channel = get(name);
-    channel.part(client);
-    // if no members remove channel
-    if (!channel.size())
-        channels.erase(Utils::caseFolded(name));
+    std::map<std::string, Channel>::iterator it = channels.find(name);
+	if (it == channels.end())
+		throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+	it->second.part(client);
+	if (!it->second.size())
+		channels.erase(it);
 }
 
-void ChannelManager::remove(const std::string &name) {
-    if (!has(name))
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
-    channels.erase(Utils::caseFolded(name));
+// delete a channel
+void ChannelManager::removeChannel(const std::string &name) {
+	std::map<std::string, Channel>::iterator it = channels.find(name);
+	if (it == channels.end())
+		throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+    channels.erase(it);
 }
 
 void ChannelManager::broadcast(const std::string &name, const std::string &msg,
-                               const Client *skip) const {
-    const Channel &channel = get(name);
+                               const Client *skip) {
+    Channel &channel = at(name);
     channel.broadcast(msg, skip);
 }
 
-void ChannelManager::addInvite(const std::string &name,
-                               const std::string &nick) {
-    Channel &channel = get(name);
-    channel.addInvite(nick);
+void ChannelManager::addInvite(const std::string &name, Client *client) {
+    Channel &channel = at(name);
+    channel.addInvite(client);
 }
 
-void ChannelManager::removeInvite(const std::string &name,
-                                  const std::string &nick) {
-    Channel &channel = get(name);
-    channel.removeInvite(nick);
+void ChannelManager::removeInvite(const std::string &name, Client *client) {
+    Channel &channel = at(name);
+    channel.removeInvite(client);
 }

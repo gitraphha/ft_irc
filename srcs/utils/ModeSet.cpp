@@ -1,8 +1,8 @@
 #include "ModeSet.hpp"
 
 ModeSet::ModeSet() {
-    modeSet[0] = 0;
-    modeSet[1] = 0;
+    modes[0] = 0;
+    modes[1] = 0;
 }
 
 bool ModeSet::has(int mode) const {
@@ -10,7 +10,7 @@ bool ModeSet::has(int mode) const {
         return false;
     uint32_t index, mask;
     indexAndMask(mode, index, mask);
-    return (modeSet[index] & mask) != 0;
+    return (modes[index] & mask) != 0;
 }
 
 bool ModeSet::hasAtLeast(const ModeSet &modes) const {
@@ -28,14 +28,14 @@ bool ModeSet::set(int mode, bool on) {
     uint32_t index, mask;
     indexAndMask(mode, index, mask);
     uint32_t desired;
-    uint32_t current = modeSet[index];
+    uint32_t current = modes[index];
     if (on)
         desired = current | mask;
     else
         desired = current & (~mask);
     if (current == desired)
         return false;
-    modeSet[index] = desired;
+    modes[index] = desired;
     return true;
 }
 

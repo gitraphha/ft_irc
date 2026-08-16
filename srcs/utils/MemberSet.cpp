@@ -12,6 +12,7 @@ MemberSet::MemberSet(Client *client, const ModeSet &modes) {
     add(client, modes);
 }
 
+// caller should add key before calling
 void MemberSet::add(Client *client, const ModeSet &modes) {
     members.insert(std::make_pair(client, modes));
 }
@@ -19,15 +20,15 @@ void MemberSet::add(Client *client, const ModeSet &modes) {
 void MemberSet::remove(Client *client) {
     std::map<Client *, ModeSet>::iterator it = members.find(client);
     if (it != members.end())
-    	members.erase(it);
+        members.erase(it);
 }
 
-void MemberSet::set(Client *client, const ModeSet &modes) {
+void MemberSet::setModes(Client *client, const ModeSet &modes) {
     std::map<Client *, ModeSet>::iterator it = members.find(client);
-    if (it != members.end())
-        it->second = modes;
-    else
+    if (it == members.end())
         add(client, modes);
+    else
+        it->second = modes;
 }
 
 size_t MemberSet::size() const {

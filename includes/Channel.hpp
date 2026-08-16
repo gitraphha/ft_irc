@@ -26,8 +26,8 @@
 class Channel {
     std::string              name;
     std::string              nameCaseFolded;
-    ModeSet                  flags;
-    std::vector<std::string> invites;
+    ModeSet                  modes;
+    std::vector<Client *>    invites;
     MemberSet                members;
     std::string              key;
     ssize_t                  userLimit;
@@ -37,21 +37,22 @@ class Channel {
     std::string              topicSetBy;
     std::time_t              topicSetTime;
 
-    bool                     invited(const std::string &nick) const;
+    bool                     isInvited(const Client *client) const;
 
   public:
-    Channel(const std::string &name, const std::string &nameCaseFolded);
+    Channel(const std::string &name, const std::string &nameCaseFolded, const std::string &key = "");
 
     void    join(Client *client, const std::string &key = "");
     void    part(Client *client);
 
     size_t  size() const;
+	const std::string &getNameCaseFolded() const;
     ssize_t getUserLimit() const;
-    bool    has(Client *client) const;
-    bool    clientIsAtLeast(Client *client, const ModeSet &modes) const;
+    bool    hasMember(Client *client) const;
+    bool    hasAtLeast(Client *client, const ModeSet &required) const;
 
     void    broadcast(const std::string &msg, const Client *skip = 0) const;
 
-    void    addInvite(const std::string &nick);
-    void    removeInvite(const std::string &nick);
+    void    addInvite(Client *client);
+    void    removeInvite(const Client *client);
 };
