@@ -69,7 +69,6 @@ bool CommandProcessor::run(Server &server, Client &client,
     return exiting;
 }
 
-
-void CommandProcessor::add(const std::string &name, const Command &cmd){
-	commands.insert(std::make_pair(name, cmd));
+void CommandProcessor::add(const std::string &name, const Command &cmd) {
+    commands.insert(std::make_pair(name, cmd));
 }

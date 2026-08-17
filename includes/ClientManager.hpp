@@ -7,12 +7,13 @@
 // draft: to be completed by blnunez-
 
 class ClientManager {
-    std::map<std::string, Client*>           clients;
-    std::map<int, std::string>              fdNick;
+    std::map<std::string, Client *> clients;
+    std::map<int, std::string>      fdNick;
 
-    std::map<std::string, Client*>::iterator findClient(const std::string &name);
-    std::map<std::string, Client*>::const_iterator
-            findClient(const std::string &name) const;
+    std::map<std::string, Client *>::iterator
+    findClient(const std::string &name);
+    std::map<std::string, Client *>::const_iterator
+    findClient(const std::string &name) const;
 
     std::map<int, std::string>::iterator       findClient(int fd);
     std::map<int, std::string>::const_iterator findClient(int fd) const;
@@ -20,10 +21,10 @@ class ClientManager {
   public:
     ClientManager();
 
-	Client *at(const std::string &name);
-	Client *at(int fd);
+    Client *at(const std::string &name);
+    Client *at(int fd);
 
-    bool hasClient(const std::string &name) const;
-    bool add(Client *client, int fd);
-    void remove(int fd);
+    bool    hasClient(const std::string &name) const;
+    bool    add(Client *client, int fd);
+    void    remove(int fd);
 };

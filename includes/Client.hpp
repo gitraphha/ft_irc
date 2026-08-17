@@ -1,8 +1,8 @@
 #pragma once
 
+#include <algorithm> // move to .cpp when implemnting all functions
 #include <string>
 #include <vector>
-#include <algorithm> // move to .cpp when implemnting all functions
 
 // draft: to be completed by blnunez-
 
@@ -21,7 +21,7 @@ class Client {
     std::vector<std::string> invitedTo;
 
   public:
-	Client() : registered(false), oper(false) {};
+    Client() : registered(false), oper(false) {};
 
     std::string getNick() const {
         return nick;
@@ -39,7 +39,7 @@ class Client {
         return oper;
     }
 
-	// TODO setters
+    // TODO setters
 
     bool isInvitedTo(const std::string &chan) const {
         std::vector<std::string>::const_iterator it =

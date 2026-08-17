@@ -5,12 +5,12 @@
 
 ClientManager::ClientManager() {}
 
-std::map<std::string, Client*>::iterator
+std::map<std::string, Client *>::iterator
 ClientManager::findClient(const std::string &name) {
     return clients.find(Utils::foldCase(name));
 }
 
-std::map<std::string, Client*>::const_iterator
+std::map<std::string, Client *>::const_iterator
 ClientManager::findClient(const std::string &name) const {
     return clients.find(Utils::foldCase(name));
 }
@@ -18,7 +18,7 @@ ClientManager::findClient(const std::string &name) const {
 // 'at' returns an existing client with name equivalent to `name`,
 // or throw an error
 Client *ClientManager::at(const std::string &name) {
-    std::map<std::string, Client*>::iterator it = findClient(name);
+    std::map<std::string, Client *>::iterator it = findClient(name);
     if (it == clients.end())
         throw Error(Reply::reply(Reply::ERR_NOSUCHNICK, name));
     return it->second;
@@ -60,7 +60,7 @@ void ClientManager::remove(int fd) {
         return;
     std::string nick = it->second;
     fdNick.erase(it);
-    std::map<std::string, Client*>::iterator it_cl = findClient(nick);
+    std::map<std::string, Client *>::iterator it_cl = findClient(nick);
     if (it_cl != clients.end())
         clients.erase(it_cl);
 }
