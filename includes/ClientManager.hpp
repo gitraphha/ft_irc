@@ -18,7 +18,12 @@ class ClientManager {
     std::map<int, std::string>::iterator       findClient(int fd);
     std::map<int, std::string>::const_iterator findClient(int fd) const;
 
+    // prevent copy and copy assignment
+    ClientManager(const ClientManager &);
+    ClientManager &operator=(const ClientManager &);
+
   public:
+    ~ClientManager();
     ClientManager();
 
     Client *at(const std::string &name);

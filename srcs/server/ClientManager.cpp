@@ -3,6 +3,12 @@
 #include "Errors.hpp"
 #include "Utils.hpp"
 
+ClientManager::~ClientManager() {
+    std::map<std::string, Client *>::iterator it = clients.begin();
+    for (; it != clients.end(); it++)
+        delete it->second;
+}
+
 ClientManager::ClientManager() {}
 
 std::map<std::string, Client *>::iterator
@@ -33,7 +39,7 @@ ClientManager::findClient(int fd) const {
     return fdNick.find(fd);
 }
 
-// 'at' returns an existing client with name equivalent to `name`,
+// 'at' returns an existing client with fd given
 // or throw an error (internal error message)
 Client *ClientManager::at(int fd) {
     std::map<int, std::string>::iterator it = findClient(fd);
@@ -46,6 +52,7 @@ bool ClientManager::hasClient(const std::string &name) const {
     return findClient(name) != clients.end();
 }
 
+// add should receive `new Client()` and add should take ownership of the pointer
 bool ClientManager::add(Client *client, int fd) {
     if (!client || hasClient(client->getNickCaseFolded()))
         return false;
@@ -61,6 +68,8 @@ void ClientManager::remove(int fd) {
     std::string nick = it->second;
     fdNick.erase(it);
     std::map<std::string, Client *>::iterator it_cl = findClient(nick);
-    if (it_cl != clients.end())
+    if (it_cl != clients.end()) {
+        delete it_cl->second;
         clients.erase(it_cl);
+    }
 }
