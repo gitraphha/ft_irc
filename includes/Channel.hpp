@@ -1,15 +1,14 @@
 #pragma once
 
-#include "Client.hpp"
-#include "MemberSet.hpp"
-#include "ModeSet.hpp"
-#include "Server.hpp"
-
 #include <algorithm>
 #include <cctype>
 #include <ctime>
 #include <string>
 #include <vector>
+
+class Client;
+#include "MemberSet.hpp"
+#include "ModeSet.hpp"
 
 /*
  * Hold one channel’s state and membership:
@@ -24,35 +23,29 @@
 */
 
 class Channel {
-    std::string              name;
-    std::string              nameCaseFolded;
-    ModeSet                  modes;
-    std::vector<Client *>    invites;
-    MemberSet                members;
-    std::string              key;
-    ssize_t                  userLimit;
-    // const Server *server;
-    std::time_t              createdTime;
-    std::string              topic;
-    std::string              topicSetBy;
-    std::time_t              topicSetTime;
-
-    bool                     isInvited(const Client *client) const;
+    std::string name;
+    std::string nameCaseFolded;
+    ModeSet     modes;
+    MemberSet   members;
+    std::string key;
+    ssize_t     userLimit;
+    std::time_t createdTime;
+    std::string topic;
+    std::string topicSetBy;
+    std::time_t topicSetTime;
 
   public:
-    Channel(const std::string &name, const std::string &nameCaseFolded, const std::string &key = "");
+    Channel(const std::string &name, const std::string &nameCaseFolded,
+            const std::string &key = "");
 
-    void    join(Client *client, const std::string &key = "");
-    void    part(Client *client);
+    void               join(Client *client, const std::string &key = "");
+    void               part(Client *client);
 
-    size_t  size() const;
-	const std::string &getNameCaseFolded() const;
-    ssize_t getUserLimit() const;
-    bool    hasMember(Client *client) const;
-    bool    hasAtLeast(Client *client, const ModeSet &required) const;
+    size_t             size() const;
+    const std::string &getNameCaseFolded() const;
+    ssize_t            getUserLimit() const;
+    bool               hasMember(Client *client) const;
+    bool hasAtLeast(Client *client, const ModeSet &required) const;
 
-    void    broadcast(const std::string &msg, const Client *skip = 0) const;
-
-    void    addInvite(Client *client);
-    void    removeInvite(const Client *client);
+    void broadcast(const std::string &msg, const Client *skip = 0) const;
 };

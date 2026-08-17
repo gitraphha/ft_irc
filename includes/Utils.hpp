@@ -10,7 +10,7 @@ static inline unsigned char toLower(unsigned char c) {
 }
 
 static inline std::string foldCase(const std::string &name) {
-	std::string folded(name);
+    std::string folded(name);
     std::transform(folded.begin(), folded.end(), folded.begin(), toLower);
     return folded;
 }

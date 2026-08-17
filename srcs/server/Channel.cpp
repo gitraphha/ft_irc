@@ -1,12 +1,14 @@
 #include "Channel.hpp"
 
+#include "Client.hpp"
 #include "Errors.hpp"
 #include "Utils.hpp"
 
 #include <algorithm>
 
 // userLimit -1 means no limit is set
-Channel::Channel(const std::string &name, const std::string &nameCaseFolded, const std::string &key)
+Channel::Channel(const std::string &name, const std::string &nameCaseFolded,
+                 const std::string &key)
     : name(name), nameCaseFolded(nameCaseFolded), key(key), userLimit(-1),
       createdTime(std::time(NULL)), topicSetTime() {}
 
@@ -16,7 +18,7 @@ void Channel::join(Client *client, const std::string &key) {
         throw Error(Reply::reply(Reply::ERR_USERONCHANNEL,
                                  client->getNick() + " " + name));
     bool inviteOnly = modes.has(Mode::InviteOnly);
-    if (inviteOnly && !isInvited(client))
+    if (inviteOnly && !client->isInvitedTo(nameCaseFolded))
         throw Error(Reply::reply(Reply::ERR_INVITEONLYCHAN, name));
     if (!this->key.empty() && this->key != key)
         throw Error(Reply::reply(Reply::ERR_BADCHANNELKEY, name));
@@ -29,7 +31,7 @@ void Channel::join(Client *client, const std::string &key) {
     }
     members.add(client, newModes);
     if (inviteOnly)
-        removeInvite(client);
+        client->removeInvite(nameCaseFolded);
 }
 
 // Part parts `client` from the channel named `name`, deleting it if it's empty.
@@ -62,22 +64,4 @@ bool Channel::hasAtLeast(Client *client, const ModeSet &required) const {
 
 void Channel::broadcast(const std::string &msg, const Client *skip) const {
     members.send(msg, skip);
-}
-
-bool Channel::isInvited(const Client *client) const {
-    std::vector<Client *>::const_iterator it =
-        std::find(invites.begin(), invites.end(), client);
-    return it != invites.end();
-}
-
-void Channel::addInvite(Client *client) {
-    if (!isInvited(client))
-        invites.push_back(client);
-}
-
-void Channel::removeInvite(const Client *client) {
-    std::vector<Client *>::iterator it =
-        std::find(invites.begin(), invites.end(), client);
-    if (it != invites.end())
-        invites.erase(it);
 }

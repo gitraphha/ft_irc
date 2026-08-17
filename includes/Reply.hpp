@@ -104,8 +104,9 @@ enum Code {
     ERR_CHANNELISFULL = 471, // <channel> :Cannot join channel (+l)
     ERR_UNKNOWNMODE =
         472, // <char> :is unknown mode char to me for <channel> (MODE)
-    ERR_INVITEONLYCHAN = 473,   // <channel> :Cannot join channel (+i)
-    ERR_BADCHANNELKEY = 475,    // <channel> :Cannot join channel (+k)
+    ERR_INVITEONLYCHAN = 473, // <channel> :Cannot join channel (+i)
+    ERR_BADCHANNELKEY = 475,  // <channel> :Cannot join channel (+k)
+    ERR_NOPRIVILEGES = 481,   // :Permission Denied- You're not an IRC operator
     ERR_CHANOPRIVSNEEDED = 482, // <channel> :You're not channel operator
     ERR_NOOPERHOST = 491        // :No O-lines for your host             (OPER)
 };
@@ -172,6 +173,8 @@ inline const char *text(Code code) {
             return "Cannot join channel (+i)";
         case ERR_BADCHANNELKEY:
             return "Cannot join channel (+k)";
+        case ERR_NOPRIVILEGES:
+            return "Permission Denied- You're not an IRC operator";
         case ERR_CHANOPRIVSNEEDED:
             return "You're not channel operator";
         case ERR_NOOPERHOST:

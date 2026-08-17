@@ -7,9 +7,11 @@
 class ChannelManager {
     std::map<std::string, Channel> channels;
 
-	std::map<std::string, Channel>::iterator findChannel(const std::string &name);
-	std::map<std::string, Channel>::const_iterator findChannel(const std::string &name) const;
-    Channel                       &at(const std::string &name);
+    std::map<std::string, Channel>::iterator
+    findChannel(const std::string &name);
+    std::map<std::string, Channel>::const_iterator
+             findChannel(const std::string &name) const;
+    Channel &at(const std::string &name);
 
   public:
     ChannelManager();
@@ -23,8 +25,5 @@ class ChannelManager {
     void removeChannel(const std::string &name);
 
     void broadcast(const std::string &name, const std::string &msg,
-                   const Client *skip = 0) ;
-
-    void addInvite(const std::string &name, Client *client);
-    void removeInvite(const std::string &name, Client *client);
+                   const Client *skip = 0);
 };
