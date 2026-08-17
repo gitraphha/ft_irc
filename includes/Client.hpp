@@ -2,18 +2,27 @@
 
 #include <string>
 #include <vector>
+#include <algorithm> // move to .cpp when implemnting all functions
 
-// draft: to be completed by blunez-
+// draft: to be completed by blnunez-
 
 class Client {
-    std::string nick;
-    std::string nickCaseFolded;
-    bool        registered;
-    bool        oper;
-    std::vector<std::string>
-        invitedTo; // casefolded name of channels invited to
+    std::string              nick;
+    std::string              nickCaseFolded;
+    std::string              username;
+    std::string              hostname;
+    std::string              realname;
+    bool                     registered;
+    std::string              recvBuffer;
+    std::string              sendBuffer;
+    // operator status needed fot KILL and REHASH
+    bool                     oper;
+    // casefolded name of channels invited to
+    std::vector<std::string> invitedTo;
 
   public:
+	Client() : registered(false), oper(false) {};
+
     std::string getNick() const {
         return nick;
     }
@@ -29,6 +38,8 @@ class Client {
     bool isOperator() const {
         return oper;
     }
+
+	// TODO setters
 
     bool isInvitedTo(const std::string &chan) const {
         std::vector<std::string>::const_iterator it =

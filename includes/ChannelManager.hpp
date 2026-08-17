@@ -11,10 +11,11 @@ class ChannelManager {
     findChannel(const std::string &name);
     std::map<std::string, Channel>::const_iterator
              findChannel(const std::string &name) const;
-    Channel &at(const std::string &name);
 
   public:
     ChannelManager();
+
+	Channel &at(const std::string &name);
 
     bool hasChannel(const std::string &name) const;
     bool isMember(Client *client, const std::string &name) const;

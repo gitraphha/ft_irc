@@ -12,33 +12,10 @@ Command &CommandProcessor::at(const std::string &name) {
     return it->second;
 }
 
+// TODO blnunez-
 bool CommandProcessor::parse(const std::string &line, std::string &cmd,
                              std::vector<std::string> &params) {
     return false;
-}
-
-// Run runs this command with the given client/message.
-bool CommandProcessor::run(Server &server, Client &client,
-                           const std::string &line) {
-    std::string              name;
-    std::vector<std::string> params;
-    if (!parse(line, name, params))
-        return false;
-
-    Command &cmd = at(name);
-    if (!client.isRegistered() && !cmd.isUsablePreReg())
-        throw Error(Reply::reply(Reply::ERR_NOTREGISTERED, ""));
-    if (cmd.getRequiresOp() && !client.isOperator())
-        throw Error(Reply::reply(Reply::ERR_NOPRIVILEGES, ""));
-    if (params.size() < cmd.getMinParams())
-        throw Error(Reply::reply(Reply::ERR_NEEDMOREPARAMS, name));
-
-    bool exiting = cmd.handler(server, client, params);
-    // after each command, see if we can send registration to the client
-    if (!exiting && !client.isRegistered()) {
-        exiting = server.tryRegister(client);
-    }
-    return exiting;
 }
 
 // Register all commandsexecutable by a client connected to us.
@@ -66,4 +43,33 @@ void CommandProcessor::registerCommands() {
     add("VERSION", Command(Handlers::version, false, 0));
     add("WHO", Command(Handlers::who, false, 1));
     add("WHOIS", Command(Handlers::whois, false, 1));
+}
+
+// Run runs this command with the given client/message.
+bool CommandProcessor::run(Server &server, Client &client,
+                           const std::string &line) {
+    std::string              name;
+    std::vector<std::string> params;
+    if (!parse(line, name, params))
+        return false;
+
+    Command &cmd = at(name);
+    if (!client.isRegistered() && !cmd.isUsablePreReg())
+        throw Error(Reply::reply(Reply::ERR_NOTREGISTERED, ""));
+    if (cmd.getRequiresOp() && !client.isOperator())
+        throw Error(Reply::reply(Reply::ERR_NOPRIVILEGES, ""));
+    if (params.size() < cmd.getMinParams())
+        throw Error(Reply::reply(Reply::ERR_NEEDMOREPARAMS, name));
+
+    bool exiting = cmd.handler(server, client, params);
+    // after each command, see if we can send registration to the client
+    if (!exiting && !client.isRegistered()) {
+        exiting = server.tryRegister(client);
+    }
+    return exiting;
+}
+
+
+void CommandProcessor::add(const std::string &name, const Command &cmd){
+	commands.insert(std::make_pair(name, cmd));
 }

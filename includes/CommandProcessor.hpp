@@ -20,7 +20,7 @@ class Command {
 
     Command() {};
     Command(Handler h, bool preReg, int minP, bool op = false)
-        : handler(h), usablePreReg(preReg), minParams(minP), requiresOp(op) {};
+        : usablePreReg(preReg), minParams(minP), requiresOp(op), handler(h) {};
 
     bool isUsablePreReg() const {
         return usablePreReg;
@@ -41,7 +41,7 @@ class CommandProcessor {
 
   public:
     void registerCommands();
-    // parser TODO blunez-
+    // parser TODO blnunez-
     bool parse(const std::string &line, std::string &name,
                std::vector<std::string> &params);
     bool run(Server &server, Client &client, const std::string &line);
