@@ -1,15 +1,9 @@
 #include <csignal>
 #include <vector>
+#include <poll.h>
 
 class IRCServer {
   private:
-    volatile static std::sig_atomic_t g_stopServerLoop;
-    static void                       g_handleStopSignals(int signal);
-    std::vector<int>                  _stopSignals;
-    void                              _initSignalHandling();
-    void                              _resetSignalHandling();
-    bool                              _setStopSignals(sighandler_t handler);
-
     std::vector<struct pollfd>        _pollfds;
 
     IRCServer(IRCServer const &other);
@@ -21,7 +15,7 @@ class IRCServer {
 
   public:
     IRCServer();
-    ~IRCServer();
+    // ~IRCServer();
 
     void run();
 };
