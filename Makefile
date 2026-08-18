@@ -1,11 +1,14 @@
 # ---- Library and Project names -----------------------------------------------
 NAME			= ircserv
+DEBUG_NAME		= ircserv_debug
 # BONUS			= ircserv_bonus
+# DEBUG_BONUS	= ircserv_bonus_debug
 
 # ---- Sources & Objects -------------------------------------------------------
 SRC_DIR			= srcs
 INC_DIR			= includes
 BUILD_DIR		= build
+DEBUG_BUILD_DIR	= build_debug
 
 SRCS_ROOT		= main
 
@@ -37,13 +40,14 @@ SRCS			= $(SRCS_ROOT) \
  				  $(addprefix server/, $(SRCS_SERVER))
 
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
-
-# BONUS_OBJS	= $(OBJS:.o=.bonus.o)
+DEBUG_OBJS		= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
+# BONUS_OBJS		= $(OBJS:.o=.bonus.o)
+# DEBUG_BONUS_OBJS	= $(DEBUG_OBJS:.o=.bonus.o)
 
 # ---- Auto-generated header deps ----------------------------------------------
 
-DEPS			= $(OBJS:.o=.d)
-# BONUS_DEPS	= $(BONUS_OBJS:.o=.d)
+DEPS			= $(OBJS:.o=.d) $(DEBUG_OBJS:.o=.d)
+# BONUS_DEPS	= $(BONUS_OBJS:.o=.d) $(DEBUG_BONUS_OBJS:.o=.d)
 
 # ---- Compiler and Flags ------------------------------------------------------
 
@@ -51,6 +55,7 @@ CXX				= c++
 CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
 IFLAGS			= -I$(INC_DIR)
 DFLAGS			= -DDEBUG -g -fsanitize=address
+DEBUG_CXXFLAGS	= $(CXXFLAGS) $(DFLAGS)
 
 # ---- Rules -------------------------------------------------------------------
 
@@ -58,11 +63,9 @@ all: $(NAME)
 
 # bonus: $(BONUS)
 
-debug: CXXFLAGS += $(DFLAGS)
-debug: $(NAME)
+debug: $(DEBUG_NAME)
 
-# debug_bonus: CXXFLAGS += $(DFLAGS)
-# debug_bonus: $(BONUS)
+# debug_bonus: $(DEBUG_BONUS)
 
 # clang-format
 format:
@@ -81,23 +84,37 @@ tidy-all:
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
 
+$(DEBUG_NAME): $(DEBUG_OBJS)
+	$(CXX) $(DEBUG_CXXFLAGS) $(DEBUG_OBJS) -o $@
+
 # $(BONUS): $(BONUS_OBJS)
 # 	$(CXX) $(CXXFLAGS) $(BONUS_OBJS) -o $@
+
+# $(DEBUG_BONUS): $(DEBUG_BONUS_OBJS)
+# 	$(CXX) $(DEBUG_CXXFLAGS) $(DEBUG_BONUS_OBJS) -o $@
 
 $(BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c $< -o $@
 
+$(DEBUG_BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(DEBUG_CXXFLAGS) $(IFLAGS) -MMD -MP -c $< -o $@
+
 # $(BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
 # 	@mkdir -p $(@D)
 # 	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
 
+# $(DEBUG_BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
+# 	@mkdir -p $(@D)
+# 	$(CXX) $(DEBUG_CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
+
 # ---- Cleanup -----------------------------------------------------------------
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(DEBUG_BUILD_DIR)
 
 fclean: clean
-	rm -f $(NAME) $(BONUS)
+	rm -f $(NAME) $(DEBUG_NAME) $(BONUS) $(DEBUG_BONUS)
 
 re: fclean all
 
