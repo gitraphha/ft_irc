@@ -12,7 +12,8 @@ DEBUG_BUILD_DIR	= build_debug
 
 SRCS_ROOT		= main
 
-SRCS_SERVER 	= IRCServer
+SRCS_SERVER 	= IRCServer \
+				SignalHandler
 # 				  Client \
 # 				  Channel
 
