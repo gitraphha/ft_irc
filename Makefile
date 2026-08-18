@@ -12,7 +12,7 @@ DEBUG_BUILD_DIR	= build_debug
 
 SRCS_ROOT		= main
 
-# SRCS_SERVER 	= Server \
+SRCS_SERVER 	= IRCServer
 # 				  Client \
 # 				  Channel
 
@@ -36,8 +36,8 @@ SRCS_ROOT		= main
 # SRCS_BONUS		= DCC \
 # 				  Bot
 
-SRCS			= $(SRCS_ROOT)
-# 				  $(addprefix server/, $(SRCS_SERVER))
+SRCS			= $(SRCS_ROOT) \
+ 				  $(addprefix server/, $(SRCS_SERVER))
 
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
 DEBUG_OBJS		= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
@@ -79,7 +79,7 @@ tidy:
 
 tidy-all:
 	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
-	  | xargs -0 clang-tidy -- $(CXXFLAGS) $(IFLAGS)
+	  | xargs -0 -I {} clang-tidy {} -- $(CXXFLAGS) $(IFLAGS)
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
