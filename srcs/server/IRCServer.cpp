@@ -1,4 +1,5 @@
 #include "server/IRCServer.hpp"
+#include "server/SignalHandler.hpp"
 
 #include <arpa/inet.h>
 #include <csignal>
@@ -7,81 +8,16 @@
 #include <sys/poll.h>
 
 /*
-	Signal handling
-	will be refactored in a separate class
-*/
-volatile std::sig_atomic_t IRCServer::g_stopServerLoop = 0;
-
-/*
-	Signal callback function
-	Will set a static class member to the triggering signal,
-	i.e. != 0, so the state can be used as a bool value directly.
-	Will be refactored in a separate class, and with a more explicit
-	stop state request function
-*/
-void                       IRCServer::g_handleStopSignals(int signal) {
-    g_stopServerLoop = signal;
-}
-
-/*
-	Setup all signal that should trigger the
-	IRCServer to stop.
-*/
-void IRCServer::_initSignalHandling() {
-    g_stopServerLoop = 0;
-    _stopSignals.push_back(SIGINT);
-    _stopSignals.push_back(SIGQUIT);
-    _stopSignals.push_back(SIGTERM);
-
-    if (!_setStopSignals(g_handleStopSignals))
-        throw std::runtime_error("std::signal failed");
-}
-
-/*
-	Reset all signal that should trigger the
-	IRCServer to stop to the default on server exit.
-*/
-void IRCServer::_resetSignalHandling() {
-    _setStopSignals(SIG_DFL);
-}
-
-/*
-	Helper function to actually set the signal behaviour
-	on system level using sigaction, as this is the most
-	portable POSIX compliant way to do it.
-*/
-bool IRCServer::_setStopSignals(sighandler_t handler) {
-    bool             success = true;
-
-    struct sigaction sigact = {};
-    sigact.sa_handler = handler;
-    sigemptyset(&sigact.sa_mask);
-    sigact.sa_flags = 0;
-
-    for (size_t i = 0; i < _stopSignals.size(); ++i)
-        if (sigaction(_stopSignals.at(i), &sigact, NULL) != 0)
-            success = false;
-
-    return success;
-}
-
-/*
 	IRCServer Constructor
-		* setup signal handling
-		* ...
+	* ...
 */
-IRCServer::IRCServer() {
-    _initSignalHandling();
-}
+IRCServer::IRCServer() {}
 
-/*
-	IRCServer Destructor
-		* reset signal handling to default
-		* ...
-*/
-IRCServer::~IRCServer() {
-    _resetSignalHandling();
-}
+// /*
+// 	IRCServer Destructor
+// 		* ...
+// */
+// IRCServer::~IRCServer() {}
 
 /*
 	Dummy function to get a usable server socket
@@ -176,7 +112,7 @@ void IRCServer::_disconnectClient(size_t const idx) {
 void IRCServer::run() {
     _createServerSocket();
 
-    while (!g_stopServerLoop) {
+    while (!SignalHandler::stopLoopSignalReceived()) {
         sleep(1);
 
         int pollResult = poll(_pollfds.data(), _pollfds.size(), 0);
@@ -230,5 +166,4 @@ void IRCServer::run() {
     while (!_pollfds.empty()) {
         _disconnectClient(_pollfds.size() - 1);
     }
-    std::cout << "caught signal: " << g_stopServerLoop << "." << std::endl;
 }
