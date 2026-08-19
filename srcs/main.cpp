@@ -43,8 +43,8 @@ int main(int argc, char **argv) {
         return (1);
 
     try {
-		SignalHandler sigHandler;
-        IRCServer srv;
+        SignalHandler sigHandler;
+        IRCServer     srv;
         srv.run();
     } catch (std::exception const &e) {
         std::cerr << e.what() << std::endl;
