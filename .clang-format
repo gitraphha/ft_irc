@@ -1,0 +1,16 @@
+# LLVM style
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++03
+
+IndentWidth: 4
+ColumnLimit: 80
+IndentCaseLabels: true
+AllowShortFunctionsOnASingleLine: Empty
+AlignConsecutiveDeclarations: AcrossEmptyLinesAndComments
+SeparateDefinitionBlocks: Always
+ReflowComments: false
+
+# Include organization
+SortIncludes: true
+IncludeBlocks: Regroup
