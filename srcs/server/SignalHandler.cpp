@@ -20,8 +20,8 @@ volatile std::sig_atomic_t SignalHandler::g_stopServerLoop = 0;
 	stop state request function
 */
 void                       SignalHandler::g_handleStopSignals(int signal) {
-	std::cout << "Caught stop signal: " << g_stopServerLoop << "." << std::endl;
     g_stopServerLoop = signal;
+    std::cout << "Caught stop signal: " << g_stopServerLoop << "." << std::endl;
 }
 
 /*
