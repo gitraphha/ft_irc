@@ -1,4 +1,5 @@
 #include "server/IRCServer.hpp"
+
 #include "server/SignalHandler.hpp"
 
 #include <arpa/inet.h>
@@ -43,6 +44,7 @@ int IRCServer::_createServerSocket() {
     // listen
     listen(serverSocket, 100);
     _pollfds.resize(1);
+    _userInputBuffer.resize(1);
     _pollfds[0].fd = serverSocket;
     _pollfds[0].events = POLLIN; // Monitor for incoming connections
 
@@ -75,6 +77,7 @@ void IRCServer::_acceptClient() {
     clientPollfd.events = POLLIN;
     clientPollfd.revents = 0;
     _pollfds.push_back(clientPollfd);
+    _userInputBuffer.push_back(std::string());
     std::cout << "Client connected, fd: " << clientFd << std::endl;
 }
 
@@ -98,6 +101,7 @@ void IRCServer::_disconnectClient(size_t const idx) {
                   << " clients remaining)" << std::endl;
     close(pfd.fd);
     _pollfds.erase(_pollfds.begin() + idx);
+    _userInputBuffer.erase(_userInputBuffer.begin() + idx);
 }
 
 /*
@@ -113,7 +117,7 @@ void IRCServer::run() {
     _createServerSocket();
 
     while (!SignalHandler::stopLoopSignalReceived()) {
-        sleep(1);
+        usleep(100);
 
         int pollResult = poll(_pollfds.data(), _pollfds.size(), 0);
         if (pollResult == -1) {
@@ -136,16 +140,55 @@ void IRCServer::run() {
             if (pfd.revents & POLLERR) {
                 std::cerr << "Client socket error on fd: " << pfd.fd
                           << std::endl;
-                // Do we need to disconnect directly in this case? Maybe not.
                 _disconnectClient(idx);
             } else if (pfd.revents & POLLIN) {
-                char buffer[1024] = "";
-                int  bytesRead = read(pfd.fd, buffer, 1024);
-                // for mockup only,
-                // this functionality will go to its own function of course
+                char buffer[BUFFLEN];
+                int  bytesRead = recv(pfd.fd, buffer, BUFFLEN, 0);
+
                 if (bytesRead > 0) {
-                    std::cout << "Buffer read from client " << idx << ": \n"
-                              << std::string(buffer) << std::endl;
+                    std::string &userInput = _userInputBuffer.at(idx);
+                    std::string  bufferStr(buffer, bytesRead);
+                    // bool         userInputValid = false;
+
+                    // // DEBUG for cont'd messages
+                    // if (!userInput.empty() && *userInput.rbegin() != '\r') {
+                    //     *userInput.rbegin() = '&';
+                    // }
+                    userInput += bufferStr;
+                    size_t lfcrPos = userInput.find("\r\n");
+                    if (userInput.length() >= MAXMSGLEN) {
+                        if (lfcrPos > MAXMSGLEN - 2) {
+                            std::cerr << "Client data error: message too "
+                                         "long.\nData sent will be discarded."
+                                      << std::endl;
+                            while (bytesRead > 0)
+                                bytesRead = recv(pfd.fd, buffer, BUFFLEN, 0);
+                            userInput.clear();
+                            continue;
+                        }
+                    } else if (lfcrPos == std::string::npos) {
+                        continue;
+                    } else if (lfcrPos < userInput.length() - 2) {
+                        std::cerr << "Client data error: message "
+                                     "malformed, data after CR-LF.\nExtraneous "
+                                     "data will be discarded."
+                                  << std::endl;
+                        userInput.resize(lfcrPos + 2);
+                    }
+                    // if (lfcrPos == userInput.length() - 2)
+                    //     userInputValid = true;
+                    // else {
+                    //     std::cerr << "What's going on here?" << std::endl;
+                    //     // userInput += bufferStr.substr(0, lfcrPos + 2);
+                    // }
+                    // if (userInputValid)
+                    {
+                        std::cout << "UserInput read from client " << idx
+                                  << ": \n"
+                                  << std::string(userInput) /* << std::endl */;
+                        userInput.clear();
+                    }
+                    // }
                 }
                 if (bytesRead <= 0) {
                     // Comment will be deleted later, kept for reference for now
