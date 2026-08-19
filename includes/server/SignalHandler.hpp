@@ -16,5 +16,5 @@ class SignalHandler {
   public:
     SignalHandler();
     ~SignalHandler();
-  static bool stopLoopSignalReceived();	
+    static bool stopLoopSignalReceived();
 };
