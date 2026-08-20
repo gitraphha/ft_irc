@@ -7,16 +7,16 @@
 // draft: to be completed by blnunez-
 
 class ClientManager {
-    std::map<std::string, Client *> clients;
-    std::map<int, std::string>      fdNick;
+    std::map<std::string, Client *> clients_;
+    std::map<int, std::string>      fdNick_;
 
     std::map<std::string, Client *>::iterator
-    findClient(const std::string &name);
+    findClient_(const std::string &name);
     std::map<std::string, Client *>::const_iterator
-    findClient(const std::string &name) const;
+    findClient_(const std::string &name) const;
 
-    std::map<int, std::string>::iterator       findClient(int fd);
-    std::map<int, std::string>::const_iterator findClient(int fd) const;
+    std::map<int, std::string>::iterator       findClient_(int fd);
+    std::map<int, std::string>::const_iterator findClient_(int fd) const;
 
     // prevent copy and copy assignment
     ClientManager(const ClientManager &);

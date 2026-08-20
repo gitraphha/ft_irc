@@ -15,9 +15,9 @@
  * Subtract 65 from the mode and use that bit of the uint32_t to represent it.
 */
 class ModeSet {
-    uint32_t    modes[2];
+    uint32_t    modes_[2];
 
-    static void indexAndMask(int mode, uint32_t &index, uint32_t &mask) {
+    static void indexAndMask_(int mode, uint32_t &index, uint32_t &mask) {
         uint32_t position = (uint32_t)mode - MIN_MODE;
         index = position / 32;
         uint32_t bit = position % 32;

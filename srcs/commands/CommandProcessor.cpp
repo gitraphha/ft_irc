@@ -5,9 +5,9 @@
 #include "Handlers.hpp"
 #include "Server.hpp"
 
-Command &CommandProcessor::at(const std::string &name) {
-    std::map<std::string, Command>::iterator it = commands.find(name);
-    if (it == commands.end())
+Command &CommandProcessor::at_(const std::string &name) {
+    std::map<std::string, Command>::iterator it = commands_.find(name);
+    if (it == commands_.end())
         throw Error(Reply::reply(Reply::ERR_UNKNOWNCOMMAND, name));
     return it->second;
 }
@@ -53,7 +53,7 @@ bool CommandProcessor::run(Server &server, Client &client,
     if (!parse(line, name, params))
         return false;
 
-    Command &cmd = at(name);
+    Command &cmd = at_(name);
     if (!client.isRegistered() && !cmd.isUsablePreReg())
         throw Error(Reply::reply(Reply::ERR_NOTREGISTERED, ""));
     if (cmd.getRequiresOp() && !client.isOperator())
@@ -70,5 +70,5 @@ bool CommandProcessor::run(Server &server, Client &client,
 }
 
 void CommandProcessor::add(const std::string &name, const Command &cmd) {
-    commands.insert(std::make_pair(name, cmd));
+    commands_.insert(std::make_pair(name, cmd));
 }

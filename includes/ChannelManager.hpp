@@ -5,12 +5,12 @@
 #include <map>
 
 class ChannelManager {
-    std::map<std::string, Channel> channels;
+    std::map<std::string, Channel> channels_;
 
     std::map<std::string, Channel>::iterator
-    findChannel(const std::string &name);
+    findChannel_(const std::string &name);
     std::map<std::string, Channel>::const_iterator
-    findChannel(const std::string &name) const;
+    findChannel_(const std::string &name) const;
 
   public:
     ChannelManager();

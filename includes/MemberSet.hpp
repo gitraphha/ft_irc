@@ -12,7 +12,7 @@
 */
 
 class MemberSet {
-    std::map<Client *, ModeSet> members;
+    std::map<Client *, ModeSet> members_;
 
   public:
     MemberSet() {};

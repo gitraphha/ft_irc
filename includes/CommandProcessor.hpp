@@ -11,33 +11,34 @@ typedef bool (*Handler)(Server &server, Client &client,
                         std::vector<std::string> &params);
 
 class Command {
-    bool usablePreReg;
-    int  minParams;
-    bool requiresOp;
+    bool usablePreReg_;
+    int  minParams_;
+    bool requiresOp_;
 
   public:
     Handler handler;
 
     Command() {};
     Command(Handler h, bool preReg, int minP, bool op = false)
-        : usablePreReg(preReg), minParams(minP), requiresOp(op), handler(h) {};
+        : usablePreReg_(preReg), minParams_(minP), requiresOp_(op),
+          handler(h) {};
 
     bool isUsablePreReg() const {
-        return usablePreReg;
+        return usablePreReg_;
     }
 
     int getMinParams() const {
-        return minParams;
+        return minParams_;
     }
 
     bool getRequiresOp() const {
-        return requiresOp;
+        return requiresOp_;
     }
 };
 
 class CommandProcessor {
-    std::map<std::string, Command> commands;
-    Command                       &at(const std::string &name);
+    std::map<std::string, Command> commands_;
+    Command                       &at_(const std::string &name);
 
   public:
     void registerCommands();

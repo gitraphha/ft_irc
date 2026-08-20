@@ -1,16 +1,16 @@
 #include "ModeSet.hpp"
 
 ModeSet::ModeSet() {
-    modes[0] = 0;
-    modes[1] = 0;
+    modes_[0] = 0;
+    modes_[1] = 0;
 }
 
 bool ModeSet::has(int mode) const {
     if (mode < MIN_MODE || mode > MAX_MODE)
         return false;
     uint32_t index, mask;
-    indexAndMask(mode, index, mask);
-    return (modes[index] & mask) != 0;
+    indexAndMask_(mode, index, mask);
+    return (modes_[index] & mask) != 0;
 }
 
 bool ModeSet::hasAtLeast(const ModeSet &modes) const {
@@ -26,16 +26,16 @@ bool ModeSet::set(int mode, bool on) {
     if (mode < MIN_MODE || mode > MAX_MODE)
         return false;
     uint32_t index, mask;
-    indexAndMask(mode, index, mask);
+    indexAndMask_(mode, index, mask);
     uint32_t desired;
-    uint32_t current = modes[index];
+    uint32_t current = modes_[index];
     if (on)
         desired = current | mask;
     else
         desired = current & (~mask);
     if (current == desired)
         return false;
-    modes[index] = desired;
+    modes_[index] = desired;
     return true;
 }
 

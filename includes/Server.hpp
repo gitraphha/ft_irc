@@ -9,11 +9,11 @@
 #define SERVER_NAME "irc.local"
 
 class Server {
-    ChannelManager   channels;
-    ClientManager    clients;
-    CommandProcessor cmds;
-    int              port;
-    std::string      password;
+    ChannelManager   channels_;
+    ClientManager    clients_;
+    CommandProcessor cmds_;
+    int              port_;
+    std::string      password_;
 
   public:
     Server(int port, const std::string &password);

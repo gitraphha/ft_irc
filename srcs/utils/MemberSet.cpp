@@ -14,41 +14,41 @@ MemberSet::MemberSet(Client *client, const ModeSet &modes) {
 
 // caller should add key before calling
 void MemberSet::add(Client *client, const ModeSet &modes) {
-    members.insert(std::make_pair(client, modes));
+    members_.insert(std::make_pair(client, modes));
 }
 
 void MemberSet::remove(Client *client) {
-    std::map<Client *, ModeSet>::iterator it = members.find(client);
-    if (it != members.end())
-        members.erase(it);
+    std::map<Client *, ModeSet>::iterator it = members_.find(client);
+    if (it != members_.end())
+        members_.erase(it);
 }
 
 void MemberSet::setModes(Client *client, const ModeSet &modes) {
-    std::map<Client *, ModeSet>::iterator it = members.find(client);
-    if (it == members.end())
+    std::map<Client *, ModeSet>::iterator it = members_.find(client);
+    if (it == members_.end())
         add(client, modes);
     else
         it->second = modes;
 }
 
 size_t MemberSet::size() const {
-    return members.size();
+    return members_.size();
 }
 
 bool MemberSet::has(Client *client) const {
-    return (members.find(client) != members.end());
+    return (members_.find(client) != members_.end());
 }
 
 bool MemberSet::hasAtLeast(Client *client, const ModeSet &modes) const {
-    std::map<Client *, ModeSet>::const_iterator it = members.find(client);
-    if (it == members.end())
+    std::map<Client *, ModeSet>::const_iterator it = members_.find(client);
+    if (it == members_.end())
         return false;
     return it->second.hasAtLeast(modes);
 }
 
 void MemberSet::send(const std::string &msg, const Client *skip) const {
-    std::map<Client *, ModeSet>::const_iterator it = members.begin();
-    for (; it != members.end(); it++) {
+    std::map<Client *, ModeSet>::const_iterator it = members_.begin();
+    for (; it != members_.end(); it++) {
         if (it->first && skip != it->first)
             it->first->send(msg);
     }

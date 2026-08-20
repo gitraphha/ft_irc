@@ -23,16 +23,16 @@ class Client;
 */
 
 class Channel {
-    std::string name;
-    std::string nameCaseFolded;
-    ModeSet     modes;
-    MemberSet   members;
-    std::string key;
-    ssize_t     userLimit;
-    std::time_t createdTime;
-    std::string topic;
-    std::string topicSetBy;
-    std::time_t topicSetTime;
+    std::string name_;
+    std::string nameCaseFolded_;
+    ModeSet     modes_;
+    MemberSet   members_;
+    std::string key_;
+    ssize_t     userLimit_;
+    std::time_t createdTime_;
+    std::string topic_;
+    std::string topicSetBy_;
+    std::time_t topicSetTime_;
 
   public:
     Channel(const std::string &name, const std::string &nameCaseFolded,
