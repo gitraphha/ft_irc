@@ -21,31 +21,29 @@
 #include <string>
 
 class Error : public std::exception {
-    bool           _hasReply;
-    Reply::Message _reply;
-    std::string    _what;
+    bool           hasReply_;
+    Reply::Message reply_;
+    std::string    what_;
 
   public:
     // A protocol error: carry a numeric reply to send back to the client.
     explicit Error(const Reply::Message &reply)
-        : _hasReply(true), _reply(reply), _what(reply.body) {}
+        : hasReply_(true), reply_(reply), what_(reply.body) {}
 
     // An internal error: no numeric reply is sent, what() is used for logging.
     explicit Error(const std::string &message)
-        : _hasReply(false), _what(message) {}
-
-    virtual ~Error() throw() {}
+        : hasReply_(false), what_(message) {}
 
     virtual const char *what() const throw() {
-        return _what.c_str();
+        return what_.c_str();
     }
 
     bool hasReply() const {
-        return _hasReply;
+        return hasReply_;
     }
 
     // Only valid when hasReply() is true.
     const Reply::Message &reply() const {
-        return _reply;
+        return reply_;
     }
 };
