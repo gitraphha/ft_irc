@@ -39,9 +39,9 @@ static std::string getDomainStr(int const domain) {
 }
 
 static int sockAddrFamily(int const socketFd) {
-    struct sockaddr sockAddr;
+    struct sockaddr sockAddr = {};
     socklen_t       sockLen = sizeof(sockAddr);
-    if (getsockname(socketFd, &sockAddr, &sockLen) != 0)
+    if (getsockname(socketFd, &sockAddr, &sockLen) != 0) // NOLINT
         throw;
     return sockAddr.sa_family;
 }
@@ -54,7 +54,7 @@ static void setSocketNonBlock(int const socketFd) {
             getDomainStr(domain) + " !");
 }
 
-static void setSocketAddr(int const socketFd, int const port,
+static void setSocketAddr(int const socketFd, int const port, // NOLINT
                           socketAddrX &sockAddrIn46, socklen_t &sockLen) {
     int domain = sockAddrFamily(socketFd);
 
@@ -73,32 +73,14 @@ static void setSocketAddr(int const socketFd, int const port,
     }
 }
 
-static void bindServerSocket(int const socketFd, int const domain,
+static void bindServerSocket(int const socketFd, int const domain, // NOLINT
                              int const port) {
-    // struct sockaddr    *serverSockaddr = 0;
-    // socklen_t           socklen = 0;
-    // struct sockaddr_in  serverAddr4 = {};
-    // struct sockaddr_in6 serverAddr6 = {};
-    // if (domain == AF_INET) {
-    //     serverAddr4.sin_family = AF_INET;
-    //     serverAddr4.sin_addr.s_addr = INADDR_ANY;
-    //     serverAddr4.sin_port = htons(port);
-    //     serverSockaddr =
-    //         reinterpret_cast<struct sockaddr *>(&serverAddr4); // NOLINT
-    //     socklen = sizeof(serverAddr4);
-    // } else if (domain == AF_INET6) {
-    //     serverAddr6.sin6_family = AF_INET;
-    //     serverAddr6.sin6_addr = in6addr_any;
-    //     serverAddr6.sin6_port = htons(port);
-    //     serverSockaddr =
-    //         reinterpret_cast<struct sockaddr *>(&serverAddr6); // NOLINT
-    //     socklen = sizeof(serverAddr6);
-    // }
-    socketAddrX sockAddrIn46;
-    socklen_t   sockLen;
+    socketAddrX sockAddrIn46 = {};
+    socklen_t   sockLen = 0;
     setSocketAddr(socketFd, port, sockAddrIn46, sockLen);
 
-    if (bind(socketFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46),
+    if (bind(socketFd,
+             reinterpret_cast<struct sockaddr *>(&sockAddrIn46), // NOLINT
              sockLen) < 0)
         throw std::runtime_error("Error while binding server socket for " +
                                  getDomainStr(domain) + " !");
@@ -159,14 +141,17 @@ int IRCServer::createServerSocket_(int const domain) {
 void IRCServer::acceptClient_(int const serverFd) {
     socketAddrX sockAddrIn46 = {};
     socklen_t   sockLen = 0;
+
     setSocketAddr(serverFd, 0, sockAddrIn46, sockLen);
 
-    int const clientFd =
-        accept(serverFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46),
-               &sockLen); // NOLINT
-    if (clientFd == -1)
-        //throw ??
-        ;
+    int const clientFd = accept(
+        serverFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46), // NOLINT
+        &sockLen);
+    if (clientFd == -1) {
+        // throw -> no everything else can still run w/o problems
+        // silent return -> cannot sent anything to client without working socket anyways...
+        return;
+    }
 
     setSocketNonBlock(clientFd);
 
@@ -178,28 +163,28 @@ void IRCServer::acceptClient_(int const serverFd) {
     if (sockAddrIn46.sai4.sin_family == AF_INET) {
         std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai4.sin_family)
                   << "\n addr:port: ";
-        uint8_t *addrData =
-            reinterpret_cast<uint8_t *>(&sockAddrIn46.sai4.sin_addr.s_addr);
+        uint8_t *addrData = reinterpret_cast<uint8_t *>(
+            &sockAddrIn46.sai4.sin_addr.s_addr); // NOLINT
         for (size_t idx = 0;
              idx < sizeof(sockAddrIn46.sai4.sin_addr) / sizeof(uint8_t);
              ++idx) {
             if (idx > 0)
                 std::cout << ".";
-            std::cout << std::dec << static_cast<int>(addrData[idx]);
+            std::cout << std::dec << static_cast<int>(addrData[idx]); // NOLINT
         }
         std::cout << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
                   << std::endl;
     } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
         std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai6.sin6_family)
                   << "\n addr:port: [";
-        uint8_t *addrData =
-            reinterpret_cast<uint8_t *>(&sockAddrIn46.sai6.sin6_addr.s6_addr);
+        uint8_t *addrData = reinterpret_cast<uint8_t *>(
+            &sockAddrIn46.sai6.sin6_addr.s6_addr); // NOLINT
         for (size_t idx = 0;
              idx < sizeof(sockAddrIn46.sai6.sin6_addr) / sizeof(uint8_t);
              ++idx) {
             if (idx > 0 && idx % 4 == 0)
                 std::cout << ":";
-            std::cout << std::hex << static_cast<int>(addrData[idx]);
+            std::cout << std::hex << static_cast<int>(addrData[idx]); // NOLINT
         }
 
         std::cout << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
@@ -254,6 +239,7 @@ void IRCServer::run() {
 
         int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
         if (pollResult == -1) {
+            throw;
             // nice error message and exit the loop
             // or throw, but then have ressource cleanup after catch
             break;
