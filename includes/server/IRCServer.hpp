@@ -4,21 +4,24 @@
 
 #define BUFFLEN 516
 #define MAXMSGLEN 512
+#define MAX_CONNECTIONS 512
 
 class IRCServer {
   private:
-    std::vector<struct pollfd> _pollfds;
-    std::vector<std::string>   _userInputBuffer;
+    int                        port_;
+    std::string                password_;
+    std::vector<struct pollfd> pollFds_;
+    std::vector<std::string>   userInputBuffer_;
 
-    IRCServer(IRCServer const &other);
-    IRCServer &operator=(IRCServer const &other);
+    // IRCServer(IRCServer const &other);
+    // IRCServer &operator=(IRCServer const &other);
 
-    int        _createServerSocket();
-    void       _acceptClient();
-    void       _disconnectClient(size_t const idx);
+    int                        createServerSocket_(int const domain);
+    void                       acceptClient_();
+    void                       disconnectClient_(size_t const idx);
 
   public:
-    IRCServer();
+    IRCServer(int const port, std::string const &password);
     // ~IRCServer();
 
     void run();
