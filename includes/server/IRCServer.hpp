@@ -1,3 +1,4 @@
+#include <netinet/in.h>
 #include <poll.h>
 #include <string>
 #include <vector>
@@ -10,14 +11,16 @@ class IRCServer {
   private:
     int                        port_;
     std::string                password_;
+
+    size_t                     numServerSockets_;
     std::vector<struct pollfd> pollFds_;
-    std::vector<std::string>   userInputBuffer_;
+    std::vector<std::string>   clientInputBuffers_;
 
     // IRCServer(IRCServer const &other);
     // IRCServer &operator=(IRCServer const &other);
 
     int                        createServerSocket_(int const domain);
-    void                       acceptClient_();
+    void                       acceptClient_(int const serverFd);
     void                       disconnectClient_(size_t const idx);
 
   public:
@@ -26,3 +29,8 @@ class IRCServer {
 
     void run();
 };
+
+typedef union uSocketAddrX {
+    struct sockaddr_in  sai4;
+    struct sockaddr_in6 sai6;
+} socketAddrX;
