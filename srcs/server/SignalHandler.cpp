@@ -10,7 +10,7 @@
 	Signal handling
 	will be refactored in a separate class
 */
-volatile std::sig_atomic_t SignalHandler::g_stopServerLoop = 0;
+volatile std::sig_atomic_t SignalHandler::stopServerLoop_ = 0;
 
 /*
 	Signal callback function
@@ -19,9 +19,9 @@ volatile std::sig_atomic_t SignalHandler::g_stopServerLoop = 0;
 	Will be refactored in a separate class, and with a more explicit
 	stop state request function
 */
-void                       SignalHandler::g_handleStopSignals(int signal) {
-	std::cout << "Caught stop signal: " << g_stopServerLoop << "." << std::endl;
-    g_stopServerLoop = signal;
+void                       SignalHandler::handleStopSignals_(int signal) {
+    stopServerLoop_ = signal;
+    std::cout << "Caught stop signal: " << stopServerLoop_ << "." << std::endl;
 }
 
 /*
@@ -29,7 +29,7 @@ void                       SignalHandler::g_handleStopSignals(int signal) {
 	on system level using sigaction, as this is the most
 	portable POSIX compliant way to do it.
 */
-bool SignalHandler::_setStopSignals(sighandler_t handler) {
+bool SignalHandler::setStopSignals_(sighandler_t handler) {
     bool             success = true;
 
     struct sigaction sigact = {};
@@ -37,8 +37,8 @@ bool SignalHandler::_setStopSignals(sighandler_t handler) {
     sigemptyset(&sigact.sa_mask);
     sigact.sa_flags = 0;
 
-    for (size_t i = 0; success && i < _stopSignals.size(); ++i)
-        if (sigaction(_stopSignals.at(i), &sigact, NULL) != 0)
+    for (size_t i = 0; success && i < stopSignals_.size(); ++i)
+        if (sigaction(stopSignals_.at(i), &sigact, NULL) != 0)
             success = false;
 
     return success;
@@ -49,12 +49,12 @@ bool SignalHandler::_setStopSignals(sighandler_t handler) {
 		* setup signal handling
 */
 SignalHandler::SignalHandler() {
-    g_stopServerLoop = 0;
-    _stopSignals.push_back(SIGINT);
-    _stopSignals.push_back(SIGQUIT);
-    _stopSignals.push_back(SIGTERM);
+    stopServerLoop_ = 0;
+    stopSignals_.push_back(SIGINT);
+    stopSignals_.push_back(SIGQUIT);
+    stopSignals_.push_back(SIGTERM);
 
-    if (!_setStopSignals(g_handleStopSignals))
+    if (!setStopSignals_(handleStopSignals_))
         throw std::runtime_error("std::signal failed");
 }
 
@@ -63,9 +63,9 @@ SignalHandler::SignalHandler() {
 		* reset signal handling to default
 */
 SignalHandler::~SignalHandler() {
-    _setStopSignals(SIG_DFL);
+    setStopSignals_(SIG_DFL);
 }
 
 bool SignalHandler::stopLoopSignalReceived() {
-    return (g_stopServerLoop > 0);
+    return (stopServerLoop_ > 0);
 }
