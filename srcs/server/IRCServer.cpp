@@ -8,7 +8,6 @@
 #include <exception>
 #include <fcntl.h>
 #include <iostream>
-// #include <map>
 #include <string>
 #include <sys/poll.h>
 
@@ -17,7 +16,7 @@
 	* set port and password from command line args
 */
 IRCServer::IRCServer(int const port, std::string const &password)
-    : port_(port), password_(password) {}
+    : port_(port), password_(password), numServerSockets_(0) {}
 
 // /*
 // 	IRCServer Destructor
@@ -39,41 +38,81 @@ static std::string getDomainStr(int const domain) {
     return "";
 }
 
-static void storeServerSocket(int const sock, std::vector<struct pollfd> &pFds,
-                              std::vector<std::string> &usrInBuff) {
-    pollfd pfd = {};
-    pfd.fd = sock;
-    pfd.events = POLLIN; // Monitor for incoming connections
+static int sockAddrFamily(int const socketFd) {
+    struct sockaddr sockAddr;
+    socklen_t       sockLen = sizeof(sockAddr);
+    if (getsockname(socketFd, &sockAddr, &sockLen) != 0)
+        throw;
+    return sockAddr.sa_family;
+}
 
-    pFds.push_back(pfd);
-    usrInBuff.push_back(std::string());
+static void setSocketNonBlock(int const socketFd) {
+    int const domain = sockAddrFamily(socketFd);
+    if (fcntl(socketFd, F_SETFL, O_NONBLOCK) != 0) // NOLINT
+        throw std::runtime_error(
+            "Error while setting socket to NON-BLOCKING for " +
+            getDomainStr(domain) + " !");
+}
+
+static void setSocketAddr(int const socketFd, int const port,
+                          socketAddrX &sockAddrIn46, socklen_t &sockLen) {
+    int domain = sockAddrFamily(socketFd);
+
+    if (domain == AF_INET) {
+        struct sockaddr_in &clientSockAddrIn4 = sockAddrIn46.sai4;
+        clientSockAddrIn4.sin_family = AF_INET;
+        clientSockAddrIn4.sin_addr.s_addr = INADDR_ANY;
+        clientSockAddrIn4.sin_port = htons(port);
+        sockLen = sizeof(clientSockAddrIn4);
+    } else if (domain == AF_INET6) {
+        struct sockaddr_in6 &clientSockAddrIn6 = sockAddrIn46.sai6;
+        clientSockAddrIn6.sin6_family = AF_INET6;
+        clientSockAddrIn6.sin6_addr = in6addr_any;
+        clientSockAddrIn6.sin6_port = htons(port);
+        sockLen = sizeof(clientSockAddrIn6);
+    }
 }
 
 static void bindServerSocket(int const socketFd, int const domain,
                              int const port) {
-    struct sockaddr    *serverSockaddr = 0;
-    socklen_t           socklen = 0;
-    struct sockaddr_in  serverAddr4 = {};
-    struct sockaddr_in6 serverAddr6 = {};
+    // struct sockaddr    *serverSockaddr = 0;
+    // socklen_t           socklen = 0;
+    // struct sockaddr_in  serverAddr4 = {};
+    // struct sockaddr_in6 serverAddr6 = {};
+    // if (domain == AF_INET) {
+    //     serverAddr4.sin_family = AF_INET;
+    //     serverAddr4.sin_addr.s_addr = INADDR_ANY;
+    //     serverAddr4.sin_port = htons(port);
+    //     serverSockaddr =
+    //         reinterpret_cast<struct sockaddr *>(&serverAddr4); // NOLINT
+    //     socklen = sizeof(serverAddr4);
+    // } else if (domain == AF_INET6) {
+    //     serverAddr6.sin6_family = AF_INET;
+    //     serverAddr6.sin6_addr = in6addr_any;
+    //     serverAddr6.sin6_port = htons(port);
+    //     serverSockaddr =
+    //         reinterpret_cast<struct sockaddr *>(&serverAddr6); // NOLINT
+    //     socklen = sizeof(serverAddr6);
+    // }
+    socketAddrX sockAddrIn46;
+    socklen_t   sockLen;
+    setSocketAddr(socketFd, port, sockAddrIn46, sockLen);
 
-    if (domain == AF_INET) {
-        serverAddr4.sin_family = AF_INET;
-        serverAddr4.sin_addr.s_addr = INADDR_ANY;
-        serverAddr4.sin_port = htons(port);
-        serverSockaddr =
-            reinterpret_cast<struct sockaddr *>(&serverAddr4); // NOLINT
-        socklen = sizeof(serverAddr4);
-    } else if (domain == AF_INET6) {
-        serverAddr6.sin6_family = AF_INET;
-        serverAddr6.sin6_addr = in6addr_any;
-        serverAddr6.sin6_port = htons(port);
-        serverSockaddr =
-            reinterpret_cast<struct sockaddr *>(&serverAddr6); // NOLINT
-        socklen = sizeof(serverAddr6);
-    }
-    if (bind(socketFd, serverSockaddr, socklen) < 0)
+    if (bind(socketFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46),
+             sockLen) < 0)
         throw std::runtime_error("Error while binding server socket for " +
                                  getDomainStr(domain) + " !");
+}
+
+static void storeServerSocket(int const                   socketFd,
+                              std::vector<struct pollfd> &pFds,
+                              std::vector<std::string>   &usrInBuff) {
+    pollfd pfd = {};
+    pfd.fd = socketFd;
+    pfd.events = POLLIN; // Monitor for incoming connections
+
+    pFds.push_back(pfd);
+    usrInBuff.push_back(std::string());
 }
 
 int IRCServer::createServerSocket_(int const domain) {
@@ -92,10 +131,7 @@ int IRCServer::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while setting socket options for " +
                                  getDomainStr(domain) + " !");
 
-    if (fcntl(socketFd, F_SETFL, O_NONBLOCK) != 0) // NOLINT
-        throw std::runtime_error(
-            "Error while setting socket to NON-BLOCKING for " +
-            getDomainStr(domain) + " !");
+    setSocketNonBlock(socketFd);
 
     bindServerSocket(socketFd, domain, port_);
 
@@ -103,7 +139,8 @@ int IRCServer::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while listening on socket for " +
                                  getDomainStr(domain) + " !");
 
-    storeServerSocket(socketFd, pollFds_, userInputBuffer_);
+    storeServerSocket(socketFd, pollFds_, clientInputBuffers_);
+    ++numServerSockets_;
 
     return socketFd;
 }
@@ -114,29 +151,44 @@ int IRCServer::createServerSocket_(int const domain) {
 	Implementation explicitely not exhaustive,
 	will be replaced by an "official" version anyways.
 */
-void IRCServer::acceptClient_() {
-    int                clientFd = 0;
-    struct pollfd      clientPollfd = {};
-    struct sockaddr_in clientAI = {};
-    socklen_t          aiSize = sizeof(clientAI);
+void IRCServer::acceptClient_(int const serverFd) {
+    socketAddrX sockAddrIn46;
+    socklen_t   sockLen;
+    setSocketAddr(serverFd, 0, sockAddrIn46, sockLen);
 
-    // accept4, so we can directly set SOCK_NONBLOCK
-    // the subject allows fcntl only on macOS
-    clientFd = accept4(pollFds_.front().fd,
-                       reinterpret_cast<struct sockaddr *>(&clientAI),
-                       &aiSize, // NOLINT
-                       SOCK_NONBLOCK);
+    int const clientFd =
+        accept(serverFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46),
+               &sockLen); // NOLINT
+    if (clientFd == -1)
+        //throw ??
+        ;
 
-    if (clientFd == -1) {
-        std::cerr << "Accept failed." << std::endl;
-        return;
-    }
+    setSocketNonBlock(clientFd);
+
+    pollfd clientPollfd = {};
     clientPollfd.fd = clientFd;
     clientPollfd.events = POLLIN;
-    clientPollfd.revents = 0;
     pollFds_.push_back(clientPollfd);
-    userInputBuffer_.push_back(std::string());
-    std::cout << "Client connected, fd: " << clientFd << std::endl;
+    clientInputBuffers_.push_back(std::string());
+    std::cout << "Client connected:\n"
+              << " fd: " << clientFd;
+    if (sockAddrIn46.sai4.sin_family == AF_INET)
+        std::cout << "\n AF: " << sockAddrIn46.sai4.sin_family
+                  << "\n addr:port: " << sockAddrIn46.sai4.sin_addr.s_addr
+                  << ":" << sockAddrIn46.sai4.sin_port << std::endl;
+    else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
+        std::cout << "\n AF: " << sockAddrIn46.sai6.sin6_family
+                  << "\n addr:port: [";
+        for (size_t idx = 0;
+             idx < sizeof(sockAddrIn46.sai6.sin6_addr) / sizeof(uint8_t);
+             ++idx) {
+            if (idx > 0 && idx % 4 == 0)
+                std::cout << ":";
+            std::cout << std::hex << sockAddrIn46.sai6.sin6_addr.s6_addr[idx];
+        }
+
+        std::cout << "]:" << sockAddrIn46.sai4.sin_port << std::endl;
+    }
 }
 
 /*
@@ -162,8 +214,8 @@ void IRCServer::disconnectClient_(size_t const idx) {
     std::vector<std::string>::difference_type dist =
         static_cast<std::vector<std::string>::difference_type>(idx);
     pollFds_.erase(pollFds_.begin() + dist);
-    userInputBuffer_.erase(
-        userInputBuffer_.begin() +
+    clientInputBuffers_.erase(
+        clientInputBuffers_.begin() +
         static_cast<std::vector<std::string>::difference_type>(dist));
 }
 
@@ -178,6 +230,7 @@ void IRCServer::disconnectClient_(size_t const idx) {
 */
 void IRCServer::run() {
     createServerSocket_(AF_INET);
+    createServerSocket_(AF_INET6);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         usleep(100);
@@ -196,7 +249,7 @@ void IRCServer::run() {
         }
 
         if (serverPollFds.revents & POLLIN) {
-            acceptClient_();
+            acceptClient_(serverPollFds.fd);
         }
         for (size_t idx = 1; idx < pollFds_.size(); ++idx) {
             pollfd &pfd = pollFds_.at(idx);
@@ -209,7 +262,7 @@ void IRCServer::run() {
                 ssize_t bytesRead = recv(pfd.fd, &buffer[0], BUFFLEN, 0);
 
                 if (bytesRead > 0) {
-                    std::string &userInput = userInputBuffer_.at(idx);
+                    std::string &userInput = clientInputBuffers_.at(idx);
                     std::string  bufferStr(&buffer[0], bytesRead);
                     // bool         userInputValid = false;
 
