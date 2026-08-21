@@ -104,9 +104,8 @@ static void bindServerSocket(int const socketFd, int const domain,
                                  getDomainStr(domain) + " !");
 }
 
-static void storeServerSocket(int const                   socketFd,
-                              std::vector<struct pollfd> &pFds,
-                              std::vector<std::string>   &usrInBuff) {
+static void storePollFd(int const socketFd, std::vector<struct pollfd> &pFds,
+                        std::vector<std::string> &usrInBuff) {
     pollfd pfd = {};
     pfd.fd = socketFd;
     pfd.events = POLLIN; // Monitor for incoming connections
@@ -126,10 +125,16 @@ int IRCServer::createServerSocket_(int const domain) {
                                  getDomainStr(domain) + " !");
 
     int optval = 1;
-    if (setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR, &optval,
+    if (setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval,
                    sizeof(optval)) != 0)
         throw std::runtime_error("Error while setting socket options for " +
                                  getDomainStr(domain) + " !");
+
+    if (domain == AF_INET6) {
+        int v6only = 1;
+        setsockopt(socketFd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only,
+                   sizeof(v6only));
+    }
 
     setSocketNonBlock(socketFd);
 
@@ -139,7 +144,7 @@ int IRCServer::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while listening on socket for " +
                                  getDomainStr(domain) + " !");
 
-    storeServerSocket(socketFd, pollFds_, clientInputBuffers_);
+    storePollFd(socketFd, pollFds_, clientInputBuffers_);
     ++numServerSockets_;
 
     return socketFd;
@@ -152,8 +157,8 @@ int IRCServer::createServerSocket_(int const domain) {
 	will be replaced by an "official" version anyways.
 */
 void IRCServer::acceptClient_(int const serverFd) {
-    socketAddrX sockAddrIn46;
-    socklen_t   sockLen;
+    socketAddrX sockAddrIn46 = {};
+    socklen_t   sockLen = 0;
     setSocketAddr(serverFd, 0, sockAddrIn46, sockLen);
 
     int const clientFd =
@@ -165,29 +170,40 @@ void IRCServer::acceptClient_(int const serverFd) {
 
     setSocketNonBlock(clientFd);
 
-    pollfd clientPollfd = {};
-    clientPollfd.fd = clientFd;
-    clientPollfd.events = POLLIN;
-    pollFds_.push_back(clientPollfd);
-    clientInputBuffers_.push_back(std::string());
+    storePollFd(clientFd, pollFds_, clientInputBuffers_);
+
     std::cout << "Client connected:\n"
               << " fd: " << clientFd;
-    if (sockAddrIn46.sai4.sin_family == AF_INET)
-        std::cout << "\n AF: " << sockAddrIn46.sai4.sin_family
-                  << "\n addr:port: " << sockAddrIn46.sai4.sin_addr.s_addr
-                  << ":" << sockAddrIn46.sai4.sin_port << std::endl;
-    else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
-        std::cout << "\n AF: " << sockAddrIn46.sai6.sin6_family
+
+    if (sockAddrIn46.sai4.sin_family == AF_INET) {
+        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai4.sin_family)
+                  << "\n addr:port: ";
+        uint8_t *addrData =
+            reinterpret_cast<uint8_t *>(&sockAddrIn46.sai4.sin_addr.s_addr);
+        for (size_t idx = 0;
+             idx < sizeof(sockAddrIn46.sai4.sin_addr) / sizeof(uint8_t);
+             ++idx) {
+            if (idx > 0)
+                std::cout << ".";
+            std::cout << std::dec << static_cast<int>(addrData[idx]);
+        }
+        std::cout << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
+                  << std::endl;
+    } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
+        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai6.sin6_family)
                   << "\n addr:port: [";
+        uint8_t *addrData =
+            reinterpret_cast<uint8_t *>(&sockAddrIn46.sai6.sin6_addr.s6_addr);
         for (size_t idx = 0;
              idx < sizeof(sockAddrIn46.sai6.sin6_addr) / sizeof(uint8_t);
              ++idx) {
             if (idx > 0 && idx % 4 == 0)
                 std::cout << ":";
-            std::cout << std::hex << sockAddrIn46.sai6.sin6_addr.s6_addr[idx];
+            std::cout << std::hex << static_cast<int>(addrData[idx]);
         }
 
-        std::cout << "]:" << sockAddrIn46.sai4.sin_port << std::endl;
+        std::cout << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
+                  << std::endl;
     }
 }
 
@@ -231,6 +247,7 @@ void IRCServer::disconnectClient_(size_t const idx) {
 void IRCServer::run() {
     createServerSocket_(AF_INET);
     createServerSocket_(AF_INET6);
+    //createServerSocket_(AF_INET);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         usleep(100);
@@ -242,16 +259,17 @@ void IRCServer::run() {
             break;
         }
 
-        struct pollfd &serverPollFds = pollFds_[0];
-        if (serverPollFds.revents & POLLERR) {
-            std::cerr << "Server socket error\n";
-            break;
+        for (size_t idx = 0; idx < numServerSockets_; ++idx) {
+            struct pollfd const &serverPollFds = pollFds_[idx];
+            if (serverPollFds.revents & POLLERR) {
+                std::cerr << "Server socket error\n";
+                break;
+            }
+            if (serverPollFds.revents & POLLIN) {
+                acceptClient_(serverPollFds.fd);
+            }
         }
-
-        if (serverPollFds.revents & POLLIN) {
-            acceptClient_(serverPollFds.fd);
-        }
-        for (size_t idx = 1; idx < pollFds_.size(); ++idx) {
+        for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
             pollfd &pfd = pollFds_.at(idx);
             if (pfd.revents & POLLERR) {
                 std::cerr << "Client socket error on fd: " << pfd.fd
