@@ -3,12 +3,10 @@
 
 class SignalHandler {
   private:
-    volatile static std::sig_atomic_t g_stopServerLoop;
-    static void                       g_handleStopSignals(int signal);
-    std::vector<int>                  _stopSignals;
-    bool                              _setStopSignals(sighandler_t handler);
-
-    std::vector<struct pollfd>        _pollfds;
+    volatile static std::sig_atomic_t stopServerLoop_;
+    static void                       handleStopSignals_(int signal);
+    std::vector<int>                  stopSignals_;
+    bool                              setStopSignals_(sighandler_t handler);
 
     SignalHandler(SignalHandler const &other);
     SignalHandler &operator=(SignalHandler const &other);

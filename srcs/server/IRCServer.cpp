@@ -1,18 +1,23 @@
 #include "server/IRCServer.hpp"
 
 #include "server/SignalHandler.hpp"
+// #include "server/Socket.hpp"
 
 #include <arpa/inet.h>
 #include <csignal>
 #include <exception>
+#include <fcntl.h>
 #include <iostream>
+// #include <map>
+#include <string>
 #include <sys/poll.h>
 
 /*
 	IRCServer Constructor
-	* ...
+	* set port and password from command line args
 */
-IRCServer::IRCServer() {}
+IRCServer::IRCServer(int const port, std::string const &password)
+    : port_(port), password_(password) {}
 
 // /*
 // 	IRCServer Destructor
@@ -26,29 +31,81 @@ IRCServer::IRCServer() {}
 	Implementation explicitely not exhaustive,
 	will be replaced by an "official" version anyways.
 */
-int IRCServer::_createServerSocket() {
-    // Create a TCP socket
-    int serverSocket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (serverSocket == -1) {
-        return -1;
-    }
-    // Bind
-    struct sockaddr_in serverAddr = {};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8082);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    if (bind(serverSocket, reinterpret_cast<struct sockaddr *>(&serverAddr),
-             sizeof(serverAddr)) == -1) {
-        return -1;
-    }
-    // listen
-    listen(serverSocket, 100);
-    _pollfds.resize(1);
-    _userInputBuffer.resize(1);
-    _pollfds[0].fd = serverSocket;
-    _pollfds[0].events = POLLIN; // Monitor for incoming connections
+static std::string getDomainStr(int const domain) {
+    if (domain == AF_INET)
+        return "IPv4";
+    if (domain == AF_INET6)
+        return "IPv6";
+    return "";
+}
 
-    return serverSocket;
+static void storeServerSocket(int const sock, std::vector<struct pollfd> &pFds,
+                              std::vector<std::string> &usrInBuff) {
+    pollfd pfd = {};
+    pfd.fd = sock;
+    pfd.events = POLLIN; // Monitor for incoming connections
+
+    pFds.push_back(pfd);
+    usrInBuff.push_back(std::string());
+}
+
+static void bindServerSocket(int const socketFd, int const domain,
+                             int const port) {
+    struct sockaddr    *serverSockaddr = 0;
+    socklen_t           socklen = 0;
+    struct sockaddr_in  serverAddr4 = {};
+    struct sockaddr_in6 serverAddr6 = {};
+
+    if (domain == AF_INET) {
+        serverAddr4.sin_family = AF_INET;
+        serverAddr4.sin_addr.s_addr = INADDR_ANY;
+        serverAddr4.sin_port = htons(port);
+        serverSockaddr =
+            reinterpret_cast<struct sockaddr *>(&serverAddr4); // NOLINT
+        socklen = sizeof(serverAddr4);
+    } else if (domain == AF_INET6) {
+        serverAddr6.sin6_family = AF_INET;
+        serverAddr6.sin6_addr = in6addr_any;
+        serverAddr6.sin6_port = htons(port);
+        serverSockaddr =
+            reinterpret_cast<struct sockaddr *>(&serverAddr6); // NOLINT
+        socklen = sizeof(serverAddr6);
+    }
+    if (bind(socketFd, serverSockaddr, socklen) < 0)
+        throw std::runtime_error("Error while binding server socket for " +
+                                 getDomainStr(domain) + " !");
+}
+
+int IRCServer::createServerSocket_(int const domain) {
+    if (domain != AF_INET && domain != AF_INET6)
+        throw std::invalid_argument(
+            "Internal Error while opening server socket.");
+
+    int socketFd = socket(domain, SOCK_STREAM, 0);
+    if (socketFd < 0)
+        throw std::runtime_error("Error while opening server socket for " +
+                                 getDomainStr(domain) + " !");
+
+    int optval = 1;
+    if (setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR, &optval,
+                   sizeof(optval)) != 0)
+        throw std::runtime_error("Error while setting socket options for " +
+                                 getDomainStr(domain) + " !");
+
+    if (fcntl(socketFd, F_SETFL, O_NONBLOCK) != 0) // NOLINT
+        throw std::runtime_error(
+            "Error while setting socket to NON-BLOCKING for " +
+            getDomainStr(domain) + " !");
+
+    bindServerSocket(socketFd, domain, port_);
+
+    if (listen(socketFd, MAX_CONNECTIONS) < 0)
+        throw std::runtime_error("Error while listening on socket for " +
+                                 getDomainStr(domain) + " !");
+
+    storeServerSocket(socketFd, pollFds_, userInputBuffer_);
+
+    return socketFd;
 }
 
 /*
@@ -57,7 +114,7 @@ int IRCServer::_createServerSocket() {
 	Implementation explicitely not exhaustive,
 	will be replaced by an "official" version anyways.
 */
-void IRCServer::_acceptClient() {
+void IRCServer::acceptClient_() {
     int                clientFd = 0;
     struct pollfd      clientPollfd = {};
     struct sockaddr_in clientAI = {};
@@ -65,8 +122,9 @@ void IRCServer::_acceptClient() {
 
     // accept4, so we can directly set SOCK_NONBLOCK
     // the subject allows fcntl only on macOS
-    clientFd = accept4(_pollfds.front().fd,
-                       reinterpret_cast<struct sockaddr *>(&clientAI), &aiSize,
+    clientFd = accept4(pollFds_.front().fd,
+                       reinterpret_cast<struct sockaddr *>(&clientAI),
+                       &aiSize, // NOLINT
                        SOCK_NONBLOCK);
 
     if (clientFd == -1) {
@@ -76,8 +134,8 @@ void IRCServer::_acceptClient() {
     clientPollfd.fd = clientFd;
     clientPollfd.events = POLLIN;
     clientPollfd.revents = 0;
-    _pollfds.push_back(clientPollfd);
-    _userInputBuffer.push_back(std::string());
+    pollFds_.push_back(clientPollfd);
+    userInputBuffer_.push_back(std::string());
     std::cout << "Client connected, fd: " << clientFd << std::endl;
 }
 
@@ -89,19 +147,24 @@ void IRCServer::_acceptClient() {
 	There is more to be done than just closing and removing
 	the client socket.
 */
-void IRCServer::_disconnectClient(size_t const idx) {
-    pollfd &pfd = _pollfds.at(idx);
+void IRCServer::disconnectClient_(size_t const idx) {
+    pollfd &pfd = pollFds_.at(idx);
 
     if (idx == 0) {
-        if (_pollfds.size() != 1)
+        if (pollFds_.size() != 1)
             std::cout << "Close clients before closing server!" << std::endl;
         std::cout << "Closing server" << std::endl;
     } else
-        std::cout << "Closing client #" << idx << " (" << _pollfds.size() - 2
+        std::cout << "Closing client #" << idx << " (" << pollFds_.size() - 2
                   << " clients remaining)" << std::endl;
     close(pfd.fd);
-    _pollfds.erase(_pollfds.begin() + idx);
-    _userInputBuffer.erase(_userInputBuffer.begin() + idx);
+
+    std::vector<std::string>::difference_type dist =
+        static_cast<std::vector<std::string>::difference_type>(idx);
+    pollFds_.erase(pollFds_.begin() + dist);
+    userInputBuffer_.erase(
+        userInputBuffer_.begin() +
+        static_cast<std::vector<std::string>::difference_type>(dist));
 }
 
 /*
@@ -114,40 +177,40 @@ void IRCServer::_disconnectClient(size_t const idx) {
 		the server socket
 */
 void IRCServer::run() {
-    _createServerSocket();
+    createServerSocket_(AF_INET);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         usleep(100);
 
-        int pollResult = poll(_pollfds.data(), _pollfds.size(), 0);
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
         if (pollResult == -1) {
             // nice error message and exit the loop
             // or throw, but then have ressource cleanup after catch
             break;
         }
 
-        struct pollfd &serverPollFds = _pollfds[0];
+        struct pollfd &serverPollFds = pollFds_[0];
         if (serverPollFds.revents & POLLERR) {
             std::cerr << "Server socket error\n";
             break;
         }
 
         if (serverPollFds.revents & POLLIN) {
-            _acceptClient();
+            acceptClient_();
         }
-        for (size_t idx = 1; idx < _pollfds.size(); ++idx) {
-            pollfd &pfd = _pollfds.at(idx);
+        for (size_t idx = 1; idx < pollFds_.size(); ++idx) {
+            pollfd &pfd = pollFds_.at(idx);
             if (pfd.revents & POLLERR) {
                 std::cerr << "Client socket error on fd: " << pfd.fd
                           << std::endl;
-                _disconnectClient(idx);
+                disconnectClient_(idx);
             } else if (pfd.revents & POLLIN) {
-                char buffer[BUFFLEN];
-                int  bytesRead = recv(pfd.fd, buffer, BUFFLEN, 0);
+                char    buffer[BUFFLEN];
+                ssize_t bytesRead = recv(pfd.fd, &buffer[0], BUFFLEN, 0);
 
                 if (bytesRead > 0) {
-                    std::string &userInput = _userInputBuffer.at(idx);
-                    std::string  bufferStr(buffer, bytesRead);
+                    std::string &userInput = userInputBuffer_.at(idx);
+                    std::string  bufferStr(&buffer[0], bytesRead);
                     // bool         userInputValid = false;
 
                     // // DEBUG for cont'd messages
@@ -162,7 +225,8 @@ void IRCServer::run() {
                                          "long.\nData sent will be discarded."
                                       << std::endl;
                             while (bytesRead > 0)
-                                bytesRead = recv(pfd.fd, buffer, BUFFLEN, 0);
+                                bytesRead =
+                                    recv(pfd.fd, &buffer[0], BUFFLEN, 0);
                             userInput.clear();
                             continue;
                         }
@@ -201,12 +265,12 @@ void IRCServer::run() {
                     // FIN is the TCP mechanism for orderly shutdown.
                     // That's why POLLIN + read() return 0—the FIN,
                     // and the zero read is how the kernel tells you "the peer closed."
-                    _disconnectClient(idx);
+                    disconnectClient_(idx);
                 }
             }
         }
     }
-    while (!_pollfds.empty()) {
-        _disconnectClient(_pollfds.size() - 1);
+    while (!pollFds_.empty()) {
+        disconnectClient_(pollFds_.size() - 1);
     }
 }

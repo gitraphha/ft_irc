@@ -1,5 +1,13 @@
 #include "IRC.hpp"
 
+#include <cstdlib>
+#include <exception>
+#include <sstream>
+#include <string>
+
+static void checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+                                  std::string &password);
+
 /*
 	NAME:
 		ircserv
@@ -37,17 +45,39 @@
 		equivalent)
 */
 
-int main(int argc, char **argv) {
-    (void)argv;
-    if (argc != 3)
-        return (1);
+int         main(int argc, char **argv) {
+    int         port = 0;
+    std::string password;
 
     try {
+        checkExtractCmdLnArgs(argc, argv, port, password);
+
         SignalHandler sigHandler;
-        IRCServer     srv;
+        IRCServer     srv(port, password);
         srv.run();
     } catch (std::exception const &e) {
         std::cerr << e.what() << std::endl;
+        return 1;
     }
     std::cout << "Clean exit." << std::endl;
+    return 0;
+}
+
+static void checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+                                  std::string &password) {
+    std::istringstream iss;
+    std::string        remainder;
+    if (argc != 3)
+        throw std::out_of_range(
+            "Usage: ./ircserv <int:port> <string:password>");
+
+    iss.str(argv[1]); // NOLINT
+    if (!((iss >> port) && (iss >> remainder).eof()))
+        throw std::runtime_error(
+            "Error while extracting port number from commandline parameter.");
+
+    iss.str(argv[2]); // NOLINT
+    if (!(iss >> password).eof())
+        throw std::out_of_range(
+            "Error while extracting password from commandline parameter.");
 }
