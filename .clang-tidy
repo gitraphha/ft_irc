@@ -14,8 +14,9 @@ Checks: >
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-macro-to-enum,
   -readability-braces-around-statements,
-  -readability-implicit-bool-conversion,
+  -readability-avoid-const-params-in-decls,
   -readability-identifier-length,
+  -readability-implicit-bool-conversion,
   -performance-avoid-endl,
 
 WarningsAsErrors: true
@@ -39,15 +40,13 @@ CheckOptions:
     value:           camelBack
   - key:             readability-identifier-naming.VariableCase
     value:           camelBack
-  - key:             readability-identifier-naming.ClassMemberPrefix
-    value:           g_
-  - key:             readability-identifier-naming.ClassMethodPrefix
-    value:           g_
-  - key:             readability-identifier-naming.PrivateMemberPrefix
+  - key:             readability-identifier-naming.ClassMemberSuffix
+    value:           _
+  - key:             readability-identifier-naming.PrivateMemberSuffix
     value:           _
   - key:             readability-identifier-naming.PrivateMethodCase
     value:           camelBack
-  - key:             readability-identifier-naming.PrivateMethodPrefix
+  - key:             readability-identifier-naming.PrivateMethodSuffix
     value:           _
   
   - key:             readability-identifier-naming.IgnoreMainLikeFunctions
