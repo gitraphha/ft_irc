@@ -132,6 +132,27 @@ int IRCServer::createServerSocket_(int const domain) {
     return socketFd;
 }
 
+static void printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
+    char      addrBuffer[64];
+    socklen_t addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+
+    if (sockAddrIn46.sai4.sin_family == AF_INET) {
+        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai4.sin_family)
+                  << "\n addr:port: "
+                  << inet_ntop(AF_INET, &sockAddrIn46.sai4.sin_addr, addrBuffer,
+                               addrBuffLen)
+                  << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
+                  << std::endl;
+    } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
+        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai6.sin6_family)
+                  << "\n addr:port: ["
+                  << inet_ntop(AF_INET6, &sockAddrIn46.sai6.sin6_addr,
+                               addrBuffer, addrBuffLen)
+                  << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
+                  << std::endl;
+    }
+}
+
 /*
 	Dummy function to get a usable client socket
 	on connect for mockup testing.
@@ -159,37 +180,7 @@ void IRCServer::acceptClient_(int const serverFd) {
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd;
-
-    if (sockAddrIn46.sai4.sin_family == AF_INET) {
-        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai4.sin_family)
-                  << "\n addr:port: ";
-        uint8_t *addrData = reinterpret_cast<uint8_t *>(
-            &sockAddrIn46.sai4.sin_addr.s_addr); // NOLINT
-        for (size_t idx = 0;
-             idx < sizeof(sockAddrIn46.sai4.sin_addr) / sizeof(uint8_t);
-             ++idx) {
-            if (idx > 0)
-                std::cout << ".";
-            std::cout << std::dec << static_cast<int>(addrData[idx]); // NOLINT
-        }
-        std::cout << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
-    } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
-        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai6.sin6_family)
-                  << "\n addr:port: [";
-        uint8_t *addrData = reinterpret_cast<uint8_t *>(
-            &sockAddrIn46.sai6.sin6_addr.s6_addr); // NOLINT
-        for (size_t idx = 0;
-             idx < sizeof(sockAddrIn46.sai6.sin6_addr) / sizeof(uint8_t);
-             ++idx) {
-            if (idx > 0 && idx % 4 == 0)
-                std::cout << ":";
-            std::cout << std::hex << static_cast<int>(addrData[idx]); // NOLINT
-        }
-
-        std::cout << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
-    }
+    printAddrfamilyAddrPort(sockAddrIn46);
 }
 
 /*
