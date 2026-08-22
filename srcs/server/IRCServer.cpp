@@ -1,12 +1,9 @@
 #include "server/IRCServer.hpp"
 
+#include "server/IRCServerHelper.hpp"
 #include "server/SignalHandler.hpp"
-// #include "server/Socket.hpp"
 
-#include <arpa/inet.h>
-#include <csignal>
 #include <exception>
-#include <fcntl.h>
 #include <iostream>
 #include <string>
 #include <sys/poll.h>
@@ -18,84 +15,9 @@
 IRCServer::IRCServer(int const port, std::string const &password)
     : port_(port), password_(password), numServerSockets_(0) {}
 
-// /*
-// 	IRCServer Destructor
-// 		* ...
-// */
-// IRCServer::~IRCServer() {}
-
 /*
-	Dummy function to get a usable server socket
-	for mockup testing.
-	Implementation explicitely not exhaustive,
-	will be replaced by an "official" version anyways.
+	tbd
 */
-static std::string getDomainStr(int const domain) {
-    if (domain == AF_INET)
-        return "IPv4";
-    if (domain == AF_INET6)
-        return "IPv6";
-    return "";
-}
-
-static int sockAddrFamily(int const socketFd) {
-    struct sockaddr sockAddr = {};
-    socklen_t       sockLen = sizeof(sockAddr);
-    if (getsockname(socketFd, &sockAddr, &sockLen) != 0) // NOLINT
-        throw;
-    return sockAddr.sa_family;
-}
-
-static void setSocketNonBlock(int const socketFd) {
-    int const domain = sockAddrFamily(socketFd);
-    if (fcntl(socketFd, F_SETFL, O_NONBLOCK) != 0) // NOLINT
-        throw std::runtime_error(
-            "Error while setting socket to NON-BLOCKING for " +
-            getDomainStr(domain) + " !");
-}
-
-static void setSocketAddr(int const socketFd, int const port, // NOLINT
-                          socketAddrX &sockAddrIn46, socklen_t &sockLen) {
-    int domain = sockAddrFamily(socketFd);
-
-    if (domain == AF_INET) {
-        struct sockaddr_in &clientSockAddrIn4 = sockAddrIn46.sai4;
-        clientSockAddrIn4.sin_family = AF_INET;
-        clientSockAddrIn4.sin_addr.s_addr = INADDR_ANY;
-        clientSockAddrIn4.sin_port = htons(port);
-        sockLen = sizeof(clientSockAddrIn4);
-    } else if (domain == AF_INET6) {
-        struct sockaddr_in6 &clientSockAddrIn6 = sockAddrIn46.sai6;
-        clientSockAddrIn6.sin6_family = AF_INET6;
-        clientSockAddrIn6.sin6_addr = in6addr_any;
-        clientSockAddrIn6.sin6_port = htons(port);
-        sockLen = sizeof(clientSockAddrIn6);
-    }
-}
-
-static void bindServerSocket(int const socketFd, int const domain, // NOLINT
-                             int const port) {
-    socketAddrX sockAddrIn46 = {};
-    socklen_t   sockLen = 0;
-    setSocketAddr(socketFd, port, sockAddrIn46, sockLen);
-
-    if (bind(socketFd,
-             reinterpret_cast<struct sockaddr *>(&sockAddrIn46), // NOLINT
-             sockLen) < 0)
-        throw std::runtime_error("Error while binding server socket for " +
-                                 getDomainStr(domain) + " !");
-}
-
-static void storePollFd(int const socketFd, std::vector<struct pollfd> &pFds,
-                        std::vector<std::string> &usrInBuff) {
-    pollfd pfd = {};
-    pfd.fd = socketFd;
-    pfd.events = POLLIN; // Monitor for incoming connections
-
-    pFds.push_back(pfd);
-    usrInBuff.push_back(std::string());
-}
-
 int IRCServer::createServerSocket_(int const domain) {
     if (domain != AF_INET && domain != AF_INET6)
         throw std::invalid_argument(
@@ -104,13 +26,13 @@ int IRCServer::createServerSocket_(int const domain) {
     int socketFd = socket(domain, SOCK_STREAM, 0);
     if (socketFd < 0)
         throw std::runtime_error("Error while opening server socket for " +
-                                 getDomainStr(domain) + " !");
+                                 srvHelp::getAdressFamilyStr(domain) + " !");
 
     int optval = 1;
-    if (setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval,
-                   sizeof(optval)) != 0)
+    if (setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR /* | SO_REUSEPORT */,
+                   &optval, sizeof(optval)) != 0)
         throw std::runtime_error("Error while setting socket options for " +
-                                 getDomainStr(domain) + " !");
+                                 srvHelp::getAdressFamilyStr(domain) + " !");
 
     if (domain == AF_INET6) {
         int v6only = 1;
@@ -118,52 +40,28 @@ int IRCServer::createServerSocket_(int const domain) {
                    sizeof(v6only));
     }
 
-    setSocketNonBlock(socketFd);
+    srvHelp::setSocketNonBlock(socketFd);
 
-    bindServerSocket(socketFd, domain, port_);
+    srvHelp::bindServerSocket(socketFd, domain, port_);
 
     if (listen(socketFd, MAX_CONNECTIONS) < 0)
         throw std::runtime_error("Error while listening on socket for " +
-                                 getDomainStr(domain) + " !");
+                                 srvHelp::getAdressFamilyStr(domain) + " !");
 
-    storePollFd(socketFd, pollFds_, clientInputBuffers_);
+    srvHelp::storePollFd(socketFd, pollFds_, clientInputBuffers_);
     ++numServerSockets_;
 
     return socketFd;
 }
 
-static void printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
-    char      addrBuffer[64];
-    socklen_t addrBuffLen = sizeof(addrBuffer) / sizeof(char);
-
-    if (sockAddrIn46.sai4.sin_family == AF_INET) {
-        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai4.sin_family)
-                  << "\n addr:port: "
-                  << inet_ntop(AF_INET, &sockAddrIn46.sai4.sin_addr, addrBuffer,
-                               addrBuffLen)
-                  << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
-    } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
-        std::cout << "\n AF: " << getDomainStr(sockAddrIn46.sai6.sin6_family)
-                  << "\n addr:port: ["
-                  << inet_ntop(AF_INET6, &sockAddrIn46.sai6.sin6_addr,
-                               addrBuffer, addrBuffLen)
-                  << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
-    }
-}
-
 /*
-	Dummy function to get a usable client socket
-	on connect for mockup testing.
-	Implementation explicitely not exhaustive,
-	will be replaced by an "official" version anyways.
+	tbd
 */
 void IRCServer::acceptClient_(int const serverFd) {
     socketAddrX sockAddrIn46 = {};
     socklen_t   sockLen = 0;
 
-    setSocketAddr(serverFd, 0, sockAddrIn46, sockLen);
+    srvHelp::setSocketAddr(serverFd, 0, sockAddrIn46, sockLen);
 
     int const clientFd = accept(
         serverFd, reinterpret_cast<struct sockaddr *>(&sockAddrIn46), // NOLINT
@@ -174,32 +72,28 @@ void IRCServer::acceptClient_(int const serverFd) {
         return;
     }
 
-    setSocketNonBlock(clientFd);
+    srvHelp::setSocketNonBlock(clientFd);
 
-    storePollFd(clientFd, pollFds_, clientInputBuffers_);
+    srvHelp::storePollFd(clientFd, pollFds_, clientInputBuffers_);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd;
-    printAddrfamilyAddrPort(sockAddrIn46);
+    srvHelp::printAddrfamilyAddrPort(sockAddrIn46);
 }
 
 /*
-	Dummy function to disconnet aclient socket
-	for mockup testing.
-	Implementation explicitely not exhaustive,
-	will be replaced by an "official" version anyways.
-	There is more to be done than just closing and removing
-	the client socket.
+	tbd
 */
 void IRCServer::disconnectClient_(size_t const idx) {
     pollfd &pfd = pollFds_.at(idx);
 
-    if (idx == 0) {
-        if (pollFds_.size() != 1)
+    if (idx < numServerSockets_) {
+        if (pollFds_.size() < numServerSockets_)
             std::cout << "Close clients before closing server!" << std::endl;
         std::cout << "Closing server" << std::endl;
     } else
-        std::cout << "Closing client #" << idx << " (" << pollFds_.size() - 2
+        std::cout << "Closing client #" << idx << " ("
+                  << pollFds_.size() - 1 - numServerSockets_
                   << " clients remaining)" << std::endl;
     close(pfd.fd);
 
@@ -214,26 +108,36 @@ void IRCServer::disconnectClient_(size_t const idx) {
 /*
 	Main server loop
 
-	* sets up its listening socket
+	* sets up its listening socket(s)
 	* runs an infinit loop to listen for connections
 	* handles client connect and disconnect scenarios
-	* on server stop, disconnects all clients and closes
-		the server socket
+	* on server stop signal, disconnects all clients and closes
+		the server socket(s)
 */
 void IRCServer::run() {
     createServerSocket_(AF_INET);
     createServerSocket_(AF_INET6);
-    //createServerSocket_(AF_INET);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         usleep(100);
 
         int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
         if (pollResult == -1) {
-            throw;
-            // nice error message and exit the loop
-            // or throw, but then have ressource cleanup after catch
-            break;
+            static size_t loopCounter = 0;
+            static size_t retries = 42;
+            if (loopCounter % 1000 == 0) {
+                retries = 42;
+                // EINTR — The call was interrupted by a signal. This is the most common retriable error. Retrying is standard practice.
+                // EAGAIN — Temporary resource unavailability (rare with poll(), but possible in some edge cases).
+                if (errno == EINTR)
+                    continue;
+                if (errno == EAGAIN && retries > 1) {
+                    retries--;
+                    usleep(10000);
+                    continue;
+                }
+                throw std::runtime_error("poll failed too many times.");
+            }
         }
 
         for (size_t idx = 0; idx < numServerSockets_; ++idx) {
