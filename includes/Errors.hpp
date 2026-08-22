@@ -28,11 +28,13 @@ class Error : public std::exception {
   public:
     // A protocol error: carry a numeric reply to send back to the client.
     explicit Error(const Reply::Message &reply)
-        : hasReply_(true), reply_(reply), what_(reply.body) {}
+        : hasReply_(true), reply_(reply), what_(reply.params) {}
 
     // An internal error: no numeric reply is sent, what() is used for logging.
     explicit Error(const std::string &message)
         : hasReply_(false), what_(message) {}
+
+    virtual ~Error() throw() {}
 
     virtual const char *what() const throw() {
         return what_.c_str();

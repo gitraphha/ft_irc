@@ -37,6 +37,7 @@
  *   - No std::to_string; the numeric code is converted with std::ostringstream.
  */
 
+#include <iomanip>
 #include <sstream>
 #include <string>
 
@@ -198,46 +199,57 @@ inline const char *text(Code code) {
 // build() injects those when the reply is actually sent.
 struct Message {
     int         code;
-    std::string body;
+    std::string params;
+    bool        has_trailing;
+    std::string trailing;
 
-    Message() : code() {}
+    Message() : code(), has_trailing(false) {}
 
-    Message(int c, const std::string &b) : code(c), body(b) {}
+    Message(int c, const std::string &p)
+        : code(c), params(p), has_trailing(false) {}
+
+    Message(int c, const std::string &p, const std::string &t)
+        : code(c), params(p), has_trailing(true), trailing(t) {}
 };
 
 // reply() with default text from text().
 //   reply(ERR_NOSUCHNICK, "bob") -> code=401, body="bob :No such nick/channel"
 //   reply(RPL_MYINFO, "irc.local 1.0 itkol") -> code=4, body="irc.local 1.0 itkol"
 inline Message reply(Code code, const std::string &params) {
-    std::string body = params;
     const char *t = text(code);
-    if (*t != '\0') {
-        body += " :";
-        body += t;
-    }
-    return Message(code, body);
+    if (*t != '\0')
+        return Message(code, params, t);
+    return Message(code, params);
 }
 
-// reply() with caller-supplied trailing text.
-// reply(RPL_TOPIC, "#chan", topic) -> code=332, body="#chan :<topic>"
+/*
+reply() with caller-supplied trailing text: the ":" is always sent, even if
+trailing is empty.
+  reply(RPL_TOPIC, "#chan", topic) -> code=332, body="#chan :<topic>"
+  reply(RPL_WELCOME, "", "Welcome ...") -> body " :Welcome ..."
+*/
 inline Message reply(Code code, const std::string &params,
                      const std::string &trailing) {
-    std::string body = params;
-    if (!trailing.empty()) {
-        body += " :";
-        body += trailing;
-    }
-    return Message(code, body);
+    return Message(code, params, trailing);
 }
 
-// builds the complete line layout for `msg`, addressed to `nick`:
-//   ":<server> <code> <nick> <body>\r\n"
-// Use "*" for `nick` until the client has registered (pre-001).
+/*
+builds the complete line layout for `msg`, addressed to `nick`:
+  ":<server> <code> <nick> <body>\r\n"
+The numeric is zero-padded to 3 digits ("001", not "1"). Empty params emit
+nothing instead of leaving two spaces before the trailing.
+Use "*" for `nick` until the client has registered (pre-001).
+*/
 inline std::string build(const std::string &server, const std::string &nick,
                          const Message &msg) {
     std::ostringstream ss;
-    ss << ":" << server << " " << msg.code << " " << nick << " " << msg.body
-       << "\r\n";
+    ss << ":" << server << " " << std::setw(3) << std::setfill('0') << msg.code
+       << " " << nick;
+    if (!msg.params.empty())
+        ss << " " << msg.params;
+    if (msg.has_trailing)
+        ss << " :" << msg.trailing;
+    ss << "\r\n";
     return ss.str();
 }
 

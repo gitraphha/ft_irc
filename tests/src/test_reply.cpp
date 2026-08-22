@@ -26,6 +26,12 @@ int main() {
     std::cout << Reply::build("irc.local", "alice",
                               Reply::reply(Reply::RPL_ENDOFNAMES, "#chan"));
 
+    std::cout << Reply::build("irc.local", "alice",
+                              Reply::reply(Reply::RPL_TOPIC, "#chan", ""));
+
+    std::cout << Reply::build("irc.local", "*",
+                              Reply::reply(Reply::ERR_NOTREGISTERED, ""));
+
     try {
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, "#chan"));
     } catch (const Error &e) {
