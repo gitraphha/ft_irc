@@ -103,20 +103,22 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     void const *addrPtr = 0;
     uint16_t    portNumber = 0;
 
-    if (sockAddrIn46.sai4.sin_family == AF_INET) {
+    if (saFamily == AF_INET) {
         addrPtr = &sockAddrIn46.sai4.sin_addr;
         portNumber = ntohs(sockAddrIn46.sai4.sin_port);
-    } else if (sockAddrIn46.sai4.sin_family == AF_INET) {
-        addrPtr = &sockAddrIn46.sai4.sin_addr;
+    } else if (saFamily == AF_INET6) {
+        addrPtr = &sockAddrIn46.sai6.sin6_addr;
         portNumber = ntohs(sockAddrIn46.sai6.sin6_port);
     }
     char const *addrStrPtr =
         inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
-    addrStrPtr = 0;
-	std::string addrStr(addrStrPtr?addrStrPtr:"nil");
+    std::string addrStr(addrStrPtr ? addrStrPtr : "<unknown address>");
+    if (saFamily == AF_INET6)
+        addrStr = "[" + addrStr + "]";
+
     std::ostringstream oss;
     oss << " AF: " << getAdressFamilyStr(saFamily)
-        << "\n addr:port: " << addrStrPtr << ":" << std::dec << portNumber;
+        << "\n addr:port: " << addrStr << ":" << std::dec << portNumber;
     return oss.str();
 }
 
