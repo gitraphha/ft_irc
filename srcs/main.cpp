@@ -53,7 +53,7 @@ int         main(int argc, char **argv) {
         checkExtractCmdLnArgs(argc, argv, port, password);
 
         SignalHandler sigHandler;
-        IRCServer     srv(port, password);
+        Server        srv(port, password);
         srv.run();
     } catch (std::exception const &e) {
         std::cerr << e.what() << std::endl;
