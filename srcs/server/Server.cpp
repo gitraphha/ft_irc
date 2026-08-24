@@ -1,7 +1,7 @@
-#include "server/Server.hpp"
+#include "Server.hpp"
 
-#include "server/ServerHelper.hpp"
-#include "server/SignalHandler.hpp"
+#include "ServerHelper.hpp"
+#include "SignalHandler.hpp"
 
 #include <exception>
 #include <iostream>
