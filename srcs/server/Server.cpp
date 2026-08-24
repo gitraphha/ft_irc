@@ -15,6 +15,23 @@
 Server::Server(int const port, std::string const &password)
     : port_(port), password_(password), numServerSockets_(0) {}
 
+/* 
+	Can anyone send sth outside of the poll loop -> No, right?
+	Then I'd always know, what fd/client I am currently talking to.
+	And could just check the sendBuffer and if it's not empty,
+	send whatever is there
+	Except for during exception (class Error) handling, when a potential
+	msg is part of the exception
+*/
+bool Server::sendMsg(int fd, std::string const &msg) {
+    if (send(fd, msg.c_str(), msg.length(), MSG_NOSIGNAL) == -1) {
+        std::cerr << "Send failed to FD " << fd << std::endl;
+        return false;
+    }
+    std::cout << "Msg sent to FD: " << fd << ": " << msg;
+    return true;
+}
+
 /*
 	tbd
 */
@@ -93,9 +110,13 @@ void Server::processClientSocketData_() {
                 }
                 // DEBUG
                 {
-                    std::cout << "UserInput read from client " << idx << ": \n"
-                              << std::string(userInput) /* << std::endl */;
+                    std::ostringstream oss;
+                    oss << idx + 1 - numServerSockets_ << ": \n\t"
+                        << std::string(userInput) /* << std::endl */;
                     userInput.clear();
+                    std::cout << "UserInput read from client #" << oss.str();					
+                    // Pong to client
+                    sendMsg(pfd.fd, "You are client #" + oss.str());
                 }
             } else if (bytesRead <= 0) {
                 // Comment will be deleted later, kept for reference for now
@@ -148,12 +169,16 @@ void Server::disconnectClient_(size_t const idx) {
     pollfd &pfd = pollFds_.at(idx);
 
     if (idx < numServerSockets_) {
-        if (pollFds_.size() < numServerSockets_)
-            std::cout << "Close clients before closing server!" << std::endl;
-        std::cout << "Closing server" << std::endl;
+        if (pollFds_.size() != idx + 1)
+            std::cout << "Close client sockets before closing server!"
+                      << std::endl;
+        std::cout << "Closing server socket ("
+                  << srvHelp::getAdressFamilyStr(
+                         srvHelp::sockAddrFamily(pfd.fd))
+                  << ")" << std::endl;
     } else
-        std::cout << "Closing client #" << idx << " ("
-                  << pollFds_.size() - 1 - numServerSockets_
+        std::cout << "Closing client #" << idx + 1 - numServerSockets_
+                  << " socket (" << pollFds_.size() - 1 - numServerSockets_
                   << " clients remaining)" << std::endl;
     close(pfd.fd);
 
