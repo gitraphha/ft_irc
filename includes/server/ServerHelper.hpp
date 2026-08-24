@@ -1,5 +1,5 @@
-#ifndef IRCSERVERHELPER_HPP
-#define IRCSERVERHELPER_HPP
+#ifndef SERVERHELPER_HPP
+#define SERVERHELPER_HPP
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -107,4 +107,4 @@ inline void printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
 
 } // namespace srvHelp
 
-#endif // IRCSERVERHELPER_HPP
+#endif // SERVERHELPER_HPP

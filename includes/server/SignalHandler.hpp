@@ -1,3 +1,6 @@
+#ifndef SIGNALHANDLER_HPP
+#define SIGNALHANDLER_HPP
+
 #include <csignal>
 #include <vector>
 
@@ -16,3 +19,5 @@ class SignalHandler {
     ~SignalHandler();
     static bool stopLoopSignalReceived();
 };
+
+#endif // SIGNALHANDLER_HPP

@@ -1,4 +1,4 @@
-#include "server/IRCServer.hpp"
+#include "server/Server.hpp"
 #include "server/SignalHandler.hpp"
 
 #include <exception>

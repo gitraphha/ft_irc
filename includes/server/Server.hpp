@@ -1,3 +1,6 @@
+#ifndef SERVER_HPP
+#define SERVER_HPP
+
 #include <netinet/in.h>
 #include <poll.h>
 #include <string>
@@ -7,7 +10,7 @@
 #define MAXMSGLEN 512
 #define MAX_CONNECTIONS 512
 
-class IRCServer {
+class Server {
   private:
     int                        port_;
     std::string                password_;
@@ -16,16 +19,16 @@ class IRCServer {
     std::vector<struct pollfd> pollFds_;
     std::vector<std::string>   clientInputBuffers_;
 
-    // IRCServer(IRCServer const &other);
-    // IRCServer &operator=(IRCServer const &other);
+    // Server(Server const &other);
+    // Server &operator=(Server const &other);
 
     int                        createServerSocket_(int const domain);
     void                       acceptClient_(int const serverFd);
     void                       disconnectClient_(size_t const idx);
 
   public:
-    IRCServer(int const port, std::string const &password);
-    // ~IRCServer();
+    Server(int const port, std::string const &password);
+    // ~Server();
 
     void run();
 };
@@ -34,3 +37,5 @@ typedef union uSocketAddrX {
     struct sockaddr_in  sai4;
     struct sockaddr_in6 sai6;
 } socketAddrX;
+
+#endif // SERVER_HPP
