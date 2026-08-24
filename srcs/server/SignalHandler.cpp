@@ -1,4 +1,4 @@
-#include "server/SignalHandler.hpp"
+#include "SignalHandler.hpp"
 
 #include <arpa/inet.h>
 #include <csignal>

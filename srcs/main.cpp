@@ -1,4 +1,5 @@
-#include "IRC.hpp"
+#include "Server.hpp"
+#include "SignalHandler.hpp"
 
 #include <cstdlib>
 #include <exception>
