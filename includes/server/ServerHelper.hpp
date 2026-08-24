@@ -94,26 +94,29 @@ inline bool isSocketListening(int sockfd) {
 }
 
 inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
-    char                   addrBuffer[128];
-    socklen_t              addrBuffLen = sizeof(addrBuffer) / sizeof(char);
-    struct sockaddr const &socketAddr =
-        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4); // NOLINT
-		char const *const addrPtr = inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai4.sin_addr, &addrBuffer[0],
-              addrBuffLen);
-    std::string addrStr(addrPtr?addrPtr:"");
+    char              addrBuffer[128];
+    socklen_t const   addrBuffLen = sizeof(addrBuffer) / sizeof(char);
 
-    std::ostringstream oss;
+    sa_family_t const saFamily =
+        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4) // NOLINT
+            .sa_family;
+    void const *addrPtr = 0;
+    uint16_t    portNumber = 0;
+
     if (sockAddrIn46.sai4.sin_family == AF_INET) {
-        oss << " AF: " << getAdressFamilyStr(sockAddrIn46.sai4.sin_family)
-            << "\n addr:port: " << inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai4.sin_addr, &addrBuffer[0],
-              addrBuffLen) << ":" << std::dec
-            << ntohs(sockAddrIn46.sai4.sin_port);
-    } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
-        oss << " AF: " << getAdressFamilyStr(sockAddrIn46.sai6.sin6_family)
-            << "\n addr:port: [" << inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai6.sin6_addr, &addrBuffer[0],
-              addrBuffLen) << "]:" << std::dec
-            << ntohs(sockAddrIn46.sai4.sin_port);
+        addrPtr = &sockAddrIn46.sai4.sin_addr;
+        portNumber = ntohs(sockAddrIn46.sai4.sin_port);
+    } else if (sockAddrIn46.sai4.sin_family == AF_INET) {
+        addrPtr = &sockAddrIn46.sai4.sin_addr;
+        portNumber = ntohs(sockAddrIn46.sai6.sin6_port);
     }
+    char const *addrStrPtr =
+        inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
+    addrStrPtr = 0;
+	std::string addrStr(addrStrPtr?addrStrPtr:"nil");
+    std::ostringstream oss;
+    oss << " AF: " << getAdressFamilyStr(saFamily)
+        << "\n addr:port: " << addrStrPtr << ":" << std::dec << portNumber;
     return oss.str();
 }
 
