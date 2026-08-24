@@ -4,6 +4,15 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <iostream>
+#include <sstream>
+#include <sys/poll.h>
+#include <unistd.h>
+#include <vector>
+
+typedef union uSocketAddrX {
+    struct sockaddr_in  sai4;
+    struct sockaddr_in6 sai6;
+} socketAddrX;
 
 namespace srvHelp {
 
@@ -32,7 +41,8 @@ inline void setSocketNonBlock(int const socketFd) {
 }
 
 inline void setSocketAddr(int const socketFd, int const port, // NOLINT
-                          socketAddrX &sockAddrIn46, socklen_t &sockLen) {
+                          socketAddrX &sockAddrIn46,
+                          socklen_t   &sockLen) { // NOLINT
     int domain = sockAddrFamily(socketFd);
 
     if (domain == AF_INET) {
@@ -63,8 +73,9 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline void storePollFd(int const socketFd, std::vector<struct pollfd> &pFds,
-                        std::vector<std::string> &usrInBuff) {
+inline void storePollFd(int const                   socketFd,
+                        std::vector<struct pollfd> &pFds,      // NOLINT
+                        std::vector<std::string>   &usrInBuff) { // NOLINT
     pollfd pfd = {};
     pfd.fd = socketFd;
     pfd.events = POLLIN; // Monitor for incoming connections
@@ -82,29 +93,44 @@ inline bool isSocketListening(int sockfd) {
     return (optVal > 0);
 }
 
-inline void printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
-    char      addrBuffer[64];
-    socklen_t addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
+    char                   addrBuffer[128];
+    socklen_t              addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+    struct sockaddr const &socketAddr =
+        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4); // NOLINT
+		char const *const addrPtr = inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai4.sin_addr, &addrBuffer[0],
+              addrBuffLen);
+    std::string addrStr(addrPtr?addrPtr:"");
 
+    std::ostringstream oss;
     if (sockAddrIn46.sai4.sin_family == AF_INET) {
-        std::cout << "\n AF: "
-                  << getAdressFamilyStr(sockAddrIn46.sai4.sin_family)
-                  << "\n addr:port: "
-                  << inet_ntop(AF_INET, &sockAddrIn46.sai4.sin_addr, addrBuffer,
-                               addrBuffLen)
-                  << ":" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
+        oss << " AF: " << getAdressFamilyStr(sockAddrIn46.sai4.sin_family)
+            << "\n addr:port: " << inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai4.sin_addr, &addrBuffer[0],
+              addrBuffLen) << ":" << std::dec
+            << ntohs(sockAddrIn46.sai4.sin_port);
     } else if (sockAddrIn46.sai6.sin6_family == AF_INET6) {
-        std::cout << "\n AF: "
-                  << getAdressFamilyStr(sockAddrIn46.sai6.sin6_family)
-                  << "\n addr:port: ["
-                  << inet_ntop(AF_INET6, &sockAddrIn46.sai6.sin6_addr,
-                               addrBuffer, addrBuffLen)
-                  << "]:" << std::dec << ntohs(sockAddrIn46.sai4.sin_port)
-                  << std::endl;
+        oss << " AF: " << getAdressFamilyStr(sockAddrIn46.sai6.sin6_family)
+            << "\n addr:port: [" << inet_ntop(socketAddr.sa_family, &sockAddrIn46.sai6.sin6_addr, &addrBuffer[0],
+              addrBuffLen) << "]:" << std::dec
+            << ntohs(sockAddrIn46.sai4.sin_port);
     }
+    return oss.str();
 }
 
+inline bool checkPollFailOK() {
+    static size_t loopCounter = 0;
+    static size_t retries = 42;
+    if (loopCounter % 1000 == 0)
+        retries = 42;
+    if (errno == EINTR)
+        return true;
+    if (errno == EAGAIN && retries > 1) {
+        retries--;
+        usleep(10000);
+        return true;
+    }
+    return false;
+}
 } // namespace srvHelp
 
 #endif // SERVERHELPER_HPP

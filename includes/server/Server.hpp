@@ -23,7 +23,9 @@ class Server {
     // Server &operator=(Server const &other);
 
     int                        createServerSocket_(int const domain);
+    void                       processServerSocketData_();
     void                       acceptClient_(int const serverFd);
+    void                       processClientSocketData_();
     void                       disconnectClient_(size_t const idx);
 
   public:
@@ -32,10 +34,5 @@ class Server {
 
     void run();
 };
-
-typedef union uSocketAddrX {
-    struct sockaddr_in  sai4;
-    struct sockaddr_in6 sai6;
-} socketAddrX;
 
 #endif // SERVER_HPP

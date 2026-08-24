@@ -54,6 +54,66 @@ int Server::createServerSocket_(int const domain) {
     return socketFd;
 }
 
+void Server::processServerSocketData_() {
+    for (size_t idx = 0; idx < numServerSockets_; ++idx) {
+        struct pollfd const &serverPollFds = pollFds_[idx];
+        if ((serverPollFds.revents & POLLERR) && !srvHelp::checkPollFailOK())
+            throw std::runtime_error("Server socket error");
+        if (serverPollFds.revents & POLLIN)
+            acceptClient_(serverPollFds.fd);
+    }
+}
+
+void Server::processClientSocketData_() {
+    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+        pollfd &pfd = pollFds_.at(idx);
+        if ((pfd.revents & POLLERR) && !srvHelp::checkPollFailOK()) {
+            std::cerr << "Client socket error on fd: " << pfd.fd
+                      << "Disconnect client." << std::endl;
+            disconnectClient_(idx);
+        } else if (pfd.revents & POLLIN) {
+            char    buffer[BUFFLEN];
+            ssize_t bytesRead = recv(pfd.fd, &buffer[0], BUFFLEN, 0);
+
+            if (bytesRead > 0) {
+                std::string &userInput = clientInputBuffers_.at(idx);
+                std::string  bufferStr(&buffer[0], bytesRead);
+
+                userInput += bufferStr;
+                size_t lfcrPos = userInput.find("\r\n");
+                if (lfcrPos == std::string::npos) {
+                    continue;
+                }
+                if (lfcrPos > MAXMSGLEN - 2) {
+                    std::cerr << "Client data error: message too "
+                                 "long.\nData sent will be discarded."
+                              << std::endl;
+                    userInput.erase(0, lfcrPos + 2);
+                    continue;
+                }
+                // DEBUG
+                {
+                    std::cout << "UserInput read from client " << idx << ": \n"
+                              << std::string(userInput) /* << std::endl */;
+                    userInput.clear();
+                }
+            } else if (bytesRead <= 0) {
+                // Comment will be deleted later, kept for reference for now
+                // this means, the client closed the connection
+                // POLLHUP isn't useful, because:
+                // When you kill netcat with Ctrl+C:
+                //     Netcat's OS kernel sent a FIN packet to your server
+                //     Your server's poll() detected this with POLLIN
+                //     Your read() returned 0 (zero bytes) == "I got the FIN, connection closed"
+                // FIN is the TCP mechanism for orderly shutdown.
+                // That's why POLLIN + read() return 0—the FIN,
+                // and the zero read is how the kernel tells you "the peer closed."
+                disconnectClient_(idx);
+            }
+        }
+    }
+}
+
 /*
 	tbd
 */
@@ -77,8 +137,9 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::storePollFd(clientFd, pollFds_, clientInputBuffers_);
 
     std::cout << "Client connected:\n"
-              << " fd: " << clientFd;
-    srvHelp::printAddrfamilyAddrPort(sockAddrIn46);
+              << " fd: " << clientFd << "\n"
+    << srvHelp::printAddrfamilyAddrPort(sockAddrIn46)
+	 << std::endl;
 }
 
 /*
@@ -113,6 +174,11 @@ void Server::disconnectClient_(size_t const idx) {
 	* handles client connect and disconnect scenarios
 	* on server stop signal, disconnects all clients and closes
 		the server socket(s)
+	* if poll returns an error -> exception is thrown, except for two scenarios:
+        EINTR — The call was interrupted by a signal. This is the most common
+		        retriable error. Retrying is standard practice.
+        EAGAIN — Temporary resource unavailability (rare with poll(),
+		         but possible in some edge cases).
 */
 void Server::run() {
     createServerSocket_(AF_INET);
@@ -122,105 +188,11 @@ void Server::run() {
         usleep(100);
 
         int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
-        if (pollResult == -1) {
-            static size_t loopCounter = 0;
-            static size_t retries = 42;
-            if (loopCounter % 1000 == 0) {
-                retries = 42;
-                // EINTR — The call was interrupted by a signal. This is the most common retriable error. Retrying is standard practice.
-                // EAGAIN — Temporary resource unavailability (rare with poll(), but possible in some edge cases).
-                if (errno == EINTR)
-                    continue;
-                if (errno == EAGAIN && retries > 1) {
-                    retries--;
-                    usleep(10000);
-                    continue;
-                }
-                throw std::runtime_error("poll failed too many times.");
-            }
-        }
+        if (pollResult == -1 && !srvHelp::checkPollFailOK())
+            throw std::runtime_error("poll failed too many times.");
 
-        for (size_t idx = 0; idx < numServerSockets_; ++idx) {
-            struct pollfd const &serverPollFds = pollFds_[idx];
-            if (serverPollFds.revents & POLLERR) {
-                std::cerr << "Server socket error\n";
-                break;
-            }
-            if (serverPollFds.revents & POLLIN) {
-                acceptClient_(serverPollFds.fd);
-            }
-        }
-        for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
-            pollfd &pfd = pollFds_.at(idx);
-            if (pfd.revents & POLLERR) {
-                std::cerr << "Client socket error on fd: " << pfd.fd
-                          << std::endl;
-                disconnectClient_(idx);
-            } else if (pfd.revents & POLLIN) {
-                char    buffer[BUFFLEN];
-                ssize_t bytesRead = recv(pfd.fd, &buffer[0], BUFFLEN, 0);
-
-                if (bytesRead > 0) {
-                    std::string &userInput = clientInputBuffers_.at(idx);
-                    std::string  bufferStr(&buffer[0], bytesRead);
-                    // bool         userInputValid = false;
-
-                    // // DEBUG for cont'd messages
-                    // if (!userInput.empty() && *userInput.rbegin() != '\r') {
-                    //     *userInput.rbegin() = '&';
-                    // }
-                    userInput += bufferStr;
-                    size_t lfcrPos = userInput.find("\r\n");
-                    if (userInput.length() >= MAXMSGLEN) {
-                        if (lfcrPos > MAXMSGLEN - 2) {
-                            std::cerr << "Client data error: message too "
-                                         "long.\nData sent will be discarded."
-                                      << std::endl;
-                            while (bytesRead > 0)
-                                bytesRead =
-                                    recv(pfd.fd, &buffer[0], BUFFLEN, 0);
-                            userInput.clear();
-                            continue;
-                        }
-                    } else if (lfcrPos == std::string::npos) {
-                        continue;
-                    } else if (lfcrPos < userInput.length() - 2) {
-                        std::cerr << "Client data error: message "
-                                     "malformed, data after CR-LF.\nExtraneous "
-                                     "data will be discarded."
-                                  << std::endl;
-                        userInput.resize(lfcrPos + 2);
-                    }
-                    // if (lfcrPos == userInput.length() - 2)
-                    //     userInputValid = true;
-                    // else {
-                    //     std::cerr << "What's going on here?" << std::endl;
-                    //     // userInput += bufferStr.substr(0, lfcrPos + 2);
-                    // }
-                    // if (userInputValid)
-                    {
-                        std::cout << "UserInput read from client " << idx
-                                  << ": \n"
-                                  << std::string(userInput) /* << std::endl */;
-                        userInput.clear();
-                    }
-                    // }
-                }
-                if (bytesRead <= 0) {
-                    // Comment will be deleted later, kept for reference for now
-                    // this means, the client closed the connection
-                    // POLLHUP isn't useful, because
-                    // When you kill netcat with Ctrl+C:
-                    //     Netcat's OS kernel sent a FIN packet to your server
-                    //     Your server's poll() detected this with POLLIN
-                    //     Your read() returned 0 (zero bytes) = "I got the FIN, connection closed"
-                    // FIN is the TCP mechanism for orderly shutdown.
-                    // That's why POLLIN + read() return 0—the FIN,
-                    // and the zero read is how the kernel tells you "the peer closed."
-                    disconnectClient_(idx);
-                }
-            }
-        }
+        processServerSocketData_();
+		processClientSocketData_();
     }
     while (!pollFds_.empty()) {
         disconnectClient_(pollFds_.size() - 1);
