@@ -138,8 +138,7 @@ void Server::acceptClient_(int const serverFd) {
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
-    << srvHelp::printAddrfamilyAddrPort(sockAddrIn46)
-	 << std::endl;
+              << srvHelp::printAddrfamilyAddrPort(sockAddrIn46) << std::endl;
 }
 
 /*
@@ -192,7 +191,7 @@ void Server::run() {
             throw std::runtime_error("poll failed too many times.");
 
         processServerSocketData_();
-		processClientSocketData_();
+        processClientSocketData_();
     }
     while (!pollFds_.empty()) {
         disconnectClient_(pollFds_.size() - 1);
