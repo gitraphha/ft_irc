@@ -33,6 +33,7 @@ class Server {
     // ~Server();
 
     void run();
+    bool sendMsg(int fd, std::string const &msg);
 };
 
 #endif // SERVER_HPP
