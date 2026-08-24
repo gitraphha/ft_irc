@@ -114,7 +114,7 @@ void Server::processClientSocketData_() {
                     oss << idx + 1 - numServerSockets_ << ": \n\t"
                         << std::string(userInput) /* << std::endl */;
                     userInput.clear();
-                    std::cout << "UserInput read from client #" << oss.str();					
+                    std::cout << "UserInput read from client #" << oss.str();
                     // Pong to client
                     sendMsg(pfd.fd, "You are client #" + oss.str());
                 }
