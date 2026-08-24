@@ -1,6 +1,6 @@
-#include "server/IRCServer.hpp"
+#include "server/Server.hpp"
 
-#include "server/IRCServerHelper.hpp"
+#include "server/ServerHelper.hpp"
 #include "server/SignalHandler.hpp"
 
 #include <exception>
@@ -9,16 +9,16 @@
 #include <sys/poll.h>
 
 /*
-	IRCServer Constructor
+	Server Constructor
 	* set port and password from command line args
 */
-IRCServer::IRCServer(int const port, std::string const &password)
+Server::Server(int const port, std::string const &password)
     : port_(port), password_(password), numServerSockets_(0) {}
 
 /*
 	tbd
 */
-int IRCServer::createServerSocket_(int const domain) {
+int Server::createServerSocket_(int const domain) {
     if (domain != AF_INET && domain != AF_INET6)
         throw std::invalid_argument(
             "Internal Error while opening server socket.");
@@ -57,7 +57,7 @@ int IRCServer::createServerSocket_(int const domain) {
 /*
 	tbd
 */
-void IRCServer::acceptClient_(int const serverFd) {
+void Server::acceptClient_(int const serverFd) {
     socketAddrX sockAddrIn46 = {};
     socklen_t   sockLen = 0;
 
@@ -84,7 +84,7 @@ void IRCServer::acceptClient_(int const serverFd) {
 /*
 	tbd
 */
-void IRCServer::disconnectClient_(size_t const idx) {
+void Server::disconnectClient_(size_t const idx) {
     pollfd &pfd = pollFds_.at(idx);
 
     if (idx < numServerSockets_) {
@@ -114,7 +114,7 @@ void IRCServer::disconnectClient_(size_t const idx) {
 	* on server stop signal, disconnects all clients and closes
 		the server socket(s)
 */
-void IRCServer::run() {
+void Server::run() {
     createServerSocket_(AF_INET);
     createServerSocket_(AF_INET6);
 
