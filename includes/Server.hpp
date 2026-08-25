@@ -1,27 +1,8 @@
 #pragma once
 
-// draft: to be completed by rhaas
-
 #include "ChannelManager.hpp"
 #include "ClientManager.hpp"
 #include "CommandProcessor.hpp"
-
-#define SERVER_NAME "irc.local"
-
-class Server {
-    ChannelManager   channels_;
-    ClientManager    clients_;
-    CommandProcessor cmds_;
-    int              port_;
-    std::string      password_;
-
-  public:
-    Server(int port, const std::string &password);
-
-    bool tryRegister(Client &client);
-};
-#ifndef SERVER_HPP
-#define SERVER_HPP
 
 #include <exception>
 #include <iostream>
@@ -30,12 +11,16 @@ class Server {
 #include <string>
 #include <vector>
 
+#define SERVER_NAME "irc.local"
 #define BUFFLEN 516
 #define MAXMSGLEN 512
 #define MAX_CONNECTIONS 512
 
 class Server {
   private:
+    ChannelManager             channels_;
+    ClientManager              clients_;
+    CommandProcessor           cmds_;
     int                        port_;
     std::string                password_;
 
@@ -58,6 +43,5 @@ class Server {
 
     void run();
     bool sendMsg(int fd, std::string const &msg);
+    bool tryRegister(Client &client);
 };
-
-#endif // SERVER_HPP
