@@ -2,4 +2,6 @@
 
 // TODO blnunez-
 
-void Client::send(const std::string &msg) {(void)msg;}
+void Client::send(const std::string &msg) {
+    (void)msg;
+}
