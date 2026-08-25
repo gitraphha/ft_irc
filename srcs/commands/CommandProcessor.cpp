@@ -15,6 +15,9 @@ Command &CommandProcessor::at_(const std::string &name) {
 // TODO blnunez-
 bool CommandProcessor::parse(const std::string &line, std::string &cmd,
                              std::vector<std::string> &params) {
+    (void)line;
+    (void)cmd;
+    (void)params;
     return false;
 }
 
