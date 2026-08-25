@@ -122,7 +122,8 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     return oss.str();
 }
 
-inline bool checkPollFailOK() {
+inline bool checkSocketFailOK() {
+	//return SignalHandler::stopLoopSignalReceived();
     static size_t loopCounter = 0;
     static size_t retries = 42;
     if (loopCounter % 1000 == 0)

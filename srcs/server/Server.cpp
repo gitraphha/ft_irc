@@ -74,7 +74,7 @@ int Server::createServerSocket_(int const domain) {
 void Server::processServerSocketData_() {
     for (size_t idx = 0; idx < numServerSockets_; ++idx) {
         struct pollfd const &serverPollFds = pollFds_[idx];
-        if ((serverPollFds.revents & POLLERR) && !srvHelp::checkPollFailOK())
+        if ((serverPollFds.revents & POLLERR) && !srvHelp::checkSocketFailOK())
             throw std::runtime_error("Server socket error");
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
@@ -84,7 +84,7 @@ void Server::processServerSocketData_() {
 void Server::processClientSocketData_() {
     for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
         pollfd &pfd = pollFds_.at(idx);
-        if ((pfd.revents & POLLERR) && !srvHelp::checkPollFailOK()) {
+        if ((pfd.revents & POLLERR) && !srvHelp::checkSocketFailOK()) {
             std::cerr << "Client socket error on fd: " << pfd.fd
                       << "Disconnect client." << std::endl;
             disconnectClient_(idx);
@@ -209,10 +209,8 @@ void Server::run() {
     createServerSocket_(AF_INET6);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
-        usleep(100);
-
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
-        if (pollResult == -1 && !srvHelp::checkPollFailOK())
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
+        if (pollResult == -1 && !srvHelp::checkSocketFailOK())
             throw std::runtime_error("poll failed too many times.");
 
         processServerSocketData_();
