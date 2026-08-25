@@ -1,5 +1,6 @@
 #include "Server.hpp"
 
+#include "Errors.hpp"
 #include "ServerHelper.hpp"
 #include "SignalHandler.hpp"
 
@@ -13,7 +14,8 @@
 	* set port and password from command line args
 */
 Server::Server(int const port, std::string const &password)
-    : port_(port), password_(password), numServerSockets_(0) {}
+    : port_(port), password_(password), serverName_(SERVER_NAME),
+      numServerSockets_(0), logger_(serverName_ + ": ") {}
 
 /* 
 	Can anyone send sth outside of the poll loop -> No, right?
@@ -65,7 +67,7 @@ int Server::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
-    srvHelp::storePollFd(socketFd, pollFds_, clientInputBuffers_);
+    srvHelp::storePollFd(socketFd, pollFds_, sockIODataStore_);
     ++numServerSockets_;
 
     return socketFd;
@@ -89,23 +91,30 @@ void Server::processClientSocketData_() {
                       << "Disconnect client." << std::endl;
             disconnectClient_(idx);
         } else if (pfd.revents & POLLIN) {
-            char    buffer[BUFFLEN];
-            ssize_t bytesRead = recv(pfd.fd, &buffer[0], BUFFLEN, 0);
+            SocketIOData &sockIOData = sockIODataStore_.at(pfd.fd);
+            char          recvBuffer[RECVBUFFLEN];
+            ssize_t bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
 
             if (bytesRead > 0) {
-                std::string &userInput = clientInputBuffers_.at(idx);
-                std::string  bufferStr(&buffer[0], bytesRead);
+                std::string &userInput = sockIOData.readBuffer;
+                userInput += std::string(&recvBuffer[0], bytesRead);
 
-                userInput += bufferStr;
                 size_t lfcrPos = userInput.find("\r\n");
-                if (lfcrPos == std::string::npos) {
-                    continue;
+                if ((userInput.length() >= MAXMSGLEN) &&
+                    (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
+                    sockIOData.discardMode = true;
                 }
-                if (lfcrPos > MAXMSGLEN - 2) {
-                    std::cerr << "Client data error: message too "
-                                 "long.\nData sent will be discarded."
-                              << std::endl;
-                    userInput.erase(0, lfcrPos + 2);
+                if (sockIOData.discardMode) {
+                    if (lfcrPos != std::string::npos) {
+                        userInput.erase(0, lfcrPos + 2);
+                        sockIOData.discardMode = false;
+                        lfcrPos = userInput.find("\r\n");
+                    } else if ('\r' == *userInput.rbegin())
+                        userInput = "\r";
+                    else
+                        userInput.clear();
+                }
+                if (lfcrPos == std::string::npos || sockIOData.discardMode) {
                     continue;
                 }
                 // DEBUG
@@ -118,6 +127,17 @@ void Server::processClientSocketData_() {
                     // Pong to client
                     sendMsg(pfd.fd, "You are client #" + oss.str());
                 }
+                try {
+                    cmds_.run(*this, *clients_.at(pfd.fd), userInput);
+                } catch (Error const &e) {
+                    if (e.hasReply()) {
+                        Client const &c = *clients_.at(pfd.fd);
+                        sendMsg(pfd.fd, Reply::build(serverName(), c.getNick(),
+                                                     e.reply()));
+                    } else
+                        log_(e.what(), (logMode)lmError);
+                }
+
             } else if (bytesRead <= 0) {
                 // Comment will be deleted later, kept for reference for now
                 // this means, the client closed the connection
@@ -155,7 +175,7 @@ void Server::acceptClient_(int const serverFd) {
 
     srvHelp::setSocketNonBlock(clientFd);
 
-    srvHelp::storePollFd(clientFd, pollFds_, clientInputBuffers_);
+    srvHelp::storePollFd(clientFd, pollFds_, sockIODataStore_);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
@@ -185,9 +205,11 @@ void Server::disconnectClient_(size_t const idx) {
     std::vector<std::string>::difference_type dist =
         static_cast<std::vector<std::string>::difference_type>(idx);
     pollFds_.erase(pollFds_.begin() + dist);
-    clientInputBuffers_.erase(
-        clientInputBuffers_.begin() +
-        static_cast<std::vector<std::string>::difference_type>(dist));
+    sockIODataStore_.erase(pfd.fd);
+}
+
+void Server::log_(std::string const &msg, logMode const lm) {
+    logger_.logMsg(msg, lm);
 }
 
 /*

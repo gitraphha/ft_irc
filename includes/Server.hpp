@@ -3,6 +3,7 @@
 #include "ChannelManager.hpp"
 #include "ClientManager.hpp"
 #include "CommandProcessor.hpp"
+#include "Logger.hpp"
 
 #include <exception>
 #include <iostream>
@@ -12,36 +13,56 @@
 #include <vector>
 
 #define SERVER_NAME "irc.local"
-#define BUFFLEN 516
+#define RECVBUFFLEN 516
 #define MAXMSGLEN 512
 #define MAX_CONNECTIONS 512
 
+struct SocketIOData {
+    std::string readBuffer;
+    std::string writeBuffer;
+    size_t      errorCount;
+    bool        discardMode;
+
+    SocketIOData() : errorCount(0), discardMode(false) {}
+};
+
 class Server {
   private:
-    ChannelManager             channels_;
-    ClientManager              clients_;
-    CommandProcessor           cmds_;
-    int                        port_;
-    std::string                password_;
+    ChannelManager              channels_;
+    ClientManager               clients_;
+    CommandProcessor            cmds_;
 
-    size_t                     numServerSockets_;
-    std::vector<struct pollfd> pollFds_;
-    std::vector<std::string>   clientInputBuffers_;
+    int                         port_;
+    std::string                 password_;
+    std::string                 serverName_;
+
+    size_t                      numServerSockets_;
+    std::vector<struct pollfd>  pollFds_;
+    // std::vector<std::string>   clientInputBuffers_;
+    std::map<int, SocketIOData> sockIODataStore_;
+
+    Logger                      logger_;
 
     // Server(Server const &other);
     // Server &operator=(Server const &other);
 
-    int                        createServerSocket_(int const domain);
-    void                       processServerSocketData_();
-    void                       acceptClient_(int const serverFd);
-    void                       processClientSocketData_();
-    void                       disconnectClient_(size_t const idx);
+    int                         createServerSocket_(int const domain);
+    void                        processServerSocketData_();
+    void                        acceptClient_(int const serverFd);
+    void                        processClientSocketData_();
+    void                        disconnectClient_(size_t const idx);
+    void                        log_(std::string const &msg, logMode const lm);
 
   public:
     Server(int const port, std::string const &password);
+
     // ~Server();
+
+    std::string const &serverName() {
+        return serverName_;
+    };
 
     void run();
     bool sendMsg(int fd, std::string const &msg);
-    bool tryRegister(Client &client);
+    bool tryRegister(Client &client){(void) client; return false;};
 };
