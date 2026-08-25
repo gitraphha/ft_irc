@@ -26,8 +26,7 @@
 #include <string>
 #include <vector>
 
-namespace Parser
-{
-	bool parse(const std::string &line, std::string &cmd,
+namespace Parser {
+bool parse(const std::string &line, std::string &cmd,
            std::vector<std::string> &params);
-}// namespace Parser
+} // namespace Parser
