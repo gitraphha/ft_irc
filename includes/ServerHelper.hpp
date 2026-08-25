@@ -1,5 +1,4 @@
-#ifndef SERVERHELPER_HPP
-#define SERVERHELPER_HPP
+#pragma once
 
 #include <arpa/inet.h>
 #include <cerrno>
@@ -124,7 +123,7 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
 }
 
 inline bool checkSocketFailOK() {
-	//return SignalHandler::stopLoopSignalReceived();
+    //return SignalHandler::stopLoopSignalReceived();
     static size_t loopCounter = 0;
     static size_t retries = 42;
     if (loopCounter % 1000 == 0)
@@ -139,5 +138,3 @@ inline bool checkSocketFailOK() {
     return false;
 }
 } // namespace srvHelp
-
-#endif // SERVERHELPER_HPP

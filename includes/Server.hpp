@@ -1,5 +1,8 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#pragma once
+
+#include "ChannelManager.hpp"
+#include "ClientManager.hpp"
+#include "CommandProcessor.hpp"
 
 #include <exception>
 #include <iostream>
@@ -8,12 +11,16 @@
 #include <string>
 #include <vector>
 
+#define SERVER_NAME "irc.local"
 #define BUFFLEN 516
 #define MAXMSGLEN 512
 #define MAX_CONNECTIONS 512
 
 class Server {
   private:
+    ChannelManager             channels_;
+    ClientManager              clients_;
+    CommandProcessor           cmds_;
     int                        port_;
     std::string                password_;
 
@@ -36,6 +43,5 @@ class Server {
 
     void run();
     bool sendMsg(int fd, std::string const &msg);
+    bool tryRegister(Client &client);
 };
-
-#endif // SERVER_HPP
