@@ -16,7 +16,8 @@ SRCS_SERVER 	= Server \
 				  Client \
 				  ClientManager \
 				  Channel \
-				  ChannelManager
+				  ChannelManager \
+				  SignalHandler
 
 SRCS_COMMANDS	= CommandProcessor \
 				  Handlers
