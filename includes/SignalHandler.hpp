@@ -4,7 +4,7 @@
 #include <csignal>
 #include <vector>
 
-typedef void (*sighandler_t) (int);
+typedef void (*sighandler_t)(int);
 
 class SignalHandler {
   private:
