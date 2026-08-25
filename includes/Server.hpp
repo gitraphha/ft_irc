@@ -64,5 +64,9 @@ class Server {
 
     void run();
     bool sendMsg(int fd, std::string const &msg);
-    bool tryRegister(Client &client){(void) client; return false;};
+
+    bool tryRegister(Client &client) {
+        (void)client;
+        return false;
+    };
 };
