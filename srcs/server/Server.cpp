@@ -209,9 +209,7 @@ void Server::run() {
     createServerSocket_(AF_INET6);
 
     while (!SignalHandler::stopLoopSignalReceived()) {
-        usleep(100);
-
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), 0);
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
         if (pollResult == -1 && !srvHelp::checkPollFailOK())
             throw std::runtime_error("poll failed too many times.");
 
