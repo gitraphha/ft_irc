@@ -84,15 +84,6 @@ inline void storePollFd(int const                   socketFd,
     usrInBuff.push_back(std::string());
 }
 
-inline bool isSocketListening(int sockfd) {
-    int       optVal = 0;
-    socklen_t optLen = sizeof(optVal);
-    if (getsockopt(sockfd, SOL_SOCKET, SO_ACCEPTCONN, &optVal, &optLen) < 0)
-        throw std::runtime_error("Error getting socket options.");
-
-    return (optVal > 0);
-}
-
 inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     char              addrBuffer[128];
     socklen_t const   addrBuffLen = sizeof(addrBuffer) / sizeof(char);
