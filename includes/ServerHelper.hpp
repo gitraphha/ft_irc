@@ -2,6 +2,7 @@
 #define SERVERHELPER_HPP
 
 #include <arpa/inet.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <iostream>
 #include <sstream>
