@@ -13,32 +13,26 @@ DEBUG_BUILD_DIR	= build_debug
 SRCS_ROOT		= main
 
 SRCS_SERVER 	= Server \
-				SignalHandler
-# 				  Client \
-# 				  Channel
+				  Client \
+				  ClientManager \
+				  Channel \
+				  ChannelManager
 
-# SRCS_COMMANDS	= Command \
-# 				  Pass \
-# 				  Nick \
-# 				  User \
-# 				  Quit \
-# 				  Join \
-# 				  Kick \
-# 				  Invite \
-# 				  Topic \
-# 				  Mode \
-# 				  Privmsg \
-# 				  Notice \
-# 				  Ping
+SRCS_COMMANDS	= CommandProcessor \
+				  Handlers
 
-# SRCS_UTILS		= Parser \
+SRCS_UTILS		= MemberSet \
+				  ModeSet
+# 				  Parser \
 # 				  Reply
 
 # SRCS_BONUS		= DCC \
 # 				  Bot
 
 SRCS			= $(SRCS_ROOT) \
- 				  $(addprefix server/, $(SRCS_SERVER))
+				  $(addprefix server/, $(SRCS_SERVER)) \
+				  $(addprefix commands/, $(SRCS_COMMANDS)) \
+				  $(addprefix utils/, $(SRCS_UTILS))
 
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
 DEBUG_OBJS		= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
