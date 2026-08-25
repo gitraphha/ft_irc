@@ -10,7 +10,9 @@
 Channel::Channel(const std::string &name, const std::string &nameCaseFolded,
                  const std::string &key)
     : name_(name), nameCaseFolded_(nameCaseFolded), key_(key), userLimit_(-1),
-      createdTime_(std::time(NULL)), topicSetTime_() {}
+      createdTime_(std::time(NULL)), topicSetTime_() {
+    (void)topicSetTime_;
+}
 
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void Channel::join(Client *client, const std::string &key) {
