@@ -20,7 +20,7 @@
 #define SOCKETERRORLIMIT 16
 
 #ifndef VERBOSE_LOG
-#define VERBOSE_LOG 1
+#define VERBOSE_LOG 0
 #endif
 
 struct SocketIOData {
