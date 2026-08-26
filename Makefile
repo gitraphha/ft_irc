@@ -50,7 +50,7 @@ DEPS			= $(OBJS:.o=.d) $(DEBUG_OBJS:.o=.d)
 CXX				= c++
 CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
 IFLAGS			= -I$(INC_DIR)
-DFLAGS			= -DDEBUG -g -fsanitize=address
+DFLAGS			= -DDEBUG -DVERBOSE_LOG=1 -g -fsanitize=address
 DEBUG_CXXFLAGS	= $(CXXFLAGS) $(DFLAGS)
 
 # ---- Rules -------------------------------------------------------------------

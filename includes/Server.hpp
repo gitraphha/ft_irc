@@ -13,9 +13,15 @@
 #include <vector>
 
 #define SERVER_NAME "irc.local"
+#define MAX_CONNECTIONS 512
+
 #define RECVBUFFLEN 516
 #define MAXMSGLEN 512
-#define MAX_CONNECTIONS 512
+#define SOCKETERRORLIMIT 16
+
+#ifndef VERBOSE_LOG
+#define VERBOSE_LOG 0
+#endif
 
 struct SocketIOData {
     std::string readBuffer;
@@ -50,7 +56,7 @@ class Server {
     void                        processServerSocketData_();
     void                        acceptClient_(int const serverFd);
     void                        processClientSocketData_();
-    void                        disconnectClient_(size_t const idx);
+    void                        closeSocket_(int const fd);
     void                        log_(std::string const &msg, logMode const lm);
 
   public:
@@ -63,7 +69,7 @@ class Server {
     };
 
     void run();
-    bool sendMsg(int fd, std::string const &msg);
+    bool sendMsg(int const fd, std::string const &msg);
 
     bool tryRegister(Client &client) {
         (void)client;
