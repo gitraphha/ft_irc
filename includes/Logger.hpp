@@ -1,5 +1,7 @@
 #pragma once
 
+#include "colours.hpp"
+
 #include <cstring>
 #include <ctime>
 #include <iostream>
@@ -28,7 +30,7 @@ class Logger {
             std::cout << nowStr_() << " " << prefix_ << "[INFO] : " << msg
                       << std::endl;
         if (lm == (logMode)lmError)
-            std::cerr << nowStr_() << " " << prefix_ << "[ERROR]: " << msg
-                      << std::endl;
+            std::cerr << nowStr_() << " " << prefix_ << CRed
+                      << "[ERROR]: " << msg << CReset << std::endl;
     }
 };
