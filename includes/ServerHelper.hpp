@@ -1,7 +1,7 @@
-#ifndef SERVERHELPER_HPP
-#define SERVERHELPER_HPP
+#pragma once
 
 #include <arpa/inet.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <iostream>
 #include <sstream>
@@ -73,15 +73,17 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline void storePollFd(int const                   socketFd,
-                        std::vector<struct pollfd> &pFds,      // NOLINT
-                        std::vector<std::string>   &usrInBuff) { // NOLINT
+inline void
+storePollFd(int const                    socketFd,
+            std::vector<struct pollfd>  &pFds,              // NOLINT
+            std::map<int, SocketIOData> &sockIODataStore) { // NOLINT
     pollfd pfd = {};
     pfd.fd = socketFd;
     pfd.events = POLLIN; // Monitor for incoming connections
 
     pFds.push_back(pfd);
-    usrInBuff.push_back(std::string());
+    sockIODataStore.insert(
+        std::make_pair<int, SocketIOData>(pfd.fd, SocketIOData()));
 }
 
 inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
@@ -113,7 +115,8 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     return oss.str();
 }
 
-inline bool checkPollFailOK() {
+inline bool checkSocketFailOK() {
+    //return SignalHandler::stopLoopSignalReceived();
     static size_t loopCounter = 0;
     static size_t retries = 42;
     if (loopCounter % 1000 == 0)
@@ -128,5 +131,3 @@ inline bool checkPollFailOK() {
     return false;
 }
 } // namespace srvHelp
-
-#endif // SERVERHELPER_HPP

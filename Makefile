@@ -13,32 +13,27 @@ DEBUG_BUILD_DIR	= build_debug
 SRCS_ROOT		= main
 
 SRCS_SERVER 	= Server \
-				SignalHandler
-# 				  Client \
-# 				  Channel
+				  Client \
+				  ClientManager \
+				  Channel \
+				  ChannelManager \
+				  SignalHandler
 
-# SRCS_COMMANDS	= Command \
-# 				  Pass \
-# 				  Nick \
-# 				  User \
-# 				  Quit \
-# 				  Join \
-# 				  Kick \
-# 				  Invite \
-# 				  Topic \
-# 				  Mode \
-# 				  Privmsg \
-# 				  Notice \
-# 				  Ping
+SRCS_COMMANDS	= CommandProcessor \
+				  Handlers
 
-# SRCS_UTILS		= Parser \
+SRCS_UTILS		= MemberSet \
+				  ModeSet
+# 				  Parser \
 # 				  Reply
 
 # SRCS_BONUS		= DCC \
 # 				  Bot
 
 SRCS			= $(SRCS_ROOT) \
- 				  $(addprefix server/, $(SRCS_SERVER))
+				  $(addprefix server/, $(SRCS_SERVER)) \
+				  $(addprefix commands/, $(SRCS_COMMANDS)) \
+				  $(addprefix utils/, $(SRCS_UTILS))
 
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
 DEBUG_OBJS		= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
@@ -53,9 +48,9 @@ DEPS			= $(OBJS:.o=.d) $(DEBUG_OBJS:.o=.d)
 # ---- Compiler and Flags ------------------------------------------------------
 
 CXX				= c++
-CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
+CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98 -DVERBOSE_LOG=0
 IFLAGS			= -I$(INC_DIR)
-DFLAGS			= -DDEBUG -g -fsanitize=address
+DFLAGS			= -DDEBUG -DVERBOSE_LOG=1 -g -fsanitize=address
 DEBUG_CXXFLAGS	= $(CXXFLAGS) $(DFLAGS)
 
 # ---- Rules -------------------------------------------------------------------

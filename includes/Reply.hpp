@@ -85,6 +85,7 @@ enum Code {
     ERR_NOORIGIN = 409,    // :No origin specified                   (PING/PONG)
     ERR_NORECIPIENT = 411, // :No recipient given (<command>)        (PRIVMSG)
     ERR_NOTEXTTOSEND = 412, // :No text to send                       (PRIVMSG)
+    ERR_INPUTTOOLONG = 417, // <client> :Input line was too long
     ERR_UNKNOWNCOMMAND = 421,   // <command> :Unknown command
     ERR_NOMOTD = 422,           // :MOTD File is missing
     ERR_NONICKNAMEGIVEN = 431,  // :No nickname given                     (NICK)
@@ -104,8 +105,9 @@ enum Code {
     ERR_CHANNELISFULL = 471, // <channel> :Cannot join channel (+l)
     ERR_UNKNOWNMODE =
         472, // <char> :is unknown mode char to me for <channel> (MODE)
-    ERR_INVITEONLYCHAN = 473,   // <channel> :Cannot join channel (+i)
-    ERR_BADCHANNELKEY = 475,    // <channel> :Cannot join channel (+k)
+    ERR_INVITEONLYCHAN = 473, // <channel> :Cannot join channel (+i)
+    ERR_BADCHANNELKEY = 475,  // <channel> :Cannot join channel (+k)
+    ERR_NOPRIVILEGES = 481,   // :Permission Denied- You're not an IRC operator
     ERR_CHANOPRIVSNEEDED = 482, // <channel> :You're not channel operator
     ERR_NOOPERHOST = 491        // :No O-lines for your host             (OPER)
 };
@@ -138,6 +140,8 @@ inline const char *text(Code code) {
             return "No origin specified";
         case ERR_NOTEXTTOSEND:
             return "No text to send";
+        case ERR_INPUTTOOLONG:
+            return "Input line was too long";
         case ERR_UNKNOWNCOMMAND:
             return "Unknown command";
         case ERR_NOMOTD:
@@ -172,6 +176,8 @@ inline const char *text(Code code) {
             return "Cannot join channel (+i)";
         case ERR_BADCHANNELKEY:
             return "Cannot join channel (+k)";
+        case ERR_NOPRIVILEGES:
+            return "Permission Denied- You're not an IRC operator";
         case ERR_CHANOPRIVSNEEDED:
             return "You're not channel operator";
         case ERR_NOOPERHOST:
