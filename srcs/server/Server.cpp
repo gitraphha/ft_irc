@@ -41,7 +41,7 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
     oss << "writeBuffer: '" << sIOD.writeBuffer << "'";
     if (!success) {
         oss << ": send to FD " << fd << " failed.";
-        log_(oss.str(), (logMode)lmError);
+        log_(oss.str(), Logger::lmError);
     } else {
         if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
             oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
@@ -49,7 +49,7 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
         else
             oss << " successfully";
         oss << " sent to FD: " << fd;
-        log_(oss.str(), (logMode)lmInfo);
+        log_(oss.str(), Logger::lmInfo);
     }
 #endif // VERBOSE_LOG
 
@@ -183,7 +183,7 @@ void Server::processClientSocketData_() {
                     } else {
                         std::string tmp("Error while trying to send msg:\n");
                         tmp.append(e.what());
-                        log_(tmp.c_str(), (logMode)lmError);
+                        log_(tmp.c_str(), Logger::lmError);
                     }
                 }
                 userInput.clear();
@@ -259,14 +259,14 @@ void Server::closeSocket_(int const fd) {
         if (pollFds_.size() != idx + 1)
             return log_("Internal error: Close client sockets before "
                         "closing server!",
-                        (logMode)lmError);
+                        Logger::lmError);
         oss << "Closing server socket ("
             << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
     } else {
         oss << "Closing client #" << idx + 1 - numServerSockets_ << " socket ("
             << pollFds_.size() - 1 - numServerSockets_ << " clients remaining)";
     }
-    log_(oss.str(), (logMode)lmInfo);
+    log_(oss.str(), Logger::lmInfo);
 
     close(fd);
     std::vector<std::string>::difference_type dist =
@@ -275,7 +275,7 @@ void Server::closeSocket_(int const fd) {
     sockIODataStore_.erase(fd);
 }
 
-void Server::log_(std::string const &msg, logMode const lm) {
+void Server::log_(std::string const &msg, Logger::logMode const lm) {
     logger_.logMsg(msg, lm);
 }
 
