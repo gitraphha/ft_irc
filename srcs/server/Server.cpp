@@ -126,10 +126,15 @@ void Server::processClientSocketData_() {
             ssize_t bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
 
             if (bytesRead > 0) {
-                SocketIOData       &sockIOData = sockIODataStore_.at(pfd.fd);
-                Client const *const client = clients_.at(pfd.fd);
+                SocketIOData &sockIOData = sockIODataStore_.at(pfd.fd);
+                Client const *client = 0;
+                try {
+                    client = clients_.at(pfd.fd);
+                } catch (std::exception const &e) {
+                    std::cerr << "caught exception: " << e.what() << std::endl;
+                }
 
-                std::string         nickName = "*";
+                std::string nickName = "*";
                 if (client && client->isRegistered())
                     nickName = client->getNick();
 
@@ -158,14 +163,16 @@ void Server::processClientSocketData_() {
                 if (lfcrPos == std::string::npos || sockIOData.discardMode) {
                     continue;
                 }
-#if LOG_VERBOSE
+#if VERBOSE_LOG
                 std::ostringstream oss;
-                oss << idx + 1 - numServerSockets_ << ": \n\t"
+                oss << "You are client #" << idx + 1 - numServerSockets_
+                    << ": \n"
+                    << "Srv received: "
                     << std::string(userInput) /* << std::endl */;
                 std::cout << "UserInput read from client #" << oss.str();
                 // Pong to client
-                sendMsg(pfd.fd, "You are client #" + oss.str());
-#endif // LOG_VERBOSE
+                sendMsg(pfd.fd, oss.str());
+#endif // VERBOSE_LOG
                 try {
                     cmds_.run(*this, *clients_.at(pfd.fd), userInput);
                 } catch (Error const &e) {
@@ -173,9 +180,13 @@ void Server::processClientSocketData_() {
                         Client const &c = *clients_.at(pfd.fd);
                         sendMsg(pfd.fd, Reply::build(serverName(), c.getNick(),
                                                      e.reply()));
-                    } else
-                        log_(e.what(), (logMode)lmError);
+                    } else {
+                        std::string tmp("Error while trying to send msg:\n");
+                        tmp.append(e.what());
+                        log_(tmp.c_str(), (logMode)lmError);
+                    }
                 }
+                userInput.clear();
 
             } else if (bytesRead <= 0) {
                 // Comment will be deleted later, kept for reference for now

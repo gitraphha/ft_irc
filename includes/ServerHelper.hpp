@@ -83,7 +83,7 @@ storePollFd(int const                    socketFd,
 
     pFds.push_back(pfd);
     sockIODataStore.insert(
-        std::make_pair<int, SocketIOData>(pfd.fd, SocketIOData()));
+        std::make_pair<int, SocketIOData>(socketFd, SocketIOData()));
 }
 
 inline bool isSocketListening(int sockfd) {
