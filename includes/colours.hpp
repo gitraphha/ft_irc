@@ -3,12 +3,15 @@
 /*                                                        :::      ::::::::   */
 /*   colours.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: raphha <raphha@student.42.fr>              +#+  +:+       +#+        */
+/*   By: rhaas <rhaas@student.42berlin.de>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/18 11:26:12 by rhaas             #+#    #+#             */
-/*   Updated: 2026/08/26 15:11:20 by raphha           ###   ########.fr       */
+/*   Updated: 2026/08/27 17:28:27 by rhaas            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
+
+#ifndef COLOURS_HPP
+#define COLOURS_HPP
 
 // Color	FG	BG
 #define CBlack "\x1B[30m"  // 40
@@ -22,3 +25,5 @@
 #define CDeflt "\x1B[39m"  // 49
 
 #define CReset "\x1B[0m"
+
+#endif // COLOURS_HPP
