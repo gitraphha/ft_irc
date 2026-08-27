@@ -73,19 +73,6 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline void
-storePollFd(int const                    socketFd,
-            std::vector<struct pollfd>  &pFds,              // NOLINT
-            std::map<int, SocketIOData> &sockIODataStore) { // NOLINT
-    pollfd pfd = {};
-    pfd.fd = socketFd;
-    pfd.events = POLLIN; // Monitor for incoming connections
-
-    pFds.push_back(pfd);
-    sockIODataStore.insert(
-        std::make_pair<int, SocketIOData>(socketFd, SocketIOData()));
-}
-
 inline bool isSocketListening(int sockfd) {
     int       optVal = 0;
     socklen_t optLen = sizeof(optVal);
