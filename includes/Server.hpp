@@ -58,7 +58,7 @@ class Server {
     void                        storePollFd_(int const socketFd);
     void                        processClientSocketData_();
     void                        closeSocket_(int const fd);
-    void                        log_(std::string const &msg, logMode const lm);
+    void                        log_(std::string const &msg, Logger::logMode const lm);
 
   public:
     Server(int const port, std::string const &password);
