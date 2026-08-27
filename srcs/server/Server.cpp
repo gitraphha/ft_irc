@@ -98,7 +98,7 @@ int Server::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
-    srvHelp::storePollFd(socketFd, pollFds_, sockIODataStore_);
+    storePollFd_(socketFd);
     ++numServerSockets_;
 
     return socketFd;
@@ -226,11 +226,21 @@ void Server::acceptClient_(int const serverFd) {
 
     srvHelp::setSocketNonBlock(clientFd);
 
-    srvHelp::storePollFd(clientFd, pollFds_, sockIODataStore_);
+    storePollFd_(clientFd);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
               << srvHelp::printAddrfamilyAddrPort(sockAddrIn46) << std::endl;
+}
+
+void Server::storePollFd_(int const socketFd) {
+    pollfd pfd = {};
+    pfd.fd = socketFd;
+    pfd.events = POLLIN; // Monitor for incoming connections
+
+    pollFds_.push_back(pfd);
+    sockIODataStore_.insert(
+        std::make_pair<int, SocketIOData>(socketFd, SocketIOData()));
 }
 
 /*
