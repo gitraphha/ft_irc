@@ -77,6 +77,17 @@ A return value of **`0`** specifically indicates a timeout occurred with no even
 *   **Automatic Flags**: The kernel sets `POLLERR`, `POLLHUP`, and `POLLNVAL` in `revents` **even if you did not request them** in `events`. Robust code must always check for these flags to detect connection resets, errors, or invalid descriptors.
 *   **Array Limits**: Passing an `nfds` value larger than the process's `RLIMIT_NOFILE` (often 1024 by default) will cause `poll()` to fail immediately with `EINVAL`.
 
+#### note on how to detect whether client closed the connection on their side
+    POLLHUP isn't useful, because:
+    When you kill netcat with Ctrl+C:
+        Netcat's OS kernel sent a FIN packet to your server
+        Your server's poll() detected this with POLLIN
+        Your read() returned 0 (zero bytes) == "I got the FIN, connection closed"
+    FIN is the TCP mechanism for orderly shutdown.
+    That's why POLLIN + read() return 0—the FIN,
+    and the zero read is how the kernel tells you "the peer closed."
+
+
 ### Windows Compatibility
 Standard `poll()` is part of POSIX and is not natively available in the standard Winsock API. Windows provides **`WSAPoll()`** in newer versions (Vista/Server 2008+), but it has historically had bugs and performance issues. Production C++ applications targeting Windows often use `select()`, Overlapped I/O (IOCP), or cross-platform libraries like **`libuv`** or **`Boost.Asio`** to abstract these differences.
 
