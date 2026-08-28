@@ -16,16 +16,19 @@ class MemberSet {
 
   public:
     MemberSet() {};
-    MemberSet(Client *client);
-    MemberSet(Client *client, const ModeSet &modes);
+    MemberSet(Client &client);
+    MemberSet(Client &client, const ModeSet &modes);
 
-    void add(Client *client, const ModeSet &modes);
-    void remove(Client *client);
-    void setModes(Client *client, const ModeSet &modes);
+    void add(Client &client, const ModeSet &modes);
+    void remove(Client &client);
+    void setModes(Client &client, const ModeSet &modes);
 
-    size_t size() const;
-    bool   has(Client *client) const;
-    bool   hasAtLeast(Client *client, const ModeSet &modes) const;
+    const std::map<Client *, ModeSet> getMembers() const;
+    size_t                            size() const;
+    bool                              has(Client &client) const;
+    bool        hasAtLeast(Client &client, int mode) const;
+    bool        hasAtLeast(Client &client, const ModeSet &modes) const;
 
-    void send(const std::string &msg, const Client *skip = 0) const;
+    void        send(const std::string &msg, const Client *skip = 0) const;
+    std::string namesList() const;
 };

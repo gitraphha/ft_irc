@@ -65,6 +65,7 @@ enum Code {
     RPL_CHANNELMODEIS = 324, // <channel> <mode> <mode params>
     RPL_NOTOPIC = 331,       // <channel> :No topic is set
     RPL_TOPIC = 332,         // <channel> :<topic>
+    RPL_TOPICWHOTIME = 333,  // <channel> <setnick> <setat>
     RPL_INVITING = 341,      // <channel> <nick>
     RPL_VERSION = 351,       // <version>.<debuglevel> <server> :<comments>
     RPL_NAMREPLY = 353, // "=" <channel> :[prefix]<nick> *( " " [prefix]<nick> )
@@ -190,6 +191,7 @@ inline const char *text(Code code) {
         case RPL_ISUPPORT:
         case RPL_CHANNELMODEIS:
         case RPL_TOPIC:
+        case RPL_TOPICWHOTIME:
         case RPL_INVITING:
         case RPL_VERSION:
         case RPL_NAMREPLY:
@@ -204,17 +206,17 @@ inline const char *text(Code code) {
 // It deliberately does not include the receiver nick or the server name;
 // build() injects those when the reply is actually sent.
 struct Message {
-    int         code;
+    Code        code;
     std::string params;
     bool        has_trailing;
     std::string trailing;
 
     Message() : code(), has_trailing(false) {}
 
-    Message(int c, const std::string &p)
+    Message(Code c, const std::string &p)
         : code(c), params(p), has_trailing(false) {}
 
-    Message(int c, const std::string &p, const std::string &t)
+    Message(Code c, const std::string &p, const std::string &t)
         : code(c), params(p), has_trailing(true), trailing(t) {}
 };
 
@@ -237,6 +239,21 @@ trailing is empty.
 inline Message reply(Code code, const std::string &params,
                      const std::string &trailing) {
     return Message(code, params, trailing);
+}
+
+inline std::string fromClient(const std::string &prefix, const std::string &cmd,
+                              const std::string &params,
+                              const std::string &trailing = "") {
+    std::string out = ":";
+    if (!prefix.empty())
+        out += prefix + " ";
+    out += cmd;
+    if (!params.empty())
+        out += " " + params;
+    if (!trailing.empty())
+        out += " :" + trailing;
+    out += "\r\n";
+    return out;
 }
 
 /*
