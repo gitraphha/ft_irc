@@ -91,29 +91,18 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     }
     char const *addrStrPtr =
         inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
-    std::string addrStr(addrStrPtr ? addrStrPtr : "<unknown address>");
-    if (saFamily == AF_INET6)
-        addrStr = "[" + addrStr + "]";
 
+    std::string addrStr("No addr:port information.");
+    if (addrStrPtr) {
+        addrStr.assign(addrStrPtr);
+        if (saFamily == AF_INET6)
+            addrStr = "[" + addrStr + "]";
+    }
     std::ostringstream oss;
     oss << " AF: " << getAdressFamilyStr(saFamily)
         << "\n addr:port: " << addrStr << ":" << std::dec << portNumber;
+
     return oss.str();
 }
 
-inline bool checkSocketFailOK() {
-    //return SignalHandler::stopLoopSignalReceived();
-    static size_t loopCounter = 0;
-    static size_t retries = 42;
-    if (loopCounter % 1000 == 0)
-        retries = 42;
-    if (errno == EINTR)
-        return true;
-    if (errno == EAGAIN && retries > 1) {
-        retries--;
-        usleep(10000);
-        return true;
-    }
-    return false;
-}
 } // namespace srvHelp
