@@ -36,22 +36,20 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
         success = false;
     }
 
-#if VERBOSE_LOG
     std::ostringstream oss;
-    oss << "writeBuffer: '" << sIOD.writeBuffer << "'";
+    oss << "SendMsg event:\n" << "WriteBuffer: '" << sIOD.writeBuffer << "':\n";
     if (!success) {
-        oss << ": send to FD " << fd << " failed.";
+        oss << " send to FD " << fd << " failed.";
         log_(oss.str(), Logger::lmError);
     } else {
         if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
             oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-                << ": " << sIOD.writeBuffer.substr(0, bytesSent);
+                << ") " << sIOD.writeBuffer.substr(0, bytesSent);
         else
             oss << " successfully";
         oss << " sent to FD: " << fd;
         log_(oss.str(), Logger::lmInfo);
     }
-#endif // VERBOSE_LOG
 
     if (!success)
         return false;
@@ -107,8 +105,8 @@ int Server::createServerSocket_(int const domain) {
 void Server::processServerSocketData_() {
     for (size_t idx = 0; idx < numServerSockets_; ++idx) {
         struct pollfd const &serverPollFds = pollFds_[idx];
-        if ((serverPollFds.revents & POLLERR) && !srvHelp::checkSocketFailOK())
-            throw std::runtime_error("Server socket error");
+        if ((serverPollFds.revents & POLLERR))
+            throw std::runtime_error("Server socket error.");
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
     }
@@ -116,27 +114,29 @@ void Server::processServerSocketData_() {
 
 void Server::processClientSocketData_() {
     for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
-        pollfd &pfd = pollFds_.at(idx);
-        if ((pfd.revents & POLLERR) && !srvHelp::checkSocketFailOK()) {
-            std::cerr << "Client socket error on fd: " << pfd.fd
-                      << "Disconnect client." << std::endl;
-            closeSocket_(idx);
+        pollfd       &pfd = pollFds_.at(idx);
+        SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
+
+        if ((pfd.revents & POLLERR)) {
+            if (sIOD.errorCount >= SOCKETERRORLIMIT) {
+                closeSocket_(pfd.fd);
+            } else
+                ++sIOD.errorCount;
+
         } else if (pfd.revents & POLLIN) {
             char    recvBuffer[RECVBUFFLEN];
             ssize_t bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
 
             if (bytesRead > 0) {
                 SocketIOData &sockIOData = sockIODataStore_.at(pfd.fd);
-                Client const *client = 0;
+                std::string   nickName = "*";
                 try {
-                    client = clients_.at(pfd.fd);
+                    Client const *const client = clients_.at(pfd.fd);
+                    if (client && client->isRegistered())
+                        nickName = client->getNick();
                 } catch (std::exception const &e) {
-                    std::cerr << "caught exception: " << e.what() << std::endl;
+                    log_(e.what(), Logger::lmExcept);
                 }
-
-                std::string nickName = "*";
-                if (client && client->isRegistered())
-                    nickName = client->getNick();
 
                 std::string &userInput = sockIOData.readBuffer;
                 userInput += std::string(&recvBuffer[0], bytesRead);
@@ -163,7 +163,8 @@ void Server::processClientSocketData_() {
                 if (lfcrPos == std::string::npos || sockIOData.discardMode) {
                     continue;
                 }
-#if VERBOSE_LOG
+
+#if 0 // For netcat debug
                 std::ostringstream oss;
                 oss << "You are client #" << idx + 1 - numServerSockets_
                     << ": \n"
@@ -172,7 +173,7 @@ void Server::processClientSocketData_() {
                 std::cout << "UserInput read from client #" << oss.str();
                 // Pong to client
                 sendMsg(pfd.fd, oss.str());
-#endif // VERBOSE_LOG
+#endif
                 try {
                     cmds_.run(*this, *clients_.at(pfd.fd), userInput);
                 } catch (Error const &e) {
@@ -189,16 +190,6 @@ void Server::processClientSocketData_() {
                 userInput.clear();
 
             } else if (bytesRead <= 0) {
-                // Comment will be deleted later, kept for reference for now
-                // this means, the client closed the connection
-                // POLLHUP isn't useful, because:
-                // When you kill netcat with Ctrl+C:
-                //     Netcat's OS kernel sent a FIN packet to your server
-                //     Your server's poll() detected this with POLLIN
-                //     Your read() returned 0 (zero bytes) == "I got the FIN, connection closed"
-                // FIN is the TCP mechanism for orderly shutdown.
-                // That's why POLLIN + read() return 0—the FIN,
-                // and the zero read is how the kernel tells you "the peer closed."
                 closeSocket_(idx);
             }
         }
@@ -219,8 +210,9 @@ void Server::acceptClient_(int const serverFd) {
                reinterpret_cast<struct sockaddr *>(&sockAddrIn46), // NOLINT
                &sockLen);
     if (clientFd == -1) {
-        // throw -> no everything else can still run w/o problems
-        // silent return -> cannot sent anything to client without working socket anyways...
+        log_("Could not accept client:\n" +
+                 srvHelp::printAddrfamilyAddrPort(sockAddrIn46),
+             Logger::lmWarn);
         return;
     }
 

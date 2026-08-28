@@ -72,28 +72,6 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline void
-storePollFd(int const                    socketFd,
-            std::vector<struct pollfd>  &pFds,              // NOLINT
-            std::map<int, SocketIOData> &sockIODataStore) { // NOLINT
-    pollfd pfd = {};
-    pfd.fd = socketFd;
-    pfd.events = POLLIN; // Monitor for incoming connections
-
-    pFds.push_back(pfd);
-    sockIODataStore.insert(
-        std::make_pair<int, SocketIOData>(socketFd, SocketIOData()));
-}
-
-inline bool isSocketListening(int sockfd) {
-    int       optVal = 0;
-    socklen_t optLen = sizeof(optVal);
-    if (getsockopt(sockfd, SOL_SOCKET, SO_ACCEPTCONN, &optVal, &optLen) < 0)
-        throw std::runtime_error("Error getting socket options.");
-
-    return (optVal > 0);
-}
-
 inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     char              addrBuffer[128];
     socklen_t const   addrBuffLen = sizeof(addrBuffer) / sizeof(char);
@@ -113,29 +91,18 @@ inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
     }
     char const *addrStrPtr =
         inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
-    std::string addrStr(addrStrPtr ? addrStrPtr : "<unknown address>");
-    if (saFamily == AF_INET6)
-        addrStr = "[" + addrStr + "]";
 
+    std::string addrStr("No addr:port information.");
+    if (addrStrPtr) {
+        addrStr.assign(addrStrPtr);
+        if (saFamily == AF_INET6)
+            addrStr = "[" + addrStr + "]";
+    }
     std::ostringstream oss;
     oss << " AF: " << getAdressFamilyStr(saFamily)
         << "\n addr:port: " << addrStr << ":" << std::dec << portNumber;
+
     return oss.str();
 }
 
-inline bool checkSocketFailOK() {
-    //return SignalHandler::stopLoopSignalReceived();
-    static size_t loopCounter = 0;
-    static size_t retries = 42;
-    if (loopCounter % 1000 == 0)
-        retries = 42;
-    if (errno == EINTR)
-        return true;
-    if (errno == EAGAIN && retries > 1) {
-        retries--;
-        usleep(10000);
-        return true;
-    }
-    return false;
-}
 } // namespace srvHelp
