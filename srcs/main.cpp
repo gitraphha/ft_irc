@@ -6,7 +6,7 @@
 #include <sstream>
 #include <string>
 
-static void checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
                                   std::string &password);
 
 /*
@@ -51,26 +51,31 @@ int         main(int argc, char **argv) {
     std::string password;
 
     try {
-        checkExtractCmdLnArgs(argc, argv, port, password);
+        if (!checkExtractCmdLnArgs(argc, argv, port, password))
+            return 1;
 
         SignalHandler sigHandler;
         Server        srv(port, password);
         srv.run();
+
     } catch (std::exception const &e) {
-        std::cerr << e.what() << std::endl;
+        std::cerr << CCyan << " !!! Exception: " << e.what() << CReset
+                  << std::endl;
         return 1;
     }
-    std::cout << "Clean exit." << std::endl;
+    std::cout << CGreen << "Clean exit." << CReset << std::endl;
     return 0;
 }
 
-static void checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
                                   std::string &password) {
     std::istringstream iss;
     std::string        remainder;
-    if (argc != 3)
-        throw std::out_of_range(
-            "Usage: ./ircserv <int:port> <string:password>");
+    if (argc != 3) {
+        std::cerr << CYellow << "Usage: ./ircserv <int:port> <string:password>"
+                  << CReset << std::endl;
+        return false;
+    }
 
     iss.str(argv[1]); // NOLINT
     if (!((iss >> port) && (iss >> remainder).eof()))
@@ -79,6 +84,8 @@ static void checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
 
     iss.str(argv[2]); // NOLINT
     if (!(iss >> password).eof())
-        throw std::out_of_range(
+        throw std::runtime_error(
             "Error while extracting password from commandline parameter.");
+
+    return true;
 }

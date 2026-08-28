@@ -16,10 +16,6 @@
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 16
 
-#ifndef VERBOSE_LOG
-#define VERBOSE_LOG 0
-#endif
-
 class Server {
   private:
     struct SocketIOData {
