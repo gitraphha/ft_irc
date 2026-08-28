@@ -19,7 +19,7 @@ class Logger {
     }
 
   public:
-    enum logMode { lmInfo, lmError };
+    enum logMode { lmInfo, lmWarn, lmError };
 
     Logger(std::string const &prefix) {
         prefix_ = prefix;
@@ -27,8 +27,11 @@ class Logger {
 
     void logMsg(std::string const &msg, logMode const lm) const {
         if (lm == Logger::lmInfo)
-            std::cout << nowStr_() << " " << prefix_ << "[INFO] : " << msg
-                      << std::endl;
+            std::cout << nowStr_() << " " << prefix_ << CGreen
+                      << " [INFO] : " << msg << CReset << std::endl;
+        if (lm == Logger::lmWarn)
+            std::cout << nowStr_() << " " << prefix_ << CYellow
+                      << " [WARN] : " << msg << CReset << std::endl;
         if (lm == Logger::lmError)
             std::cerr << nowStr_() << " " << prefix_ << CRed
                       << "[ERROR]: " << msg << CReset << std::endl;
