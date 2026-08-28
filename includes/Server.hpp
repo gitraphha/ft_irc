@@ -5,9 +5,6 @@
 #include "CommandProcessor.hpp"
 #include "Logger.hpp"
 
-#include <exception>
-#include <iostream>
-#include <netinet/in.h>
 #include <poll.h>
 #include <string>
 #include <vector>
@@ -23,17 +20,17 @@
 #define VERBOSE_LOG 0
 #endif
 
-struct SocketIOData {
-    std::string readBuffer;
-    std::string writeBuffer;
-    size_t      errorCount;
-    bool        discardMode;
-
-    SocketIOData() : errorCount(0), discardMode(false) {}
-};
-
 class Server {
   private:
+    struct SocketIOData {
+        std::string readBuffer;
+        std::string writeBuffer;
+        size_t      errorCount;
+        bool        discardMode;
+
+        SocketIOData() : errorCount(0), discardMode(false) {}
+    };
+
     ChannelManager              channels_;
     ClientManager               clients_;
     CommandProcessor            cmds_;
@@ -55,9 +52,10 @@ class Server {
     int                         createServerSocket_(int const domain);
     void                        processServerSocketData_();
     void                        acceptClient_(int const serverFd);
+    void                        storePollFd_(int const socketFd);
     void                        processClientSocketData_();
     void                        closeSocket_(int const fd);
-    void                        log_(std::string const &msg, logMode const lm);
+    void log_(std::string const &msg, Logger::logMode const lm);
 
   public:
     Server(int const port, std::string const &password);
@@ -73,6 +71,6 @@ class Server {
 
     bool tryRegister(Client &client) {
         (void)client;
-        return false;
+        return true;
     };
 };

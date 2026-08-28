@@ -7,8 +7,6 @@
 #include <iostream>
 #include <string>
 
-enum logMode { lmInfo, lmError };
-
 class Logger {
     std::string prefix_;
 
@@ -21,15 +19,17 @@ class Logger {
     }
 
   public:
+    enum logMode { lmInfo, lmError };
+
     Logger(std::string const &prefix) {
         prefix_ = prefix;
     }
 
     void logMsg(std::string const &msg, logMode const lm) const {
-        if (lm == (logMode)lmInfo)
+        if (lm == Logger::lmInfo)
             std::cout << nowStr_() << " " << prefix_ << "[INFO] : " << msg
                       << std::endl;
-        if (lm == (logMode)lmError)
+        if (lm == Logger::lmError)
             std::cerr << nowStr_() << " " << prefix_ << CRed
                       << "[ERROR]: " << msg << CReset << std::endl;
     }

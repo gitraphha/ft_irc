@@ -1,7 +1,6 @@
 #pragma once
 
 #include <arpa/inet.h>
-#include <cerrno>
 #include <fcntl.h>
 #include <iostream>
 #include <sstream>
@@ -84,6 +83,15 @@ storePollFd(int const                    socketFd,
     pFds.push_back(pfd);
     sockIODataStore.insert(
         std::make_pair<int, SocketIOData>(socketFd, SocketIOData()));
+}
+
+inline bool isSocketListening(int sockfd) {
+    int       optVal = 0;
+    socklen_t optLen = sizeof(optVal);
+    if (getsockopt(sockfd, SOL_SOCKET, SO_ACCEPTCONN, &optVal, &optLen) < 0)
+        throw std::runtime_error("Error getting socket options.");
+
+    return (optVal > 0);
 }
 
 inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
