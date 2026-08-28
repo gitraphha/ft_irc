@@ -23,21 +23,22 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
     bool          success = true;
 
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
-        sIOD.errorCount = SOCKETERRORLIMIT;
+        sIOD.sendErrorCount = SOCKETERRORLIMIT;
     else {
         sIOD.writeBuffer += msg;
         bytesSent = send(fd, sIOD.writeBuffer.c_str(),
                          sIOD.writeBuffer.length(), MSG_NOSIGNAL);
         if (bytesSent <= 0)
-            ++sIOD.errorCount;
+            ++sIOD.sendErrorCount;
     }
-    if (sIOD.errorCount >= SOCKETERRORLIMIT) {
+    if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
         closeSocket_(fd);
         success = false;
     }
 
     std::ostringstream oss;
-    oss << "SendMsg event:\n" << "WriteBuffer: '" << sIOD.writeBuffer << "':\n";
+    oss << "SendMsg event:\n"
+        << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
     if (!success) {
         oss << " send to FD " << fd << " failed.";
         log_(oss.str(), Logger::lmError);
@@ -54,8 +55,8 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
     if (!success)
         return false;
 
-    if (sIOD.errorCount > 0)
-        sIOD.errorCount = 0;
+    if (sIOD.sendErrorCount > 0)
+        sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
     else
@@ -118,10 +119,10 @@ void Server::processClientSocketData_() {
         SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
 
         if ((pfd.revents & POLLERR)) {
-            if (sIOD.errorCount >= SOCKETERRORLIMIT) {
+            if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
                 closeSocket_(pfd.fd);
             } else
-                ++sIOD.errorCount;
+                ++sIOD.recvErrorCount;
 
         } else if (pfd.revents & POLLIN) {
             char    recvBuffer[RECVBUFFLEN];
@@ -130,8 +131,9 @@ void Server::processClientSocketData_() {
             if (bytesRead > 0) {
                 SocketIOData &sockIOData = sockIODataStore_.at(pfd.fd);
                 std::string   nickName = "*";
+                Client const *client = 0;
                 try {
-                    Client const *const client = clients_.at(pfd.fd);
+                    client = clients_.at(pfd.fd);
                     if (client && client->isRegistered())
                         nickName = client->getNick();
                 } catch (std::exception const &e) {
@@ -145,12 +147,18 @@ void Server::processClientSocketData_() {
                 if ((userInput.length() >= MAXMSGLEN) &&
                     (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
                     sockIOData.discardMode = true;
+                    ++sIOD.recvErrorCount;
                     sendMsg(pfd.fd,
                             Reply::build(
                                 serverName(), nickName,
                                 Reply::reply(Reply::ERR_INPUTTOOLONG, "")));
                 }
                 if (sockIOData.discardMode) {
+                    if (!client || !client->isRegistered() ||
+                        sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+                        closeSocket_(pfd.fd);
+                        continue;
+                    }
                     if (lfcrPos != std::string::npos) {
                         userInput.erase(0, lfcrPos + 2);
                         sockIOData.discardMode = false;
@@ -163,34 +171,35 @@ void Server::processClientSocketData_() {
                 if (lfcrPos == std::string::npos || sockIOData.discardMode) {
                     continue;
                 }
-
-#if 0 // For netcat debug
-                std::ostringstream oss;
-                oss << "You are client #" << idx + 1 - numServerSockets_
-                    << ": \n"
-                    << "Srv received: "
-                    << std::string(userInput) /* << std::endl */;
-                std::cout << "UserInput read from client #" << oss.str();
-                // Pong to client
-                sendMsg(pfd.fd, oss.str());
+                sIOD.recvErrorCount = 0;
+                userInput = userInput.substr(0, userInput.length() - 2);
+#if 1 // For netcat debug
+                {
+                    size_t const clientNumber = idx + 1 - numServerSockets_;
+                    std::ostringstream oss;
+                    oss << "You are client #" << clientNumber << ": \n"
+                        << "Srv received: " << std::string(userInput)
+                        << std::endl;
+                    sendMsg(pfd.fd, oss.str());
+                }
 #endif
                 try {
                     cmds_.run(*this, *clients_.at(pfd.fd), userInput);
                 } catch (Error const &e) {
                     if (e.hasReply()) {
-                        Client const &c = *clients_.at(pfd.fd);
-                        sendMsg(pfd.fd, Reply::build(serverName(), c.getNick(),
+                        sendMsg(pfd.fd, Reply::build(serverName(), nickName,
                                                      e.reply()));
                     } else {
-                        std::string tmp("Error while trying to send msg:\n");
+                        std::string tmp("Error while trying to run cmd:\n");
+                        tmp.append(userInput + "\n");
                         tmp.append(e.what());
-                        log_(tmp.c_str(), Logger::lmError);
+                        log_(tmp.c_str(), Logger::lmExcept);
                     }
                 }
                 userInput.clear();
 
             } else if (bytesRead <= 0) {
-                closeSocket_(idx);
+                closeSocket_(pfd.fd);
             }
         }
     }
@@ -255,8 +264,9 @@ void Server::closeSocket_(int const fd) {
         oss << "Closing server socket ("
             << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
     } else {
-        oss << "Closing client #" << idx + 1 - numServerSockets_ << " socket ("
-            << pollFds_.size() - 1 - numServerSockets_ << " clients remaining)";
+        oss << "Closing client #" << idx + 1 - numServerSockets_ << ", sockFd "
+            << fd << "; (" << pollFds_.size() - 1 - numServerSockets_
+            << " clients remaining)";
     }
     log_(oss.str(), Logger::lmInfo);
 
@@ -279,11 +289,6 @@ void Server::log_(std::string const &msg, Logger::logMode const lm) {
 	* handles client connect and disconnect scenarios
 	* on server stop signal, disconnects all clients and closes
 		the server socket(s)
-	* if poll returns an error -> exception is thrown, except for two scenarios:
-        EINTR — The call was interrupted by a signal. This is the most common
-		        retriable error. Retrying is standard practice.
-        EAGAIN — Temporary resource unavailability (rare with poll(),
-		         but possible in some edge cases).
 */
 void Server::run() {
     createServerSocket_(AF_INET);
@@ -298,6 +303,6 @@ void Server::run() {
         processClientSocketData_();
     }
     while (!pollFds_.empty()) {
-        closeSocket_(pollFds_.size() - 1);
+        closeSocket_(pollFds_.back().fd);
     }
 }

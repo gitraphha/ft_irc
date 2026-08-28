@@ -21,10 +21,12 @@ class Server {
     struct SocketIOData {
         std::string readBuffer;
         std::string writeBuffer;
-        size_t      errorCount;
+        size_t      recvErrorCount;
+        size_t      sendErrorCount;
         bool        discardMode;
 
-        SocketIOData() : errorCount(0), discardMode(false) {}
+        SocketIOData()
+            : recvErrorCount(0), sendErrorCount(0), discardMode(false) {}
     };
 
     ChannelManager              channels_;
