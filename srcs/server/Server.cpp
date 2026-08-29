@@ -170,10 +170,9 @@ void Server::setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
     }
 }
 
-bool Server::clientDataSanityCheck_(SocketIOData &sIOD, int fd, /* 
-                                    Client const *const client, */
-                                    std::string const &nickName,
-                                    bool const         isRegistered) {
+size_t Server::clientDataSanityCheck_(SocketIOData &sIOD, int fd,
+                                      std::string const &nickName,
+                                      bool const         isRegistered) {
     std::string &rdBuffer = sIOD.readBuffer;
     size_t       lfcrPos = rdBuffer.find("\r\n");
     if ((rdBuffer.length() >= MAXMSGLEN) &&
@@ -186,21 +185,20 @@ bool Server::clientDataSanityCheck_(SocketIOData &sIOD, int fd, /*
     if (sIOD.discardMode) {
         if (!isRegistered || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
             closeSocket_(fd);
-            return false;
+            return std::string::npos;
         }
         if (lfcrPos != std::string::npos) {
             rdBuffer.erase(0, lfcrPos + 2);
             sIOD.discardMode = false;
             lfcrPos = rdBuffer.find("\r\n");
-        } else if ('\r' == *rdBuffer.rbegin())
-            rdBuffer = "\r";
-        else
-            rdBuffer.clear();
+        } else /* lfcrPos == std::string::npos */ {
+            if ('\r' == *rdBuffer.rbegin())
+                rdBuffer = "\r";
+            else
+                rdBuffer.clear();
+        }
     }
-    if (lfcrPos == std::string::npos || sIOD.discardMode) {
-        return false;
-    }
-    return true;
+    return lfcrPos;
 }
 
 bool Server::processClientSocketData_(struct pollfd &pfd, SocketIOData &sIOD) {
@@ -209,24 +207,23 @@ bool Server::processClientSocketData_(struct pollfd &pfd, SocketIOData &sIOD) {
     bool          clntIsReg = false;
     setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
 
-    if (!clientDataSanityCheck_(sIOD, pfd.fd, nickName, clntIsReg))
+    size_t lfcrPos = clientDataSanityCheck_(sIOD, pfd.fd, nickName, clntIsReg);
+    if (lfcrPos == std::string::npos)
         return false;
-
-    sIOD.recvErrorCount = 0;
-    size_t      lfcrPos = sIOD.readBuffer.find("\r\n");
-    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
-    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
 
 #if NETCATDBG
     {
         // size_t const       clientNumber = idx + 1 - numServerSockets_;
         std::ostringstream oss;
         oss << "You are client '" << nickName << "' (fd " << pfd.fd << "): \n"
-            << "Srv received: " << std::string(cmdLine) << std::endl;
+            << "Srv received: " << std::string(sIOD.readBuffer) << std::endl;
         sendMsg(pfd.fd, oss.str());
     }
 #endif
 
+    sIOD.recvErrorCount = 0;
+    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
     try {
         cmds_.run(*this, *clients_.at(pfd.fd), cmdLine);
     } catch (Error const &e) {
