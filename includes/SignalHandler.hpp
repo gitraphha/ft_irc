@@ -1,5 +1,4 @@
-#ifndef SIGNALHANDLER_HPP
-#define SIGNALHANDLER_HPP
+#pragma once
 
 #include <csignal>
 #include <vector>
@@ -10,6 +9,7 @@ class SignalHandler {
   private:
     volatile static std::sig_atomic_t stopServerLoop_;
     static void                       handleStopSignals_(int signal);
+
     std::vector<int>                  stopSignals_;
     bool                              setStopSignals_(sighandler_t handler);
 
@@ -21,5 +21,3 @@ class SignalHandler {
     ~SignalHandler();
     static bool stopLoopSignalReceived();
 };
-
-#endif // SIGNALHANDLER_HPP
