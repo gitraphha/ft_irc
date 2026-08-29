@@ -1,19 +1,12 @@
 #include "Client.hpp"
 
-#include <cctype>
+#include "Utils.hpp"
 
-static char foldChar(char c) {
-    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-}
-
-static std::string foldCase(const std::string &s) {
-    std::string folded(s);
-    for (std::string::size_type i = 0; i < folded.size(); i++)
-        folded[i] = foldChar(folded[i]);
-    return folded;
-}
+#include <algorithm>
 
 std::string Client::getPrefix() const {
+    if (!hasIdentity() || hostname_.empty())
+        return "";
     return nick_ + "!" + username_ + "@" + hostname_;
 }
 
@@ -23,7 +16,7 @@ bool Client::hasIdentity() const {
 
 void Client::setNick(const std::string &name) {
     nick_ = name;
-    nickCaseFolded_ = foldCase(name);
+    nickCaseFolded_ = Utils::foldCase(name);
 }
 
 void Client::setUser(const std::string &user, const std::string &real) {
@@ -47,6 +40,27 @@ void Client::setOperator(bool value) {
     oper_ = value;
 }
 
+bool Client::isInvitedTo(const std::string &name) const {
+    const std::string folded = Utils::foldCase(name);
+    return std::find(invitedTo_.begin(), invitedTo_.end(), folded) !=
+           invitedTo_.end();
+}
+
+void Client::addInvite(const std::string &name) {
+    const std::string folded = Utils::foldCase(name);
+    if (std::find(invitedTo_.begin(), invitedTo_.end(), folded) ==
+        invitedTo_.end())
+        invitedTo_.push_back(folded);
+}
+
+void Client::removeInvite(const std::string &name) {
+    const std::string                  folded = Utils::foldCase(name);
+    std::vector<std::string>::iterator it =
+        std::find(invitedTo_.begin(), invitedTo_.end(), folded);
+    if (it != invitedTo_.end())
+        invitedTo_.erase(it);
+}
+
 void Client::send(const std::string &msg) {
     sendBuffer_ += msg;
 }
@@ -56,7 +70,7 @@ void Client::appendToRecvBuffer(const std::string &bytes) {
 }
 
 bool Client::extractLine(std::string &line) {
-    std::string::size_type pos = recvBuffer_.find('\n');
+    const std::string::size_type pos = recvBuffer_.find('\n');
     if (pos == std::string::npos)
         return false;
 
@@ -68,7 +82,7 @@ bool Client::extractLine(std::string &line) {
     return true;
 }
 
-size_t Client::recvBufferSize() const {
+std::size_t Client::recvBufferSize() const {
     return recvBuffer_.size();
 }
 
@@ -76,11 +90,15 @@ const std::string &Client::getSendBuffer() const {
     return sendBuffer_;
 }
 
-void Client::consumeSendBuffer(size_t count) {
+void Client::consumeSendBuffer(std::size_t count) {
     if (count >= sendBuffer_.size())
         sendBuffer_.clear();
     else
         sendBuffer_.erase(0, count);
+}
+
+void Client::clearSendBuffer() {
+    sendBuffer_.clear();
 }
 
 bool Client::hasPendingOutput() const {

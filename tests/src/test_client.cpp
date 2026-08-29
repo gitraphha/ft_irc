@@ -64,6 +64,17 @@ int main() {
     }
 
     {
+        std::cout << "[combined chunk may exceed one message limit]\n";
+        Client            c;
+        const std::string first(300, 'A');
+        const std::string second(300, 'B');
+        c.appendToRecvBuffer(first + "\r\n" + second + "\r\n");
+        expectLine(c, first);
+        expectLine(c, second);
+        expectNoLine(c, "both individually valid lines were extracted");
+    }
+
+    {
         std::cout << "[complete line plus a partial one]\n";
         Client c;
         c.appendToRecvBuffer("NICK bob\r\nUSE");
@@ -91,10 +102,22 @@ int main() {
     {
         std::cout << "[nick is stored casefolded as well]\n";
         Client c;
-        c.setNick("BoB");
-        report(c.getNick() == "BoB", "getNick keeps the chosen spelling");
-        report(c.getNickCaseFolded() == "bob",
-               "getNickCaseFolded is lowercase");
+        c.setNick("BoB[\\~");
+        report(c.getNick() == "BoB[\\~", "getNick keeps the chosen spelling");
+        report(c.getNickCaseFolded() == "bob{|^",
+               "getNickCaseFolded uses IRC case mapping");
+    }
+
+    {
+        std::cout << "[invites are casefolded and unique]\n";
+        Client c;
+        c.addInvite("#TeSt[Room]");
+        c.addInvite("#test{room}");
+        report(c.isInvitedTo("#TEST[ROOM]"),
+               "equivalent channel spellings match");
+        c.removeInvite("#test{room}");
+        report(!c.isInvitedTo("#TeSt[Room]"),
+               "one removal clears the unique invite");
     }
 
     {
@@ -127,8 +150,11 @@ int main() {
     {
         std::cout << "[prefix]\n";
         Client c;
+        report(c.getPrefix().empty(), "prefix is empty without an identity");
         c.setNick("bob");
+        report(c.getPrefix().empty(), "prefix is empty with only a nickname");
         c.setUser("b", "Bob Example");
+        report(c.getPrefix().empty(), "prefix is empty without a hostname");
         c.setHostname("127.0.0.1");
         report(c.getPrefix() == "bob!b@127.0.0.1", "prefix is nick!user@host");
     }
@@ -145,6 +171,9 @@ int main() {
                "a partial write leaves the tail");
         c.consumeSendBuffer(100);
         report(!c.hasPendingOutput(), "consuming past the end empties it");
+        c.send("NOTICE bob :queued\r\n");
+        c.clearSendBuffer();
+        report(!c.hasPendingOutput(), "clearSendBuffer discards all output");
     }
 
     std::cout << "\n";

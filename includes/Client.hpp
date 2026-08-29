@@ -5,7 +5,6 @@
  * command handlers own validation and IRC behavior.
  */
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -68,29 +67,17 @@ class Client {
     void        setPassAccepted(bool value);
     void        setOperator(bool value);
 
-    bool        isInvitedTo(const std::string &chan) const {
-        std::vector<std::string>::const_iterator it =
-            std::find(invitedTo_.begin(), invitedTo_.end(), chan);
-        return it != invitedTo_.end();
-    }
+    bool        isInvitedTo(const std::string &name) const;
+    void        addInvite(const std::string &name);
+    void        removeInvite(const std::string &name);
 
-    void addInvite(const std::string &name) {
-        invitedTo_.push_back(name);
-    }
-
-    void removeInvite(const std::string &name) {
-        std::vector<std::string>::iterator it =
-            std::find(invitedTo_.begin(), invitedTo_.end(), name);
-        if (it != invitedTo_.end())
-            invitedTo_.erase(it);
-    }
-
-    void               send(const std::string &msg);
-    void               appendToRecvBuffer(const std::string &bytes);
-    bool               extractLine(std::string &line);
-    size_t             recvBufferSize() const;
+    void        send(const std::string &msg);
+    void        appendToRecvBuffer(const std::string &bytes);
+    bool        extractLine(std::string &line);
+    std::size_t recvBufferSize() const;
     const std::string &getSendBuffer() const;
-    void               consumeSendBuffer(size_t count);
+    void               consumeSendBuffer(std::size_t count);
+    void               clearSendBuffer();
 
     bool               hasPendingOutput() const;
 };
