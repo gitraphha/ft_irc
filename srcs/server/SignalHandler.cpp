@@ -21,7 +21,7 @@ volatile std::sig_atomic_t SignalHandler::stopServerLoop_ = 0;
 */
 void                       SignalHandler::handleStopSignals_(int signal) {
     stopServerLoop_ = signal;
-    std::cout << "Caught stop signal: " << stopServerLoop_ << "." << std::endl;
+    std::cerr << "Caught stop signal: " << stopServerLoop_ << "." << std::endl;
 }
 
 /*
