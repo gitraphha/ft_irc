@@ -53,16 +53,15 @@ class Server {
     void                        acceptClient_(int const serverFd);
     void                        processClientSockets_();
     void                        storePollFd_(int const socketFd);
-    bool checkSocket_(struct pollfd &pfd, SocketIOData &sIOD);
-    bool processClientSocketData_(struct pollfd &pfd, SocketIOData &sIOD);
-    void setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
-                        bool &isReg);
-    bool clientDataSanityCheck_(SocketIOData &sIOD, int fd,
-                                /* Client const *const client, */
-                                std::string const &nickName,
-                                bool const         isRegistered);
-    void closeSocket_(int const fd);
-    void log_(std::string const &msg, Logger::logMode const lm);
+    bool   checkSocket_(struct pollfd &pfd, SocketIOData &sIOD);
+    bool   processClientSocketData_(struct pollfd &pfd, SocketIOData &sIOD);
+    void   setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
+                          bool &isReg);
+    size_t clientDataSanityCheck_(SocketIOData &sIOD, int fd,
+                                  std::string const &nickName,
+                                  bool const         isRegistered);
+    void   closeSocket_(int const fd);
+    void   log_(std::string const &msg, Logger::logMode const lm);
 
     Server(Server const &other);
     Server &operator=(Server const &other);
