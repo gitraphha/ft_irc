@@ -10,13 +10,25 @@
 #include <sys/poll.h>
 
 /*
-	Server Constructor
-	* set port and password from command line args
+    Server Constructor
+    * set port and password from command line args
+    * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
     : port_(port), password_(password), serverName_(SERVER_NAME),
       numServerSockets_(0), logger_(serverName_ + ": ") {}
 
+Server::~Server() {
+    while (!pollFds_.empty())
+        closeSocket_(pollFds_.back().fd);
+}
+
+/*
+    sendMsg
+    * send string msg to a network socket
+    * uses i/o buffers and error counters in SocketIOData
+	* closes the socket (== disconnects the client) in case of too many errors
+*/
 bool Server::sendMsg(int const fd, std::string const &msg) {
     SocketIOData &sIOD = sockIODataStore_.at(fd);
     ssize_t       bytesSent = -1;
@@ -55,8 +67,7 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
     if (!success)
         return false;
 
-    if (sIOD.sendErrorCount > 0)
-        sIOD.sendErrorCount = 0;
+    sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
     else
@@ -64,8 +75,28 @@ bool Server::sendMsg(int const fd, std::string const &msg) {
     return true;
 }
 
+void Server::setupServerSockets_() {
+    int              domArr[] = {AF_INET, AF_INET6};
+    std::vector<int> domains(domArr,  // NOLINT
+                             domArr + // NOLINT
+                                 (sizeof(domArr) / sizeof(domArr[0])));
+    for (size_t idx = 0; idx < domains.size(); ++idx) {
+        try {
+            createServerSocket_(domains[idx]);
+        } catch (std::exception const &e) {
+            log_(e.what(), Logger::lmExcept);
+        }
+    }
+    if (numServerSockets_ == 0)
+        throw std::runtime_error("No server socket could be setup correctly.");
+}
+
 /*
-	tbd
+    createServerSocket_
+    * Setup a listening network socket for the address family/domain specified
+	* only supports IPv4 and IPv6
+    * for IPv6, uses and IPv6only socket, so the IPv4 is kept separate
+	  (not all systems support dual stack handling of IPv4 through IPv6)
 */
 int Server::createServerSocket_(int const domain) {
     if (domain != AF_INET && domain != AF_INET6)
@@ -104,7 +135,9 @@ int Server::createServerSocket_(int const domain) {
 }
 
 void Server::processServerSocketData_() {
-    for (size_t idx = 0; idx < numServerSockets_; ++idx) {
+    for (size_t idx = 0;
+         !SignalHandler::stopLoopSignalReceived() && idx < numServerSockets_;
+         ++idx) {
         struct pollfd const &serverPollFds = pollFds_[idx];
         if ((serverPollFds.revents & POLLERR))
             throw std::runtime_error("Server socket error.");
@@ -113,92 +146,118 @@ void Server::processServerSocketData_() {
     }
 }
 
-void Server::processClientSocketData_() {
-    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+bool Server::checkSocket_(struct pollfd &pfd, SocketIOData &sIOD) {
+    if ((pfd.revents & POLLERR)) {
+        if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+            closeSocket_(pfd.fd);
+        else
+            ++sIOD.recvErrorCount;
+        return false;
+    }
+    return true;
+}
+
+void Server::setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
+                            bool &isReg) {
+    try {
+        *clntPtr = clients_.at(fd);
+        if (*clntPtr && (*clntPtr)->isRegistered()) {
+            isReg = true;
+            nick = (*clntPtr)->getNick();
+        }
+    } catch (std::exception const &e) {
+        log_(e.what(), Logger::lmExcept);
+    }
+}
+
+bool Server::clientDataSanityCheck_(SocketIOData &sIOD, int fd, /* 
+                                    Client const *const client, */
+                                    std::string const &nickName,
+                                    bool const         isRegistered) {
+    std::string &rdBuffer = sIOD.readBuffer;
+    size_t       lfcrPos = rdBuffer.find("\r\n");
+    if ((rdBuffer.length() >= MAXMSGLEN) &&
+        (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
+        sIOD.discardMode = true;
+        ++sIOD.recvErrorCount;
+        sendMsg(fd, Reply::build(serverName(), nickName,
+                                 Reply::reply(Reply::ERR_INPUTTOOLONG, "")));
+    }
+    if (sIOD.discardMode) {
+        if (!isRegistered || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+            closeSocket_(fd);
+            return false;
+        }
+        if (lfcrPos != std::string::npos) {
+            rdBuffer.erase(0, lfcrPos + 2);
+            sIOD.discardMode = false;
+            lfcrPos = rdBuffer.find("\r\n");
+        } else if ('\r' == *rdBuffer.rbegin())
+            rdBuffer = "\r";
+        else
+            rdBuffer.clear();
+    }
+    if (lfcrPos == std::string::npos || sIOD.discardMode) {
+        return false;
+    }
+    return true;
+}
+
+bool Server::processClientSocketData_(struct pollfd &pfd, SocketIOData &sIOD) {
+    Client const *client = 0;
+    std::string   nickName = "*";
+    bool          clntIsReg = false;
+    setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
+
+    if (!clientDataSanityCheck_(sIOD, pfd.fd, nickName, clntIsReg))
+        return false;
+
+    sIOD.recvErrorCount = 0;
+    size_t      lfcrPos = sIOD.readBuffer.find("\r\n");
+    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+
+#if NETCATDBG
+    {
+        // size_t const       clientNumber = idx + 1 - numServerSockets_;
+        std::ostringstream oss;
+        oss << "You are client '" << nickName << "' (fd " << pfd.fd << "): \n"
+            << "Srv received: " << std::string(cmdLine) << std::endl;
+        sendMsg(pfd.fd, oss.str());
+    }
+#endif
+
+    try {
+        cmds_.run(*this, *clients_.at(pfd.fd), cmdLine);
+    } catch (Error const &e) {
+        if (e.hasReply()) {
+            sendMsg(pfd.fd, Reply::build(serverName(), nickName, e.reply()));
+        } else {
+            std::string tmp("Error while trying to run cmd:\n");
+            tmp.append(cmdLine + "\n" + e.what());
+            log_(tmp, Logger::lmExcept);
+        }
+    }
+    return true;
+}
+
+void Server::processClientSockets_() {
+    for (size_t idx = numServerSockets_;
+         !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
+         ++idx) {
         pollfd       &pfd = pollFds_.at(idx);
         SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
 
-        if ((pfd.revents & POLLERR)) {
-            if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-                closeSocket_(pfd.fd);
-            } else
-                ++sIOD.recvErrorCount;
+        if (!checkSocket_(pfd, sIOD))
+            continue;
+        if (pfd.revents & POLLIN) {
+            char recvBuffer[RECVBUFFLEN];
+            sIOD.bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
 
-        } else if (pfd.revents & POLLIN) {
-            char    recvBuffer[RECVBUFFLEN];
-            ssize_t bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
-
-            if (bytesRead > 0) {
-                SocketIOData &sockIOData = sockIODataStore_.at(pfd.fd);
-                std::string   nickName = "*";
-                Client const *client = 0;
-                try {
-                    client = clients_.at(pfd.fd);
-                    if (client && client->isRegistered())
-                        nickName = client->getNick();
-                } catch (std::exception const &e) {
-                    log_(e.what(), Logger::lmExcept);
-                }
-
-                std::string &userInput = sockIOData.readBuffer;
-                userInput += std::string(&recvBuffer[0], bytesRead);
-
-                size_t lfcrPos = userInput.find("\r\n");
-                if ((userInput.length() >= MAXMSGLEN) &&
-                    (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
-                    sockIOData.discardMode = true;
-                    ++sIOD.recvErrorCount;
-                    sendMsg(pfd.fd,
-                            Reply::build(
-                                serverName(), nickName,
-                                Reply::reply(Reply::ERR_INPUTTOOLONG, "")));
-                }
-                if (sockIOData.discardMode) {
-                    if (!client || !client->isRegistered() ||
-                        sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-                        closeSocket_(pfd.fd);
-                        continue;
-                    }
-                    if (lfcrPos != std::string::npos) {
-                        userInput.erase(0, lfcrPos + 2);
-                        sockIOData.discardMode = false;
-                        lfcrPos = userInput.find("\r\n");
-                    } else if ('\r' == *userInput.rbegin())
-                        userInput = "\r";
-                    else
-                        userInput.clear();
-                }
-                if (lfcrPos == std::string::npos || sockIOData.discardMode) {
-                    continue;
-                }
-                sIOD.recvErrorCount = 0;
-                userInput = userInput.substr(0, userInput.length() - 2);
-#if 1 // For netcat debug
-                {
-                    size_t const clientNumber = idx + 1 - numServerSockets_;
-                    std::ostringstream oss;
-                    oss << "You are client #" << clientNumber << ": \n"
-                        << "Srv received: " << std::string(userInput)
-                        << std::endl;
-                    sendMsg(pfd.fd, oss.str());
-                }
-#endif
-                try {
-                    cmds_.run(*this, *clients_.at(pfd.fd), userInput);
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        sendMsg(pfd.fd, Reply::build(serverName(), nickName,
-                                                     e.reply()));
-                    } else {
-                        std::string tmp("Error while trying to run cmd:\n");
-                        tmp.append(userInput + "\n");
-                        tmp.append(e.what());
-                        log_(tmp.c_str(), Logger::lmExcept);
-                    }
-                }
-                userInput.clear();
-
-            } else if (bytesRead <= 0) {
+            if (sIOD.bytesRead > 0) {
+                sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
+                processClientSocketData_(pfd, sIOD);
+            } else if (sIOD.bytesRead <= 0) {
                 closeSocket_(pfd.fd);
             }
         }
@@ -257,10 +316,12 @@ void Server::closeSocket_(int const fd) {
 
     std::ostringstream oss;
     if (idx < numServerSockets_) {
-        if (pollFds_.size() != idx + 1)
-            return log_("Internal error: Close client sockets before "
-                        "closing server!",
-                        Logger::lmError);
+        if (pollFds_.size() != idx + 1) {
+            log_("Internal error: Close client sockets before "
+                 "closing server!",
+                 Logger::lmError);
+            return;
+        }
         oss << "Closing server socket ("
             << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
     } else {
@@ -291,18 +352,16 @@ void Server::log_(std::string const &msg, Logger::logMode const lm) {
 		the server socket(s)
 */
 void Server::run() {
-    createServerSocket_(AF_INET);
-    createServerSocket_(AF_INET6);
+    setupServerSockets_();
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
-        if (pollResult == -1)
-            throw std::runtime_error("Fatal error: poll failed.");
+        if (pollResult == -1) {
+            log_("Fatal error: poll failed.", Logger::lmError);
+            break;
+        }
 
         processServerSocketData_();
-        processClientSocketData_();
-    }
-    while (!pollFds_.empty()) {
-        closeSocket_(pollFds_.back().fd);
+        processClientSockets_();
     }
 }
