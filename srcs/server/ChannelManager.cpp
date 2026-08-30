@@ -24,6 +24,13 @@ Channel &ChannelManager::at(const std::string &name) {
     return it->second;
 }
 
+const Channel &ChannelManager::at(const std::string &name) const {
+	std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+    return it->second;	
+}
+
 bool ChannelManager::hasChannel(const std::string &name) const {
     return findChannel_(name) != channels_.end();
 }
@@ -113,7 +120,7 @@ void ChannelManager::removeChannel(const std::string &name) {
 }
 
 void ChannelManager::broadcast(const std::string &name, const std::string &msg,
-                               const Client *skip) {
-    Channel &channel = at(name);
+                               const Client *skip) const {
+    const Channel &channel = at(name);
     channel.broadcast(msg, skip);
 }

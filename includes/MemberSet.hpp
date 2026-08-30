@@ -23,7 +23,6 @@ class MemberSet {
     void remove(Client &client);
     void setModes(Client &client, const ModeSet &modes);
 
-    const std::map<Client *, ModeSet> getMembers() const;
     size_t                            size() const;
     bool                              has(Client &client) const;
     bool        hasAtLeast(Client &client, int mode) const;

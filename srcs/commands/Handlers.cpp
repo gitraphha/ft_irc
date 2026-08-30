@@ -22,6 +22,43 @@ bool Handlers::invite(Server &server, Client &client,
 }
 
 /*
+INVITE <nickname> <channel>
+
+The INVITE command is used to invite a user to a channel. The parameter
+<nickname> is the nickname of the person to be invited to the target channel
+<channel>. There is no requirement that the channel the target user is being
+invited to must exist or be a valid channel. However, if the channel exists,
+only members of the channel are allowed to invite other users. When the channel
+has invite-only flag set, only channel operators may issue INVITE command.
+
+Only the user inviting and the user being invited will receive notification of
+the invitation. Other channel members are not notified. (This is unlike the MODE
+changes, and is occasionally the source of trouble for users.)
+*/
+bool Handlers::invite(Server &server, Client &client,
+                      const std::vector<std::string> &params) {
+    ChannelManager &cm = server.getChannelManager();
+    ClientManager  &clm = server.getClientManager();
+    try {
+        Client &target = clm.at(params[0]);
+        if (cm.hasChannel(params[1])) {
+            Channel &chan = cm.at(params[1]);
+            chan.checkInvite(client, target);
+        }
+        target.addInvite(params[1]);
+        client.sendReply(server.getServerName(),
+                         Reply::reply(Reply::RPL_INVITING,
+                                      params[1] + " " + target.getNick()));
+        target.send(Reply::fromClient(client.getPrefix(), "INVITE",
+                                      target.getNick() + " " + params[1]));
+    } catch (const Error &e) {
+        if (e.hasReply())
+            client.sendReply(server.getServerName(), e.reply());
+    }
+    return false;
+}
+
+/*
 JOIN <channel> *( "," <channel> ) [ <key> *( "," <key> ) ]
      / "0"
 
@@ -41,7 +78,7 @@ the list of users who are on the channel (using RPL_NAMREPLY), which
 MUST include the user joining.
 */
 bool Handlers::join(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     ChannelManager &cm = server.getChannelManager();
     if (params.size() == 1 && params.at(0) == "0") {
         cm.partAll(client, client.getNick());
@@ -72,12 +109,6 @@ bool Handlers::join(Server &server, Client &client,
 }
 
 /*
-INVITE <nickname> <channel>
-*/
-bool Handlers::invite(Server &server, Client &client,
-                      std::vector<std::string> &params) {}
-
-/*
 KICK <channel> *( "," <channel> ) <user> *( "," <user> ) [<comment>]
 
 The KICK command can be used to request the forced removal of a user from a
@@ -88,7 +119,7 @@ parameters.  If a "comment" is given, this will be sent instead of the default
 message, the nickname of the user issuing the KICK.
 */
 bool Handlers::kick(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::vector<std::string> users = Utils::split(params[1], ',');
     if (channels.size() != users.size() && channels.size() != 1) {
@@ -129,7 +160,7 @@ of active members for all given channels listed in the parameter string. If a
 nickname.
 */
 bool Handlers::part(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::string     reason = (params.size() > 1) ? params[1] : client.getNick();
     ChannelManager &cm = server.getChannelManager();
@@ -270,7 +301,7 @@ if this action is allowed for the user requesting it. If the <topic> parameter
 is an empty string, the topic for that channel will be removed.
 */
 bool Handlers::topic(Server &server, Client &client,
-                     std::vector<std::string> &params) {
+                     const std::vector<std::string> &params) {
     try {
         Channel &ch = server.getChannelManager().at(params[0]);
         if (params.size() > 1)

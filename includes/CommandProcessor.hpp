@@ -8,7 +8,7 @@ class Server;
 class Client;
 
 typedef bool (*Handler)(Server &server, Client &client,
-                        std::vector<std::string> &params);
+                        const std::vector<std::string> &params);
 
 class Command {
     bool   usablePreReg_;

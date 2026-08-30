@@ -31,10 +31,6 @@ void MemberSet::setModes(Client &client, const ModeSet &modes) {
         it->second = modes;
 }
 
-const std::map<Client *, ModeSet> MemberSet::getMembers() const {
-    return members_;
-}
-
 size_t MemberSet::size() const {
     return members_.size();
 }

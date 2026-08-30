@@ -54,7 +54,7 @@ class Server {
         return clients_;
     }
 
-    const std::string &getServerName() {
+    const std::string &getServerName() const {
         return serverName_;
     }
 
