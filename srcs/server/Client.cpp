@@ -41,24 +41,15 @@ void Client::setOperator(bool value) {
 }
 
 bool Client::isInvitedTo(const std::string &name) const {
-    const std::string folded = Utils::foldCase(name);
-    return std::find(invitedTo_.begin(), invitedTo_.end(), folded) !=
-           invitedTo_.end();
+    return invitedTo_.find(Utils::foldCase(name)) != invitedTo_.end();
 }
 
 void Client::addInvite(const std::string &name) {
-    const std::string folded = Utils::foldCase(name);
-    if (std::find(invitedTo_.begin(), invitedTo_.end(), folded) ==
-        invitedTo_.end())
-        invitedTo_.push_back(folded);
+    invitedTo_.insert(Utils::foldCase(name));
 }
 
 void Client::removeInvite(const std::string &name) {
-    const std::string                  folded = Utils::foldCase(name);
-    std::vector<std::string>::iterator it =
-        std::find(invitedTo_.begin(), invitedTo_.end(), folded);
-    if (it != invitedTo_.end())
-        invitedTo_.erase(it);
+    invitedTo_.erase(Utils::foldCase(name));
 }
 
 void Client::send(const std::string &msg) {

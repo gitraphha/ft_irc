@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <set>
 
 class Client {
     std::string              nick_;
@@ -20,7 +21,7 @@ class Client {
     std::string              sendBuffer_;
     bool                     passAccepted_;
     bool                     oper_;
-    std::vector<std::string> invitedTo_;
+    std::set<std::string> invitedTo_;
 
   public:
     Client() : registered_(false), passAccepted_(false), oper_(false) {}
