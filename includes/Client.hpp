@@ -7,7 +7,6 @@
 
 #include <cstddef>
 #include <string>
-#include <vector>
 #include <set>
 
 class Client {
