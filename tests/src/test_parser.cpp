@@ -18,25 +18,23 @@
 
 static int  failures = 0;
 
-static void report(bool ok, const std::string &what)
-{
+static void report(bool ok, const std::string &what) {
     std::cout << (ok ? "  ok   " : "  FAIL ") << what << "\n";
     if (!ok)
         failures++;
 }
 
 static void expect(const std::string &label, const std::string &line,
-    		bool wantOk, const char *wantCmd, const char *expected[])
-{
+                   bool wantOk, const char *wantCmd, const char *expected[]) {
     std::string              cmd;
     std::vector<std::string> params;
 
     std::cout << label << "\n";
     bool ok = Parser::parse(line, cmd, params);
-    report(ok == wantOk, ok ? "parse accepted the line" :
-    		"parse rejected the line");
+    report(ok == wantOk,
+           ok ? "parse accepted the line" : "parse rejected the line");
     if (!ok || !wantOk)
-        return ;
+        return;
     report(cmd == wantCmd, "command is " + std::string(wantCmd));
 
     size_t wantCount = 0;
@@ -48,11 +46,10 @@ static void expect(const std::string &label, const std::string &line,
         std::ostringstream got;
         got << count.str() << ", got " << params.size();
         report(false, got.str());
-        return ;
+        return;
     }
     report(true, count.str());
-    for (size_t i = 0; i < wantCount; i++)
-    {
+    for (size_t i = 0; i < wantCount; i++) {
         std::ostringstream detail;
         detail << "params[" << i << "] is \"" << expected[i] << "\"";
         bool same = params[i] == expected[i];
@@ -115,8 +112,8 @@ int main() {
     // the empty parameter would silently turn one command into the other.
     {
         const char *p[] = {"#c", "", NULL};
-        expect("[empty trailing clears the topic]", "TOPIC #c :", true,
-        		"TOPIC", p);
+        expect("[empty trailing clears the topic]", "TOPIC #c :", true, "TOPIC",
+               p);
     }
     {
         const char *p[] = {"#c", NULL};

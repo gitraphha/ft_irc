@@ -8,7 +8,6 @@ trap 'rm -f "$TEST_BIN"' EXIT
 
 c++ -Wall -Wextra -Werror -pedantic -std=c++98 -I "$ROOT_DIR/includes" \
 	-o "$TEST_BIN" \
-	"$SCRIPT_DIR/src/test_parser.cpp" \
-	"$ROOT_DIR/srcs/Parser.cpp" || exit 1
+	"$SCRIPT_DIR/src/test_parser.cpp" || exit 1
 
 "$TEST_BIN"
