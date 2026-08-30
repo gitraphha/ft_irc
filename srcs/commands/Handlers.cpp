@@ -40,40 +40,77 @@ confirmation and is then sent the channel's topic (using RPL_TOPIC) and
 the list of users who are on the channel (using RPL_NAMREPLY), which
 MUST include the user joining.
 */
-bool join(Server &server, Client &client, std::vector<std::string> &params) {
+bool Handlers::join(Server &server, Client &client,
+                    std::vector<std::string> &params) {
     ChannelManager &cm = server.getChannelManager();
     if (params.size() == 1 && params.at(0) == "0") {
-        cm.partAll(client);
+        cm.partAll(client, client.getNick());
         return false;
     }
-    std::vector<std::string> names = Utils::split(params[0], ',');
+    std::vector<std::string> channels = Utils::split(params[0], ',');
     std::vector<std::string> keys = params.size() > 1
                                         ? Utils::split(params[1], ',')
                                         : std::vector<std::string>();
     const std::string       &serverName = server.getServerName();
-    for (size_t i = 0; i < names.size(); i++) {
-        if (names[i].empty())
+    for (size_t i = 0; i < channels.size(); i++) {
+        if (channels[i].empty())
             continue;
         try {
             const std::string &key = i < keys.size() ? keys[i] : "";
-            cm.join(client, names[i], key);
-            Channel &ch = cm.at(names[i]);
+            cm.join(client, channels[i], key);
+            Channel &ch = cm.at(channels[i]);
             ch.broadcast(
-                Reply::fromClient(client.getPrefix(), "JOIN", names[i]));
-            //send topic
-            if (ch.hasTopic())
-                client.sendReply(
-                    serverName,
-                    Reply::reply(Reply::RPL_TOPIC, names[i], ch.getTopic()));
-            else
-                client.sendReply(serverName,
-                                 Reply::reply(Reply::RPL_NOTOPIC, names[i]));
-            //send names
-            client.sendReply(serverName,
-                             Reply::reply(Reply::RPL_NAMREPLY, "= " + names[i],
-                                          ch.namesList()));
-            client.sendReply(serverName,
-                             Reply::reply(Reply::RPL_ENDOFNAMES, names[i]));
+                Reply::fromClient(client.getPrefix(), "JOIN", channels[i]));
+            ch.sendTopic(serverName, client);
+            ch.sendNames(serverName, client);
+        } catch (const Error &e) {
+            if (e.hasReply())
+                client.sendReply(serverName, e.reply());
+        }
+    }
+    return false;
+}
+
+/*
+INVITE <nickname> <channel>
+*/
+bool Handlers::invite(Server &server, Client &client,
+                      std::vector<std::string> &params) {}
+
+/*
+KICK <channel> *( "," <channel> ) <user> *( "," <user> ) [<comment>]
+
+The KICK command can be used to request the forced removal of a user from a
+channel.  It causes the <user> to PART from the <channel> by force. For the
+message to be syntactically correct, there MUST be either one channel parameter
+and multiple user parameter, or as many channel parameters as there are user
+parameters.  If a "comment" is given, this will be sent instead of the default
+message, the nickname of the user issuing the KICK.
+
+The server MUST NOT send KICK messages with multiple channels or users to clients.
+*/
+bool Handlers::kick(Server &server, Client &client,
+                    std::vector<std::string> &params) {}
+
+/*
+PART channel> *( "," <channel> ) [ <Part Message> ]
+
+The PART command causes the user sending the message to be removed from the list
+of active members for all given channels listed in the parameter string. If a
+"Part Message" is given, this will be sent instead of the default message, the
+nickname.
+*/
+bool Handlers::part(Server &server, Client &client,
+                    std::vector<std::string> &params) {
+    std::vector<std::string> channels = Utils::split(params[0], ',');
+    std::string     reason = (params.size() > 1) ? params[1] : client.getNick();
+    ChannelManager &cm = server.getChannelManager();
+    const std::string &serverName = server.getServerName();
+    for (size_t i = 0; i < channels.size(); i++) {
+        if (channels[i].empty())
+            continue;
+        try {
+            cm.part(client, channels[i], reason);
         } catch (const Error &e) {
             if (e.hasReply())
                 client.sendReply(serverName, e.reply());
@@ -204,7 +241,8 @@ If the <topic> parameter is present, the topic for that channel will be changed,
 if this action is allowed for the user requesting it. If the <topic> parameter
 is an empty string, the topic for that channel will be removed.
 */
-bool topic(Server &server, Client &client, std::vector<std::string> &params) {
+bool Handlers::topic(Server &server, Client &client,
+                     std::vector<std::string> &params) {
     try {
         Channel &ch = server.getChannelManager().at(params[0]);
         if (params.size() > 1)

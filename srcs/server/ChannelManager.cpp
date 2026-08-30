@@ -47,29 +47,42 @@ void ChannelManager::join(Client &client, const std::string &name,
     it->second.join(client, key);
 }
 
-void ChannelManager::part_(Client                                  &client,
-                           std::map<std::string, Channel>::iterator it) {
-    it->second.part(client);
+// Part parts `client` from the channel named `name`, deleting it if it's empty.
+// Broadcasts part message to all clients.
+void ChannelManager::part(Client &client, const std::string &name,
+                          const std::string &msg) {
+    std::map<std::string, Channel>::iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+    it->second.part(client, msg);
     if (!it->second.size())
         channels_.erase(it);
 }
 
-// Part parts `client` from the channel named `name`, deleting it if it's empty.
-void ChannelManager::part(Client &client, const std::string &name) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
-    part_(client, it);
+// Parts client from all channels, deleting it if it's empty.
+// Broadcasts part message.
+void ChannelManager::partAll(Client &client, const std::string &msg) {
+    partAll_(client, msg, true);
 }
 
-// Parts client from all channels, deleting it if it's empty
-void ChannelManager::partAll(Client &client) {
+// Parts client from all channels, deleting it if it's empty.
+void ChannelManager::quitAll(Client &client) {
+    partAll_(client);
+}
+
+void ChannelManager::partAll_(Client &client, const std::string &msg,
+                              bool announce) {
     std::map<std::string, Channel>::iterator it = channels_.begin();
     while (it != channels_.end()) {
         std::map<std::string, Channel>::iterator cur = it++;
-        if (cur->second.hasMember(client)) {
-            part_(client, cur);
-        }
+        if (!cur->second.hasMember(client))
+            continue;
+        if (announce)
+            cur->second.part(client, msg);
+        else
+            cur->second.quit(client);
+        if (!cur->second.size())
+            channels_.erase(cur);
     }
 }
 

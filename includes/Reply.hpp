@@ -241,6 +241,7 @@ inline Message reply(Code code, const std::string &params,
     return Message(code, params, trailing);
 }
 
+// returns formatted string ( :<prefix> <COMMAND> <params> [ :trailing ] )
 inline std::string fromClient(const std::string &prefix, const std::string &cmd,
                               const std::string &params,
                               const std::string &trailing = "") {

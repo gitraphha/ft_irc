@@ -38,7 +38,16 @@ void Channel::join(Client &client, const std::string &key) {
 }
 
 // Part parts `client` from the channel named `name`, deleting it if it's empty.
-void Channel::part(Client &client) {
+// Broadcasts part message to all clients.
+void Channel::part(Client &client, const std::string &msg) {
+    if (!hasMember(client))
+        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+    broadcast(Reply::fromClient(client.getPrefix(), "PART", name_, msg));
+    members_.remove(client);
+}
+
+// Quit parts `client` from the channel named `name`, deleting it if it's empty.
+void Channel::quit(Client &client) {
     if (!hasMember(client))
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
     members_.remove(client);
@@ -46,6 +55,10 @@ void Channel::part(Client &client) {
 
 size_t Channel::size() const {
     return members_.size();
+}
+
+const std::string &Channel::getName() const {
+    return name_;
 }
 
 const std::string &Channel::getNameCaseFolded() const {
@@ -72,7 +85,8 @@ void Channel::setTopic(Client &client, const std::string &topic) {
     broadcast(Reply::fromClient(client.getPrefix(), "TOPIC", name_, topic_));
 }
 
-// sends the channel topic to the given client.
+// sends the channel topic, topicSetBy and topicSetTime to the given client if
+// topic is set.
 void Channel::sendTopic(const std::string &serverName, Client &client) {
     if (!hasMember(client))
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
@@ -86,6 +100,15 @@ void Channel::sendTopic(const std::string &serverName, Client &client) {
     client.sendReply(serverName,
                      Reply::reply(Reply::RPL_TOPICWHOTIME,
                                   name_ + " " + topicSetBy_ + " " + oss.str()));
+}
+
+// send list of users in the channel to the given client
+// s toggle the secret channel flag -> if added, for non-members treat as
+// non-existent channel
+void Channel::sendNames(const std::string &serverName, Client &client) {
+    client.sendReply(serverName, Reply::reply(Reply::RPL_NAMREPLY, "= " + name_,
+                                              members_.namesList()));
+    client.sendReply(serverName, Reply::reply(Reply::RPL_ENDOFNAMES, name_));
 }
 
 // hasAtLeast returns whether the client has at least the given channel privilege.
@@ -107,9 +130,4 @@ bool Channel::hasTopic() const {
 
 void Channel::broadcast(const std::string &msg, const Client *skip) const {
     members_.send(msg, skip);
-}
-
-// returns the list of users joined to the channel
-std::string Channel::namesList() const {
-    return members_.namesList();
 }

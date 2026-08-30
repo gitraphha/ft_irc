@@ -39,21 +39,23 @@ class Channel {
             const std::string &key = "");
 
     void               join(Client &client, const std::string &key = "");
-    void               part(Client &client);
+    void               part(Client &client, const std::string &msg = "");
+    void               quit(Client &client);
 
     size_t             size() const;
+    const std::string &getName() const;
     const std::string &getNameCaseFolded() const;
     ssize_t            getUserLimit() const;
     const std::string &getTopic() const;
 
     void               setTopic(Client &client, const std::string &topic);
     void               sendTopic(const std::string &serverName, Client &client);
+    void               sendNames(const std::string &serverName, Client &client);
 
     bool               hasAtLeast(Client &client, int mode) const;
-    bool        hasAtLeast(Client &client, const ModeSet &required) const;
-    bool        hasMember(Client &client) const;
-    bool        hasTopic() const;
+    bool hasAtLeast(Client &client, const ModeSet &required) const;
+    bool hasMember(Client &client) const;
+    bool hasTopic() const;
 
-    void        broadcast(const std::string &msg, const Client *skip = 0) const;
-    std::string namesList() const;
+    void broadcast(const std::string &msg, const Client *skip = 0) const;
 };

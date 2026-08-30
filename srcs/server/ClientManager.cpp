@@ -73,7 +73,7 @@ void ClientManager::remove(int fd, ChannelManager &cm) {
     std::map<std::string, Client *>::iterator it_cl = findClient_(nick);
     if (it_cl == clients_.end())
         return;
-    cm.partAll(*it_cl->second);
+    cm.quitAll(*it_cl->second);
     delete it_cl->second;
     clients_.erase(it_cl);
 }
