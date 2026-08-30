@@ -53,7 +53,7 @@ class Client {
         return oper_;
     }
 
-    bool hasPassAccepted() const {
+    bool isPassAccepted() const {
         return passAccepted_;
     }
 
