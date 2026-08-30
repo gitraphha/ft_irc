@@ -124,7 +124,7 @@ int main() {
         std::cout << "[registration state starts empty]\n";
         Client c;
         report(!c.isRegistered(), "a new client is not registered");
-        report(!c.hasPassAccepted(), "a new client has not sent PASS");
+        report(!c.isPassAccepted(), "a new client has not sent PASS");
         report(!c.hasIdentity(), "a new client has neither NICK nor USER");
     }
 
