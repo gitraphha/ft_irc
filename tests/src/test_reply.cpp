@@ -1,5 +1,5 @@
-#include "Reply.hpp"
 #include "Errors.hpp"
+#include "Reply.hpp"
 
 #include <iostream>
 
@@ -10,18 +10,22 @@ int main() {
     std::cout << Reply::build("irc.local", "*",
                               Reply::reply(Reply::ERR_NICKNAMEINUSE, "alice"));
 
-    std::cout << Reply::build("irc.local", "alice",
-                              Reply::reply(Reply::ERR_NEEDMOREPARAMS, "PRIVMSG"));
+    std::cout << Reply::build(
+        "irc.local", "alice",
+        Reply::reply(Reply::ERR_NEEDMOREPARAMS, "PRIVMSG"));
 
-    std::cout << Reply::build("irc.local", "alice",
-                              Reply::reply(Reply::RPL_WELCOME, "",
-                                           "Welcome to the Internet Relay Network alice!user@host"));
+    std::cout << Reply::build(
+        "irc.local", "alice",
+        Reply::reply(Reply::RPL_WELCOME, "",
+                     "Welcome to the Internet Relay Network alice!user@host"));
 
-    std::cout << Reply::build("irc.local", "alice",
-                              Reply::reply(Reply::RPL_TOPIC, "#chan", "a topic"));
+    std::cout << Reply::build(
+        "irc.local", "alice",
+        Reply::reply(Reply::RPL_TOPIC, "#chan", "a topic"));
 
-    std::cout << Reply::build("irc.local", "alice",
-                              Reply::reply(Reply::RPL_NAMREPLY, "= #chan", "@alice bob"));
+    std::cout << Reply::build(
+        "irc.local", "alice",
+        Reply::reply(Reply::RPL_NAMREPLY, "= #chan", "@alice bob"));
 
     std::cout << Reply::build("irc.local", "alice",
                               Reply::reply(Reply::RPL_ENDOFNAMES, "#chan"));
@@ -31,6 +35,9 @@ int main() {
 
     std::cout << Reply::build("irc.local", "*",
                               Reply::reply(Reply::ERR_NOTREGISTERED, ""));
+
+    std::cout << Reply::build("irc.local", "*",
+                              Reply::reply(Reply::ERR_INPUTTOOLONG, ""));
 
     try {
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, "#chan"));
@@ -47,7 +54,7 @@ int main() {
                   << " what=" << e.what() << "\n";
     }
 
-	try {
+    try {
         throw Error(Reply::reply(Reply::ERR_USERNOTINCHANNEL, "bob #chan"));
     } catch (const Error &e) {
         std::cout << "caught, hasReply=" << e.hasReply() << "\n";
@@ -55,8 +62,8 @@ int main() {
             std::cout << Reply::build("irc.local", "alice", e.reply());
     }
 
-	// or directly send an error
-	// std::cout << Reply::build("irc.local", "alice",
-	// 						Reply::reply(Reply::ERR_USERNOTINCHANNEL, "bob #chan"));
+    // or directly send an error
+    // std::cout << Reply::build("irc.local", "alice",
+    // 						Reply::reply(Reply::ERR_USERNOTINCHANNEL, "bob #chan"));
     return 0;
 }

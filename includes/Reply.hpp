@@ -85,6 +85,7 @@ enum Code {
     ERR_NOORIGIN = 409,    // :No origin specified                   (PING/PONG)
     ERR_NORECIPIENT = 411, // :No recipient given (<command>)        (PRIVMSG)
     ERR_NOTEXTTOSEND = 412, // :No text to send                       (PRIVMSG)
+    ERR_INPUTTOOLONG = 417, // :Input line was too long
     ERR_UNKNOWNCOMMAND = 421,   // <command> :Unknown command
     ERR_NOMOTD = 422,           // :MOTD File is missing
     ERR_NONICKNAMEGIVEN = 431,  // :No nickname given                     (NICK)
@@ -139,6 +140,8 @@ inline const char *text(Code code) {
             return "No origin specified";
         case ERR_NOTEXTTOSEND:
             return "No text to send";
+        case ERR_INPUTTOOLONG:
+            return "Input line was too long";
         case ERR_UNKNOWNCOMMAND:
             return "Unknown command";
         case ERR_NOMOTD:
