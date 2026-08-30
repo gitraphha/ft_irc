@@ -8,12 +8,9 @@
 #include <sstream>
 
 // userLimit -1 means no limit is set
-Channel::Channel(const std::string &name, const std::string &nameCaseFolded,
-                 const std::string &key)
-    : name_(name), nameCaseFolded_(nameCaseFolded), key_(key), userLimit_(-1),
-      createdTime_(std::time(NULL)), topicSetTime_() {
-    (void)topicSetTime_;
-}
+Channel::Channel(const std::string &name, const std::string &nameCaseFolded)
+    : name_(name), nameCaseFolded_(nameCaseFolded), key_(), userLimit_(-1),
+      createdTime_(std::time(NULL)), topicSetTime_() {}
 
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void Channel::join(Client &client, const std::string &key) {
@@ -51,6 +48,19 @@ void Channel::quit(Client &client) {
     if (!hasMember(client))
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
     members_.remove(client);
+}
+
+void Channel::kick(Client &client, Client &target, const std::string &msg) {
+    if (!hasMember(client))
+        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+    if (!hasAtLeast(client, Mode::Halfop))
+        throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+    if (!hasMember(target))
+        throw Error(Reply::reply(Reply::ERR_USERNOTINCHANNEL,
+                                 target.getNick() + " " + name_));
+    broadcast(Reply::fromClient(client.getPrefix(), "KICK",
+                                name_ + " " + target.getNick(), msg));
+    members_.remove(target);
 }
 
 size_t Channel::size() const {

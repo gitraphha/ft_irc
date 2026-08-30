@@ -10,9 +10,10 @@ class ChannelManager {
     std::map<std::string, Channel>::iterator
     findChannel_(const std::string &name);
     std::map<std::string, Channel>::const_iterator
-         findChannel_(const std::string &name) const;
-    void partAll_(Client &client, const std::string &msg = "",
-                  bool announce = false);
+                findChannel_(const std::string &name) const;
+    void        partAll_(Client &client, const std::string &msg = "",
+                         bool announce = false);
+    static bool isChannelName_(const std::string &name);
 
   public:
     ChannelManager();

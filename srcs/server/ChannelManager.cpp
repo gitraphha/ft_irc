@@ -33,13 +33,31 @@ bool ChannelManager::isMember(Client &client, const std::string &name) const {
     return (it != channels_.end() && it->second.hasMember(client));
 }
 
+/*
+Channels names are strings (beginning with a '&', '#', '+' or '!' character) of
+length up to fifty (50) characters. It SHALL NOT contain any spaces (' '), a
+control G (^G or ASCII 7), a comma (','). Space is used as parameter separator
+and command is used as a list item separator by the protocol). A colon (':') can
+also be used as a delimiter for the channel mask. Channel names are case
+insensitive.
+
+Note: * and ? added for mask safety
+*/
+bool ChannelManager::isChannelName_(const std::string &name) {
+    if (name.empty() || name.size() > 50 || name.find_first_of("&#+!") != 0)
+        return false;
+    return name.find_first_of(" \a,:*?") == std::string::npos;
+}
+
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void ChannelManager::join(Client &client, const std::string &name,
                           const std::string &key) {
+    if (!isChannelName_(name))
+        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
     std::string                              folded = Utils::foldCase(name);
     std::map<std::string, Channel>::iterator it = channels_.find(folded);
     if (it == channels_.end()) {
-        Channel newChannel(name, folded, key);
+        Channel newChannel(name, folded);
         newChannel.join(client, key);
         channels_.insert(std::make_pair(folded, newChannel));
         return;

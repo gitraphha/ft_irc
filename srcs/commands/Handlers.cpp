@@ -86,14 +86,42 @@ message to be syntactically correct, there MUST be either one channel parameter
 and multiple user parameter, or as many channel parameters as there are user
 parameters.  If a "comment" is given, this will be sent instead of the default
 message, the nickname of the user issuing the KICK.
-
-The server MUST NOT send KICK messages with multiple channels or users to clients.
 */
 bool Handlers::kick(Server &server, Client &client,
-                    std::vector<std::string> &params) {}
+                    std::vector<std::string> &params) {
+    std::vector<std::string> channels = Utils::split(params[0], ',');
+    std::vector<std::string> users = Utils::split(params[1], ',');
+    if (channels.size() != users.size() && channels.size() != 1) {
+        client.sendReply(server.getServerName(),
+                         Reply::reply(Reply::ERR_NEEDMOREPARAMS, "KICK"));
+        return false;
+    }
+    ChannelManager    &cm = server.getChannelManager();
+    ClientManager     &clm = server.getClientManager();
+    const std::string &comment =
+        params.size() > 2 ? params[2] : client.getNick();
+    for (size_t i = 0; i < users.size(); i++) {
+        const std::string &chan =
+            channels.size() == 1 ? channels[0] : channels[i];
+        if (chan.empty()) {
+            if (channels.size() == 1)
+                break;
+            continue;
+        }
+        try {
+            Channel &ch = cm.at(chan);
+            Client  &user = clm.at(users[i]);
+            ch.kick(client, user, comment);
+        } catch (const Error &e) {
+            if (e.hasReply())
+                client.sendReply(server.getServerName(), e.reply());
+        }
+    }
+    return false;
+}
 
 /*
-PART channel> *( "," <channel> ) [ <Part Message> ]
+PART <channel> *( "," <channel> ) [ <Part Message> ]
 
 The PART command causes the user sending the message to be removed from the list
 of active members for all given channels listed in the parameter string. If a

@@ -47,7 +47,15 @@ bool MemberSet::hasAtLeast(Client &client, int mode) const {
     std::map<Client *, ModeSet>::const_iterator it = members_.find(&client);
     if (it == members_.end())
         return false;
-    return it->second.has(mode);
+    size_t total = Mode::totalUserModes;
+    for (size_t i = 0; i < total; i++) {
+        int m = Mode::channelUserModes[i];
+        if (it->second.has(m))
+            return true;
+        if (m == mode)
+            return false;
+    }
+    return false;
 }
 
 bool MemberSet::hasAtLeast(Client &client, const ModeSet &modes) const {
@@ -74,8 +82,14 @@ std::string MemberSet::namesList() const {
             continue; // shouldn't happen, maybe log error?
         if (it != members_.begin())
             out += " ";
-        if (it->second.has(Mode::ChannelOperator))
-            out += "@";
+        size_t total = Mode::totalUserModes;
+        for (size_t i = 0; i < total; i++) {
+            int m = Mode::channelUserModes[i];
+            if (it->second.has(m)) {
+                out += Mode::channelModePrefix(m);
+                break;
+            }
+        }
         out += it->first->getNick();
     }
     return out;

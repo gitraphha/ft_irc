@@ -36,8 +36,11 @@ enum UserMode {
 
 // ChannelUserModes holds the list of all user modes that can be applied to a
 // user in a channel in descending order of precedence
-static const int channelUserModes[] = {ChannelFounder, ChannelAdmin,
-                                       ChannelOperator, Halfop, Voice};
+static const int    channelUserModes[] = {ChannelFounder, ChannelAdmin,
+                                          ChannelOperator, Halfop, Voice};
+
+static const size_t totalUserModes =
+    sizeof(channelUserModes) / sizeof(*channelUserModes);
 
 inline std::string channelModePrefix(int m) {
     switch (m) {

@@ -35,14 +35,14 @@ class Channel {
     std::time_t topicSetTime_;
 
   public:
-    Channel(const std::string &name, const std::string &nameCaseFolded,
-            const std::string &key = "");
+    Channel(const std::string &name, const std::string &nameCaseFolded);
 
-    void               join(Client &client, const std::string &key = "");
-    void               part(Client &client, const std::string &msg = "");
-    void               quit(Client &client);
+    void   join(Client &client, const std::string &key = "");
+    void   part(Client &client, const std::string &msg = "");
+    void   quit(Client &client);
+    void   kick(Client &client, Client &target, const std::string &msg = "");
 
-    size_t             size() const;
+    size_t size() const;
     const std::string &getName() const;
     const std::string &getNameCaseFolded() const;
     ssize_t            getUserLimit() const;

@@ -50,6 +50,14 @@ class Server {
 
     void run();
 
+    ClientManager &getClientManager() {
+        return clients_;
+    }
+
+    const std::string &getServerName() {
+        return serverName_;
+    }
+
     bool tryRegister(Client &client) {
         (void)client;
         return true;
