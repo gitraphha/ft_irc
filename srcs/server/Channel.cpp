@@ -97,7 +97,7 @@ void Channel::setTopic(Client &client, const std::string &topic) {
 
 // sends the channel topic, topicSetBy and topicSetTime to the given client if
 // topic is set.
-void Channel::sendTopic(const std::string &serverName, Client &client) const{
+void Channel::sendTopic(const std::string &serverName, Client &client) const {
     if (!hasMember(client))
         throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
     if (topic_.empty()) {
@@ -123,13 +123,13 @@ void Channel::sendNames(const std::string &serverName, Client &client) const {
 
 // throws error when client cannot invite target to the channel
 void Channel::checkInvite(Client &client, Client &target) const {
-	if (!hasMember(client))
-		throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
-	if (hasMember(target))
-		throw Error(Reply::reply(Reply::ERR_USERONCHANNEL,
-							target.getNick() + " " + name_));
-	if (inviteOnly() && !hasAtLeast(client, Mode::ChannelOperator))
-		throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+    if (!hasMember(client))
+        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+    if (hasMember(target))
+        throw Error(Reply::reply(Reply::ERR_USERONCHANNEL,
+                                 target.getNick() + " " + name_));
+    if (inviteOnly() && !hasAtLeast(client, Mode::ChannelOperator))
+        throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
 }
 
 bool Channel::inviteOnly() const {

@@ -5,6 +5,8 @@
  * command handlers own validation and IRC behavior.
  */
 
+#include "Reply.hpp"
+
 #include <cstddef>
 #include <set>
 #include <string>

@@ -25,10 +25,10 @@ Channel &ChannelManager::at(const std::string &name) {
 }
 
 const Channel &ChannelManager::at(const std::string &name) const {
-	std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
     if (it == channels_.end())
         throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
-    return it->second;	
+    return it->second;
 }
 
 bool ChannelManager::hasChannel(const std::string &name) const {

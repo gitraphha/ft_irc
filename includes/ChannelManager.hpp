@@ -18,20 +18,20 @@ class ChannelManager {
   public:
     ChannelManager();
 
-    Channel &at(const std::string &name);
-	const Channel &at(const std::string &name) const;
+    Channel       &at(const std::string &name);
+    const Channel &at(const std::string &name) const;
 
-    bool     hasChannel(const std::string &name) const;
-    bool     isMember(Client &client, const std::string &name) const;
+    bool           hasChannel(const std::string &name) const;
+    bool           isMember(Client &client, const std::string &name) const;
 
-    void     join(Client &client, const std::string &name,
-                  const std::string &key = "");
-    void     part(Client &client, const std::string &name,
-                  const std::string &msg = "");
-    void     partAll(Client &client, const std::string &msg = "");
-    void     quitAll(Client &client);
-    void     removeChannel(const std::string &name);
+    void           join(Client &client, const std::string &name,
+                        const std::string &key = "");
+    void           part(Client &client, const std::string &name,
+                        const std::string &msg = "");
+    void           partAll(Client &client, const std::string &msg = "");
+    void           quitAll(Client &client);
+    void           removeChannel(const std::string &name);
 
-    void     broadcast(const std::string &name, const std::string &msg,
-                       const Client *skip = 0) const;
+    void           broadcast(const std::string &name, const std::string &msg,
+                             const Client *skip = 0) const;
 };

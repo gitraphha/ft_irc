@@ -49,12 +49,12 @@ class Channel {
     const std::string &getTopic() const;
 
     void               setTopic(Client &client, const std::string &topic);
-    void               sendTopic(const std::string &serverName, Client &client) const;
-    void               sendNames(const std::string &serverName, Client &client) const;
-	void checkInvite(Client &client, Client &target) const;
+    void sendTopic(const std::string &serverName, Client &client) const;
+    void sendNames(const std::string &serverName, Client &client) const;
+    void checkInvite(Client &client, Client &target) const;
 
-    bool               inviteOnly() const;
-    bool               hasAtLeast(Client &client, int mode) const;
+    bool inviteOnly() const;
+    bool hasAtLeast(Client &client, int mode) const;
     bool hasAtLeast(Client &client, const ModeSet &required) const;
     bool hasMember(Client &client) const;
     bool hasTopic() const;
