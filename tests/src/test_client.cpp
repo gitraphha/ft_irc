@@ -124,7 +124,7 @@ int main() {
         std::cout << "[registration state starts empty]\n";
         Client c;
         report(!c.isRegistered(), "a new client is not registered");
-        report(!c.isPassAccepted(), "a new client has not sent PASS");
+        report(!c.hasPassAccepted(), "a new client has not sent PASS");
         report(!c.hasIdentity(), "a new client has neither NICK nor USER");
     }
 
@@ -150,11 +150,11 @@ int main() {
     {
         std::cout << "[prefix]\n";
         Client c;
-        report(c.getPrefix().empty(), "prefix is empty without an identity");
+        report(c.getPrefix() == "*", "prefix is * without an identity");
         c.setNick("bob");
-        report(c.getPrefix().empty(), "prefix is empty with only a nickname");
+        report(c.getPrefix() == "*", "prefix is * with only a nickname");
         c.setUser("b", "Bob Example");
-        report(c.getPrefix().empty(), "prefix is empty without a hostname");
+        report(c.getPrefix() == "*", "prefix is * without a hostname");
         c.setHostname("127.0.0.1");
         report(c.getPrefix() == "bob!b@127.0.0.1", "prefix is nick!user@host");
     }

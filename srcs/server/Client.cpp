@@ -4,6 +4,38 @@
 
 #include <algorithm>
 
+std::string Client::getNick() const {
+    return nick_;
+}
+
+std::string Client::getNickCaseFolded() const {
+    return nickCaseFolded_;
+}
+
+std::string Client::getUsername() const {
+    return username_;
+}
+
+std::string Client::getHostname() const {
+    return hostname_;
+}
+
+std::string Client::getRealname() const {
+    return realname_;
+}
+
+bool Client::isRegistered() const {
+    return registered_;
+}
+
+bool Client::isOperator() const {
+    return oper_;
+}
+
+bool Client::hasPassAccepted() const {
+    return passAccepted_;
+}
+
 std::string Client::getPrefix() const {
     if (!hasIdentity() || hostname_.empty())
         return "*";

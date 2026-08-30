@@ -6,56 +6,34 @@
  */
 
 #include <cstddef>
-#include <string>
 #include <set>
+#include <string>
 
 class Client {
-    std::string              nick_;
-    std::string              nickCaseFolded_;
-    std::string              username_;
-    std::string              hostname_;
-    std::string              realname_;
-    bool                     registered_;
-    std::string              recvBuffer_;
-    std::string              sendBuffer_;
-    bool                     passAccepted_;
-    bool                     oper_;
+    std::string           nick_;
+    std::string           nickCaseFolded_;
+    std::string           username_;
+    std::string           hostname_;
+    std::string           realname_;
+    bool                  registered_;
+    std::string           recvBuffer_;
+    std::string           sendBuffer_;
+    bool                  passAccepted_;
+    bool                  oper_;
     std::set<std::string> invitedTo_;
 
   public:
     Client() : registered_(false), passAccepted_(false), oper_(false) {}
 
-    std::string getNick() const {
-        return nick_;
-    }
+    std::string getNick() const;
+    std::string getNickCaseFolded() const;
+    std::string getUsername() const;
+    std::string getHostname() const;
+    std::string getRealname() const;
 
-    std::string getNickCaseFolded() const {
-        return nickCaseFolded_;
-    }
-
-    std::string getUsername() const {
-        return username_;
-    }
-
-    std::string getHostname() const {
-        return hostname_;
-    }
-
-    std::string getRealname() const {
-        return realname_;
-    }
-
-    bool isRegistered() const {
-        return registered_;
-    }
-
-    bool isOperator() const {
-        return oper_;
-    }
-
-    bool isPassAccepted() const {
-        return passAccepted_;
-    }
+    bool        isRegistered() const;
+    bool        isOperator() const;
+    bool        hasPassAccepted() const;
 
     std::string getPrefix() const;
     bool        hasIdentity() const;
