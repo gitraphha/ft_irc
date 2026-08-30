@@ -6,7 +6,7 @@
 
 std::string Client::getPrefix() const {
     if (!hasIdentity() || hostname_.empty())
-        return "";
+        return "*";
     return nick_ + "!" + username_ + "@" + hostname_;
 }
 
