@@ -85,7 +85,7 @@ enum Code {
     ERR_NOORIGIN = 409,    // :No origin specified                   (PING/PONG)
     ERR_NORECIPIENT = 411, // :No recipient given (<command>)        (PRIVMSG)
     ERR_NOTEXTTOSEND = 412, // :No text to send                       (PRIVMSG)
-    ERR_INPUTTOOLONG = 417, // <client> :Input line was too long
+    ERR_INPUTTOOLONG = 417, // :Input line was too long
     ERR_UNKNOWNCOMMAND = 421,   // <command> :Unknown command
     ERR_NOMOTD = 422,           // :MOTD File is missing
     ERR_NONICKNAMEGIVEN = 431,  // :No nickname given                     (NICK)
