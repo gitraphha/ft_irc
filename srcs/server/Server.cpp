@@ -276,7 +276,7 @@ void Server::acceptClient_(int const serverFd) {
                &sockLen);
     if (clientFd == -1) {
         log_("Could not accept client:\n" +
-                 srvHelp::printAddrfamilyAddrPort(sockAddrIn46),
+                 srvHelp::composeAddrfamAddrPortStr(sockAddrIn46),
              Logger::lmWarn);
         return;
     }
@@ -287,7 +287,7 @@ void Server::acceptClient_(int const serverFd) {
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
-              << srvHelp::printAddrfamilyAddrPort(sockAddrIn46) << std::endl;
+              << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
 }
 
 void Server::storePollFd_(int const socketFd) {
