@@ -46,14 +46,14 @@ bool Handlers::invite(Server &server, Client &client,
             chan.checkInvite(client, target);
         }
         target.addInvite(params[1]);
-        client.sendReply(server.getServerName(),
+        client.sendReply(server.serverName(),
                          Reply::reply(Reply::RPL_INVITING,
                                       params[1] + " " + target.getNick()));
         target.send(Reply::fromClient(client.getPrefix(), "INVITE",
                                       target.getNick() + " " + params[1]));
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.getServerName(), e.reply());
+            client.sendReply(server.serverName(), e.reply());
     }
     return false;
 }
@@ -88,7 +88,7 @@ bool Handlers::join(Server &server, Client &client,
     std::vector<std::string> keys = params.size() > 1
                                         ? Utils::split(params[1], ',')
                                         : std::vector<std::string>();
-    const std::string       &serverName = server.getServerName();
+    const std::string       &serverName = server.serverName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -123,7 +123,7 @@ bool Handlers::kick(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::vector<std::string> users = Utils::split(params[1], ',');
     if (channels.size() != users.size() && channels.size() != 1) {
-        client.sendReply(server.getServerName(),
+        client.sendReply(server.serverName(),
                          Reply::reply(Reply::ERR_NEEDMOREPARAMS, "KICK"));
         return false;
     }
@@ -145,7 +145,7 @@ bool Handlers::kick(Server &server, Client &client,
             ch.kick(client, user, comment);
         } catch (const Error &e) {
             if (e.hasReply())
-                client.sendReply(server.getServerName(), e.reply());
+                client.sendReply(server.serverName(), e.reply());
         }
     }
     return false;
@@ -164,7 +164,7 @@ bool Handlers::part(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::string     reason = (params.size() > 1) ? params[1] : client.getNick();
     ChannelManager &cm = server.getChannelManager();
-    const std::string &serverName = server.getServerName();
+    const std::string &serverName = server.serverName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -307,10 +307,10 @@ bool Handlers::topic(Server &server, Client &client,
         if (params.size() > 1)
             ch.setTopic(client, params[1]);
         else
-            ch.sendTopic(server.getServerName(), client);
+            ch.sendTopic(server.serverName(), client);
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.getServerName(), e.reply());
+            client.sendReply(server.serverName(), e.reply());
     }
     return false;
 }

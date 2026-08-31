@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <set>
 #include <string>
-#include "Reply.hpp"
 
 class Client {
     std::string           nick_;
@@ -53,10 +52,10 @@ class Client {
     void removeInvite(const std::string &name);
 
     void        send(const std::string &msg);
-	void        sendReply(const std::string &serverName, const Reply::Message &msg);
-    void        appendToRecvBuffer(const std::string &bytes);
-    bool        extractLine(std::string &line);
-    std::size_t recvBufferSize() const;
+    void sendReply(const std::string &serverName, const Reply::Message &msg);
+    void appendToRecvBuffer(const std::string &bytes);
+    bool extractLine(std::string &line);
+    std::size_t        recvBufferSize() const;
     const std::string &getSendBuffer() const;
     void               consumeSendBuffer(std::size_t count);
     void               clearSendBuffer();
