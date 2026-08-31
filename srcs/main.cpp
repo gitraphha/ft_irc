@@ -46,7 +46,7 @@ static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
 		equivalent)
 */
 
-int         main(int argc, char **argv) {
+int main(int argc, char **argv) {
     int         port = 0;
     std::string password;
 

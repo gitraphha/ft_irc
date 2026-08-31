@@ -73,8 +73,8 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
 }
 
 inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
-    char              addrBuffer[128];
-    socklen_t const   addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+    char            addrBuffer[128];
+    socklen_t const addrBuffLen = sizeof(addrBuffer) / sizeof(char);
 
     sa_family_t const saFamily =
         // NOLINTNEXTLINE
