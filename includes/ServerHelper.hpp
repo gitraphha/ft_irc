@@ -72,13 +72,13 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline std::string printAddrfamilyAddrPort(socketAddrX const &sockAddrIn46) {
-    char              addrBuffer[128];
-    socklen_t const   addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
+    char            addrBuffer[128];
+    socklen_t const addrBuffLen = sizeof(addrBuffer) / sizeof(char);
 
     sa_family_t const saFamily =
-        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4) // NOLINT
-            .sa_family;
+        // NOLINTNEXTLINE
+        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4).sa_family;
     void const *addrPtr = 0;
     uint16_t    portNumber = 0;
 

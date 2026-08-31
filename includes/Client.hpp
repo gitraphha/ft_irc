@@ -1,62 +1,61 @@
 #pragma once
 
-#include <algorithm> // move to .cpp when implemnting all functions
-#include <string>
-#include <vector>
+/*
+ * Client stores per-connection state only. Server owns sockets and syscalls;
+ * command handlers own validation and IRC behavior.
+ */
 
-// draft: to be completed by blnunez-
+#include <cstddef>
+#include <set>
+#include <string>
 
 class Client {
-    std::string              nick_;
-    std::string              nickCaseFolded_;
-    std::string              username_;
-    std::string              hostname_;
-    std::string              realname_;
-    bool                     registered_;
-    std::string              recvBuffer_;
-    std::string              sendBuffer_;
-    // operator status needed fot KILL and REHASH
-    bool                     oper_;
-    // casefolded name of channels invited to
-    std::vector<std::string> invitedTo_;
+    std::string           nick_;
+    std::string           nickCaseFolded_;
+    std::string           username_;
+    std::string           hostname_;
+    std::string           realname_;
+    bool                  registered_;
+    std::string           recvBuffer_;
+    std::string           sendBuffer_;
+    bool                  passAccepted_;
+    bool                  oper_;
+    std::set<std::string> invitedTo_;
 
   public:
-    Client() : registered_(false), oper_(false) {};
+    Client() : registered_(false), passAccepted_(false), oper_(false) {}
 
-    std::string getNick() const {
-        return nick_;
-    }
+    std::string getNick() const;
+    std::string getNickCaseFolded() const;
+    std::string getUsername() const;
+    std::string getHostname() const;
+    std::string getRealname() const;
 
-    std::string getNickCaseFolded() const {
-        return nickCaseFolded_;
-    }
+    bool isRegistered() const;
+    bool isOperator() const;
+    bool hasPassAccepted() const;
 
-    bool isRegistered() const {
-        return registered_;
-    }
+    std::string getPrefix() const;
+    bool        hasIdentity() const;
+    void        setNick(const std::string &name);
+    void        setUser(const std::string &user, const std::string &real);
+    void        setHostname(const std::string &host);
 
-    bool isOperator() const {
-        return oper_;
-    }
+    void setRegistered(bool value);
+    void setPassAccepted(bool value);
+    void setOperator(bool value);
 
-    // TODO setters
+    bool isInvitedTo(const std::string &name) const;
+    void addInvite(const std::string &name);
+    void removeInvite(const std::string &name);
 
-    bool isInvitedTo(const std::string &chan) const {
-        std::vector<std::string>::const_iterator it =
-            std::find(invitedTo_.begin(), invitedTo_.end(), chan);
-        return it != invitedTo_.end();
-    }
+    void               send(const std::string &msg);
+    void               appendToRecvBuffer(const std::string &bytes);
+    bool               extractLine(std::string &line);
+    std::size_t        recvBufferSize() const;
+    const std::string &getSendBuffer() const;
+    void               consumeSendBuffer(std::size_t count);
+    void               clearSendBuffer();
 
-    void addInvite(const std::string &name) {
-        invitedTo_.push_back(name);
-    }
-
-    void removeInvite(const std::string &name) {
-        std::vector<std::string>::iterator it =
-            std::find(invitedTo_.begin(), invitedTo_.end(), name);
-        if (it != invitedTo_.end())
-            invitedTo_.erase(it);
-    }
-
-    void send(const std::string &msg);
+    bool hasPendingOutput() const;
 };

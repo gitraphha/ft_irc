@@ -38,8 +38,8 @@ class Channel {
     Channel(const std::string &name, const std::string &nameCaseFolded,
             const std::string &key = "");
 
-    void               join(Client *client, const std::string &key = "");
-    void               part(Client *client);
+    void join(Client *client, const std::string &key = "");
+    void part(Client *client);
 
     size_t             size() const;
     const std::string &getNameCaseFolded() const;
