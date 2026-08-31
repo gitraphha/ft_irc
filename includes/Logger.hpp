@@ -8,7 +8,7 @@
 #include <string>
 
 class Logger {
-    std::string        prefix_;
+    std::string prefix_;
 
     static std::string nowStr_() {
         time_t     now = time(0);

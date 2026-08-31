@@ -31,9 +31,9 @@ class Client {
     std::string getHostname() const;
     std::string getRealname() const;
 
-    bool        isRegistered() const;
-    bool        isOperator() const;
-    bool        hasPassAccepted() const;
+    bool isRegistered() const;
+    bool isOperator() const;
+    bool hasPassAccepted() const;
 
     std::string getPrefix() const;
     bool        hasIdentity() const;
@@ -41,21 +41,21 @@ class Client {
     void        setUser(const std::string &user, const std::string &real);
     void        setHostname(const std::string &host);
 
-    void        setRegistered(bool value);
-    void        setPassAccepted(bool value);
-    void        setOperator(bool value);
+    void setRegistered(bool value);
+    void setPassAccepted(bool value);
+    void setOperator(bool value);
 
-    bool        isInvitedTo(const std::string &name) const;
-    void        addInvite(const std::string &name);
-    void        removeInvite(const std::string &name);
+    bool isInvitedTo(const std::string &name) const;
+    void addInvite(const std::string &name);
+    void removeInvite(const std::string &name);
 
-    void        send(const std::string &msg);
-    void        appendToRecvBuffer(const std::string &bytes);
-    bool        extractLine(std::string &line);
-    std::size_t recvBufferSize() const;
+    void               send(const std::string &msg);
+    void               appendToRecvBuffer(const std::string &bytes);
+    bool               extractLine(std::string &line);
+    std::size_t        recvBufferSize() const;
     const std::string &getSendBuffer() const;
     void               consumeSendBuffer(std::size_t count);
     void               clearSendBuffer();
 
-    bool               hasPendingOutput() const;
+    bool hasPendingOutput() const;
 };

@@ -19,7 +19,7 @@ volatile std::sig_atomic_t SignalHandler::stopServerLoop_ = 0;
 	Will be refactored in a separate class, and with a more explicit
 	stop state request function
 */
-void                       SignalHandler::handleStopSignals_(int signal) {
+void SignalHandler::handleStopSignals_(int signal) {
     stopServerLoop_ = signal;
     std::cerr << "Caught stop signal: " << stopServerLoop_ << "." << std::endl;
 }
@@ -30,7 +30,7 @@ void                       SignalHandler::handleStopSignals_(int signal) {
 	portable POSIX compliant way to do it.
 */
 bool SignalHandler::setStopSignals_(sighandler_t handler) {
-    bool             success = true;
+    bool success = true;
 
     struct sigaction sigact = {};
     sigact.sa_handler = handler;
