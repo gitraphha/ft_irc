@@ -1,5 +1,6 @@
 #include "Socket.hpp"
 
+#include "Errors.hpp"
 #include "Reply.hpp"
 #include "ServerHelper.hpp"
 
@@ -8,9 +9,9 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-void Socket::addSocket(int const fd) {
+void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(
-        std::make_pair<int, Socket::SocketIOData>(fd, Socket::SocketIOData()));
+        std::make_pair<int, Socket::SocketIOData>(fd, SocketIOData(srvSocket)));
 }
 
 bool Socket::checkSocket_(struct pollfd &pfd) {
@@ -25,21 +26,51 @@ bool Socket::checkSocket_(struct pollfd &pfd) {
     return true;
 }
 
-size_t Socket::clientDataSanityCheck_(Socket::SocketIOData &sIOD, int fd,
-                                      std::string const &serverName,
-                                      std::string const &nickName,
-                                      bool const         isRegistered) {
-    std::string &rdBuffer = sIOD.readBuffer;
-    size_t       lfcrPos = rdBuffer.find("\r\n");
+std::string Socket::getCmdLine(int const fd) {
+    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+    std::string           cmdLine;
+    char                  recvBuffer[RECVBUFFLEN];
+    sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
+
+    if (sIOD.bytesRead > 0) {
+        sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
+        size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
+        if (lfcrPos != std::string::npos) {
+
+#if NETCATDBG
+            {
+                std::ostringstream oss;
+                oss << "You are client fd " << fd << ": \n"
+                    << "Srv received: " << std::string(sIOD.readBuffer)
+                    << std::endl;
+                sendMsg(fd, oss.str());
+            }
+#endif
+            sIOD.recvErrorCount = 0;
+            cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+            sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+        }
+    } else if (sIOD.bytesRead <= 0) {
+        closeSocket_(fd);
+    }
+    return cmdLine;
+}
+
+size_t Socket::bufferLengthAndSanityCheck_(
+    int const fd /* , bool const isRegistered */) {
+    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+    std::string          &rdBuffer = sIOD.readBuffer;
+    size_t                lfcrPos = rdBuffer.find("\r\n");
+    bool                  msgTooLong = false;
+
     if ((rdBuffer.length() >= MAXMSGLEN) &&
         (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
         sIOD.discardMode = true;
         ++sIOD.recvErrorCount;
-        sendMsg(fd, Reply::build(serverName, nickName,
-                                 Reply::reply(Reply::ERR_INPUTTOOLONG, "")));
+        msgTooLong = true;
     }
     if (sIOD.discardMode) {
-        if (!isRegistered || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+        if (/* !isRegistered || */ sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
             closeSocket_(fd);
             return std::string::npos;
         }
@@ -54,6 +85,9 @@ size_t Socket::clientDataSanityCheck_(Socket::SocketIOData &sIOD, int fd,
                 rdBuffer.clear();
         }
     }
+    if (msgTooLong)
+        throw Error(Reply::reply(Reply::ERR_INPUTTOOLONG, ""));
+
     return lfcrPos;
 }
 
@@ -109,18 +143,8 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     return true;
 }
 
-Socket::SocketIOData &Socket::getSocketIOData_(int const fd) {
-    std::map<int, SocketIOData>::iterator sIODit = sockIODataStore_.find(fd);
-    if (sIODit == sockIODataStore_.end()) {
-        std::ostringstream oss;
-        oss << "No SocketIOData for fd " << fd;
-        throw std::out_of_range(oss.str());
-    }
-    return sIODit->second;
-}
-
 void Socket::closeSocket_(int const fd) {
-    SocketIOData &sIOD = getSocketIOData_(fd);
+    SocketIOData &sIOD = sockIODataStore_.at(fd);
 
     std::ostringstream oss;
     if (sIOD.isSrvSocket) {

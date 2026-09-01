@@ -10,8 +10,11 @@
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 8
 
+#define NETCATDBG 1 // For netcat debug
+
 class Socket {
   public:
+  private:
     struct SocketIOData {
         std::string readBuffer;
         std::string writeBuffer;
@@ -20,10 +23,11 @@ class Socket {
         size_t      sendErrorCount;
         bool        discardMode;
         bool        isSrvSocket;
+        bool        fdClosed;
 
-        SocketIOData()
+        SocketIOData(bool srvSocket)
             : bytesRead(0), recvErrorCount(0), sendErrorCount(0),
-              discardMode(false) {}
+              discardMode(false), isSrvSocket(srvSocket), fdClosed(false) {}
     };
 
   private:
@@ -33,13 +37,15 @@ class Socket {
   public:
     Socket(Logger const &logger) : logger_(logger) {}
 
-    SocketIOData &getSocketIOData_(int const fd);
-    size_t        clientDataSanityCheck_(Socket::SocketIOData &sIOD, int fd,
-                                         std::string const &serverName,
-                                         std::string const &nickName,
-                                         bool const         isRegistered);
-    void          addSocket(int const fd);
-    bool          checkSocket_(struct pollfd &pfd);
-    bool          sendMsg(int const fd, std::string const &msg);
-    void          closeSocket_(int const fd);
+    void        addSocket(int const fd, bool srvSocket);
+    bool        checkSocket_(struct pollfd &pfd);
+    std::string getCmdLine(int const fd);
+    size_t
+    bufferLengthAndSanityCheck_(int const fd /* , bool const isRegistered */);
+    bool sendMsg(int const fd, std::string const &msg);
+    void closeSocket_(int const fd);
+
+    bool socketClosed(int const fd) const {
+        return (sockIODataStore_.find(fd) == sockIODataStore_.end());
+    }
 };

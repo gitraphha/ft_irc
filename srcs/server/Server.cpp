@@ -79,7 +79,7 @@ int Server::createServerSocket_(int const domain) {
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
-    storePollFd_(socketFd);
+    storePollFd_(socketFd, true);
     ++numServerSockets_;
 
     return socketFd;
@@ -97,7 +97,7 @@ void Server::processServerSocketData_() {
     }
 }
 
-void Server::setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
+void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                             bool &isReg) {
     try {
         *clntPtr = clients_.at(fd);
@@ -106,76 +106,46 @@ void Server::setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
             nick = (*clntPtr)->getNick();
         }
     } catch (std::exception const &e) {
-        log_(e.what(), Logger::lmExcept);
+        log_(e.what(), Logger::lmWarn);
     }
-}
-
-bool Server::processClientSocketData_(struct pollfd        &pfd,
-                                      Socket::SocketIOData &sIOD) {
-    Client const *client = 0;
-    std::string   nickName = "*";
-    bool          clntIsReg = false;
-    setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
-
-    size_t lfcrPos = sockets_.clientDataSanityCheck_(sIOD, pfd.fd, serverName(),
-                                                     nickName, clntIsReg);
-    if (lfcrPos == std::string::npos)
-        return false;
-
-#if NETCATDBG
-    {
-        // size_t const       clientNumber = idx + 1 - numServerSockets_;
-        std::ostringstream oss;
-        oss << "You are client '" << nickName << "' (fd " << pfd.fd << "): \n"
-            << "Srv received: " << std::string(sIOD.readBuffer) << std::endl;
-        sockets_.sendMsg(pfd.fd, oss.str());
-    }
-#endif
-
-    sIOD.recvErrorCount = 0;
-    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
-    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
-    try {
-        cmds_.run(*this, *clients_.at(pfd.fd), cmdLine);
-    } catch (Error const &e) {
-        if (e.hasReply()) {
-            sockets_.sendMsg(pfd.fd,
-                             Reply::build(serverName(), nickName, e.reply()));
-        } else {
-            std::string tmp("Error while trying to run cmd:\n");
-            tmp.append(cmdLine + "\n" + e.what());
-            log_(tmp, Logger::lmExcept);
-        }
-    }
-    return true;
 }
 
 void Server::processClientSockets_() {
     for (size_t idx = numServerSockets_;
          !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
          ++idx) {
-        pollfd               &pfd = pollFds_.at(idx);
-        Socket::SocketIOData &sIOD = sockets_.getSocketIOData_(pfd.fd);
+        pollfd &pfd = pollFds_.at(idx);
 
-        if (!sockets_.checkSocket_(pfd))
-            continue;
-        if (pfd.revents & POLLIN) {
-            char recvBuffer[RECVBUFFLEN];
-            sIOD.bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
+        if (sockets_.checkSocket_(pfd)) {
+            if (pfd.revents & POLLIN) {
+                Client     *client = 0;
+                std::string nickName = "*";
+                bool        clntIsReg = false;
+                setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
 
-            if (sIOD.bytesRead > 0) {
-                sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
-                processClientSocketData_(pfd, sIOD);
-            } else if (sIOD.bytesRead <= 0) {
-                sockets_.closeSocket_(pfd.fd);
+                std::string cmdLine;
+                try {
+                    cmdLine = sockets_.getCmdLine(pfd.fd);
+                    cmds_.run(*this, *client, cmdLine);
+                } catch (Error const &e) {
+                    if (e.hasReply()) {
+                        sockets_.sendMsg(
+                            pfd.fd,
+                            Reply::build(serverName_, nickName, e.reply()));
+                    } else {
+                        std::string tmp(
+                            "Error while trying to get/execute cmd:\n");
+                        tmp.append("'" + cmdLine + "'\n" + e.what());
+                        log_(tmp, Logger::lmExcept);
+                    }
+                }
             }
         }
+        if (sockets_.socketClosed(pfd.fd))
+            pollFds_.erase(--pollFds_.end());
     }
 }
 
-/*
-	tbd
-*/
 void Server::acceptClient_(int const serverFd) {
     socketAddrX sockAddrIn46 = {};
     socklen_t   sockLen = 0;
@@ -195,20 +165,20 @@ void Server::acceptClient_(int const serverFd) {
 
     srvHelp::setSocketNonBlock(clientFd);
 
-    storePollFd_(clientFd);
+    storePollFd_(clientFd, false);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
               << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
 }
 
-void Server::storePollFd_(int const socketFd) {
+void Server::storePollFd_(int const socketFd, bool srvSocket) {
     pollfd pfd = {};
     pfd.fd = socketFd;
-    pfd.events = POLLIN; // Monitor for incoming connections
+    pfd.events = POLLIN;
 
     pollFds_.push_back(pfd);
-    sockets_.addSocket(socketFd);
+    sockets_.addSocket(socketFd, srvSocket);
 }
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
@@ -221,8 +191,6 @@ void Server::log_(std::string const &msg, Logger::logMode const lm) {
 	* sets up its listening socket(s)
 	* runs an infinit loop to listen for connections
 	* handles client connect and disconnect scenarios
-	* on server stop signal, disconnects all clients and closes
-		the server socket(s)
 */
 void Server::run() {
     setupServerSockets_();

@@ -13,8 +13,6 @@
 #define SERVER_NAME "irc.local"
 #define MAX_CONNECTIONS 512
 
-#define NETCATDBG 1 // For netcat debug
-
 class Server {
   private:
     std::string serverName_;
@@ -36,10 +34,8 @@ class Server {
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
     void processClientSockets_();
-    void storePollFd_(int const socketFd);
-    bool processClientSocketData_(struct pollfd        &pfd,
-                                  Socket::SocketIOData &sIOD);
-    void setClientInfo_(int fd, Client const **clntPtr, std::string &nick,
+    void storePollFd_(int const socketFd, bool srvSocket);
+    void setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                         bool &isReg);
     void log_(std::string const &msg, Logger::logMode const lm);
 
@@ -50,10 +46,6 @@ class Server {
     Server(int const port, std::string const &password);
 
     ~Server();
-
-    std::string const &serverName() const {
-        return serverName_;
-    };
 
     void run();
 
