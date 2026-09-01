@@ -124,21 +124,25 @@ void Server::processClientSockets_() {
                 setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
 
                 std::string cmdLine;
-                try {
-                    cmdLine = sockets_.getCmdLine(pfd.fd);
-                    cmds_.run(*this, *client, cmdLine);
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        sockets_.sendMsg(
-                            pfd.fd,
-                            Reply::build(serverName_, nickName, e.reply()));
-                    } else {
-                        std::string tmp(
-                            "Error while trying to get/execute cmd:\n");
-                        tmp.append("'" + cmdLine + "'\n" + e.what());
-                        log_(tmp, Logger::lmExcept);
+                bool        buffHasMoreCmds = false;
+                do {
+                    try {
+                        cmdLine = sockets_.getCmdLine(pfd.fd, buffHasMoreCmds);
+                        if (!cmdLine.empty())
+                            cmds_.run(*this, *client, cmdLine);
+                    } catch (Error const &e) {
+                        if (e.hasReply()) {
+                            sockets_.sendMsg(
+                                pfd.fd,
+                                Reply::build(serverName_, nickName, e.reply()));
+                        } else {
+                            std::string tmp(
+                                "Error while trying to get/execute cmd:\n");
+                            tmp.append("'" + cmdLine + "'\n" + e.what());
+                            log_(tmp, Logger::lmExcept);
+                        }
                     }
-                }
+                } while (!buffHasMoreCmds);
             }
         }
         if (sockets_.socketClosed(pfd.fd))
