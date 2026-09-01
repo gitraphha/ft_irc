@@ -19,7 +19,7 @@ class Command {
     Handler handler;
 
     Command() {};
-    Command(Handler h, bool preReg, int minP, bool op = false)
+    Command(Handler h, bool preReg, size_t minP, bool op = false)
         : usablePreReg_(preReg), minParams_(minP), requiresOp_(op),
           handler(h) {};
 
