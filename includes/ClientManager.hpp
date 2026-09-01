@@ -30,7 +30,7 @@ class ClientManager {
     Client &at(const std::string &name);
     Client &at(int fd);
 
-    bool    hasClient(const std::string &name) const;
-    bool    add(Client &client, int fd);
-    void    remove(int fd, ChannelManager &cm);
+    bool hasClient(const std::string &name) const;
+    bool add(Client &client, int fd);
+    void remove(int fd, ChannelManager &cm);
 };

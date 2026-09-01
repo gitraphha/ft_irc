@@ -51,7 +51,7 @@ class Client {
     void addInvite(const std::string &name);
     void removeInvite(const std::string &name);
 
-    void        send(const std::string &msg);
+    void send(const std::string &msg);
     void sendReply(const std::string &serverName, const Reply::Message &msg);
     void appendToRecvBuffer(const std::string &bytes);
     bool extractLine(std::string &line);
