@@ -27,7 +27,8 @@ inline int sockAddrFamily(int const socketFd) {
     struct sockaddr sockAddr = {};
     socklen_t       sockLen = sizeof(sockAddr);
     if (getsockname(socketFd, &sockAddr, &sockLen) != 0) // NOLINT
-        throw;
+        std::runtime_error(
+            "Error whil getting address family through getsockname failed");
     return sockAddr.sa_family;
 }
 

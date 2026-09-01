@@ -198,6 +198,8 @@ void Server::run() {
     while (!SignalHandler::stopLoopSignalReceived()) {
         int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
         if (pollResult == -1) {
+            if (SignalHandler::stopLoopSignalReceived())
+                break;
             log_("Fatal error: poll failed.", Logger::lmError);
             break;
         }

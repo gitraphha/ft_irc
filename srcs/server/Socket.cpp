@@ -10,8 +10,7 @@
 #include <unistd.h>
 
 void Socket::addSocket(int const fd, bool srvSocket) {
-    sockIODataStore_.insert(
-        std::make_pair<int, Socket::SocketIOData>(fd, SocketIOData(srvSocket)));
+    sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
 }
 
 bool Socket::checkSocket_(struct pollfd &pfd) {
