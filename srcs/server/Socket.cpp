@@ -25,32 +25,35 @@ bool Socket::checkSocket_(struct pollfd &pfd) {
     return true;
 }
 
-std::string Socket::getCmdLine(int const fd) {
+std::string Socket::getCmdLine(int const fd, bool &buffHasMoreCmds) {
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
     std::string           cmdLine;
-    char                  recvBuffer[RECVBUFFLEN];
-    sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
 
-    if (sIOD.bytesRead > 0) {
-        sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
-        size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
-        if (lfcrPos != std::string::npos) {
-
-#if NETCATDBG
-            {
-                std::ostringstream oss;
-                oss << "You are client fd " << fd << ": \n"
-                    << "Srv received: " << std::string(sIOD.readBuffer)
-                    << std::endl;
-                sendMsg(fd, oss.str());
-            }
-#endif
-            sIOD.recvErrorCount = 0;
-            cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
-            sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+    if (!buffHasMoreCmds) {
+        char recvBuffer[RECVBUFFLEN];
+        sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
+        if (sIOD.bytesRead > 0) {
+            sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
+        } else if (sIOD.bytesRead <= 0) {
+            closeSocket_(fd);
+            return std::string();
         }
-    } else if (sIOD.bytesRead <= 0) {
-        closeSocket_(fd);
+    }
+    size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
+    if (lfcrPos != std::string::npos) {
+#if NETCATDBG
+        {
+            std::ostringstream oss;
+            oss << "You are client fd " << fd << ": \n"
+                << "Srv received: " << std::string(sIOD.readBuffer)
+                << std::endl;
+            sendMsg(fd, oss.str());
+        }
+#endif
+        sIOD.recvErrorCount = 0;
+        cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+        sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+        buffHasMoreCmds = (sIOD.readBuffer.find("\r\n") != std::string::npos);
     }
     return cmdLine;
 }
