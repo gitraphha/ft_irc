@@ -10,7 +10,7 @@
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 8
 
-#define NETCATDBG 1 // For netcat debug
+#define NETCATDBG 0 // For netcat debug
 
 class Socket {
   public:
@@ -39,7 +39,7 @@ class Socket {
 
     void        addSocket(int const fd, bool srvSocket);
     bool        checkSocket_(struct pollfd &pfd);
-    std::string getCmdLine(int const fd);
+    std::string getCmdLine(int const fd, bool &buffHasMoreCmds);
     size_t
     bufferLengthAndSanityCheck_(int const fd /* , bool const isRegistered */);
     bool sendMsg(int const fd, std::string const &msg);
