@@ -81,6 +81,8 @@ static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
     if (!((iss >> port) && (iss >> remainder).eof()))
         throw std::runtime_error(
             "Error while extracting port number from commandline parameter.");
+    if (port < 1 || port > 65535)
+        throw std::runtime_error("Error: port must be in the range 1-65535.");
 
     iss.str(argv[2]); // NOLINT
     if (!(iss >> password).eof())
