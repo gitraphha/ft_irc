@@ -10,7 +10,10 @@
         "cwd": "${workspaceFolder}",
         "stopOnEntry": false,
 		"preLaunchTask": "42 build with Makefile",
-    },	
+           "initCommands": [
+                "process handle SIGINT -s false -p true"
+            ]
+	},	
     {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
