@@ -12,6 +12,13 @@ MemberSet::MemberSet(Client &client, const ModeSet &modes) {
     add(client, modes);
 }
 
+int MemberSet::highestUserMode(Client &client) const {
+    std::map<Client *, ModeSet>::const_iterator it = members_.find(&client);
+    if (it == members_.end())
+        return Mode::NoMode;
+    return it->second.highestUserMode();
+}
+
 // caller should add key before calling
 void MemberSet::add(Client &client, const ModeSet &modes) {
     members_.insert(std::make_pair(&client, modes));

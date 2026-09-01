@@ -56,7 +56,7 @@ void Channel::remove(Client &client) {
 // Kick parts `target` from the channel, if `client` has permissions to do so.
 void Channel::kick(Client &client, Client &target, const std::string &msg) {
     requireMember_(client);
-    if (!hasAtLeast(client, Mode::Halfop))
+    if (!clientHasPrivsOver(client, target))
         throw Error::reply(Reply::ERR_CHANOPRIVSNEEDED, name_);
     if (!hasMember(target))
         throw Error::reply(Reply::ERR_USERNOTINCHANNEL,
@@ -146,6 +146,11 @@ bool Channel::hasAtLeast(Client &client, int mode) const {
 
 bool Channel::hasAtLeast(Client &client, const ModeSet &required) const {
     return members_.hasAtLeast(client, required);
+}
+
+bool Channel::clientHasPrivsOver(Client &client, Client &target) const {
+    return Mode::hasPrivsOver(members_.highestUserMode(client),
+                              members_.highestUserMode(target));
 }
 
 bool Channel::hasMember(Client &client) const {

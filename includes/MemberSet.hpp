@@ -19,6 +19,8 @@ class MemberSet {
     MemberSet(Client &client);
     MemberSet(Client &client, const ModeSet &modes);
 
+    int         highestUserMode(Client &client) const;
+
     void        add(Client &client, const ModeSet &modes);
     void        remove(Client &client);
     void        setModes(Client &client, const ModeSet &modes);

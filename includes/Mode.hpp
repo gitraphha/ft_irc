@@ -30,8 +30,8 @@ enum UserMode {
     ChannelAdmin = 'a',    // arg
     ChannelOperator = 'o', // arg
     Halfop = 'h',          // arg
-    Voice = 'v'            // arg
-
+    Voice = 'v',           // arg
+    NoMode = 0
 };
 
 // ChannelUserModes holds the list of all user modes that can be applied to a
@@ -58,4 +58,19 @@ inline std::string channelModePrefix(int m) {
             return "";
     }
 }
+
+inline bool hasPrivsOver(int kickerMode, int targetMode) {
+    switch (kickerMode) {
+        case ChannelFounder:
+            return true;
+        case ChannelAdmin:
+        case ChannelOperator:
+            return targetMode != ChannelFounder && targetMode != ChannelAdmin;
+        case Halfop:
+            return targetMode == Voice || targetMode == NoMode;
+        default:
+            return false;
+    }
+}
+
 } // namespace Mode

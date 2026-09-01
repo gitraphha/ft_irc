@@ -58,6 +58,7 @@ class Channel {
     bool inviteOnly() const;
     bool hasAtLeast(Client &client, int mode) const;
     bool hasAtLeast(Client &client, const ModeSet &required) const;
+    bool clientHasPrivsOver(Client &client, Client &target) const;
     bool hasMember(Client &client) const;
     bool hasTopic() const;
 

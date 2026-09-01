@@ -15,6 +15,22 @@ ChannelManager::findChannel_(const std::string &name) const {
     return channels_.find(Utils::foldCase(name));
 }
 
+std::map<std::string, Channel>::iterator
+ChannelManager::findChannelOrThrow_(const std::string &name) {
+    std::map<std::string, Channel>::iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
+    return it;
+}
+
+std::map<std::string, Channel>::const_iterator
+ChannelManager::findChannelOrThrow_(const std::string &name) const {
+    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
+    return it;
+}
+
 /*
 Channels names are strings (beginning with a '&', '#', '+' or '!' character) of
 length up to fifty (50) characters. It SHALL NOT contain any spaces (' '), a
@@ -39,17 +55,11 @@ void ChannelManager::cleanup_(std::map<std::string, Channel>::iterator it) {
 // 'at' returns an existing channel with name equivalent to `name`,
 // or throw an error
 Channel &ChannelManager::at(const std::string &name) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
-    return it->second;
+    return findChannelOrThrow_(name)->second;
 }
 
 const Channel &ChannelManager::at(const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
-    return it->second;
+    return findChannelOrThrow_(name)->second;
 }
 
 bool ChannelManager::hasChannel(const std::string &name) const {
@@ -81,10 +91,15 @@ void ChannelManager::join(Client &client, const std::string &name,
 // Broadcasts part message to all clients.
 void ChannelManager::part(Client &client, const std::string &name,
                           const std::string &msg) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
+    std::map<std::string, Channel>::iterator it = findChannelOrThrow_(name);
     it->second.part(client, msg);
+    cleanup_(it);
+}
+
+void ChannelManager::kick(Client &client, const std::string &name,
+                          Client &target, const std::string &msg) {
+    std::map<std::string, Channel>::iterator it = findChannelOrThrow_(name);
+    it->second.kick(client, target, msg);
     cleanup_(it);
 }
 
@@ -107,10 +122,7 @@ void ChannelManager::leaveAll(Client &client, const std::string &msg,
 
 // delete a channel
 void ChannelManager::removeChannel(const std::string &name) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
-    channels_.erase(it);
+    channels_.erase(findChannelOrThrow_(name));
 }
 
 void ChannelManager::broadcast(const std::string &name, const std::string &msg,
