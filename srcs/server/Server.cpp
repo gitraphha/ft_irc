@@ -142,11 +142,14 @@ void Server::processClientSockets_() {
                             log_(tmp, Logger::lmExcept);
                         }
                     }
-                } while (!buffHasMoreCmds);
+                } while (buffHasMoreCmds);
             }
         }
-        if (sockets_.socketClosed(pfd.fd))
-            pollFds_.erase(--pollFds_.end());
+        if (sockets_.socketClosed(pfd.fd)) {
+            std::vector<struct pollfd>::difference_type dist =
+                static_cast<std::vector<struct pollfd>::difference_type>(idx);
+            pollFds_.erase(pollFds_.begin() + dist);
+        }
     }
 }
 
