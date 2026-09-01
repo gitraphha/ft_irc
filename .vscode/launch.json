@@ -1,11 +1,21 @@
 {
   "version": "0.2.0",
   "configurations": [
+	{
+        "name": "Debug with LLDB",
+        "type": "lldb",
+        "request": "launch",
+        "args": ["6667", "pass"],
+        "program": "${workspaceFolder}/ircserv_debug",
+        "cwd": "${workspaceFolder}",
+        "stopOnEntry": false,
+		"preLaunchTask": "42 build with Makefile",
+    },	
     {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",
-    "args": ["6667", "pass"],
+      "args": ["6667", "pass"],
 //   "stopAtEntry": true,
       "externalConsole": false,
       "cwd": "${workspaceFolder}",
