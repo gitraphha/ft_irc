@@ -48,4 +48,13 @@ class Error : public std::exception {
     const Reply::Message &reply() const {
         return reply_;
     }
+
+    static Error reply(Reply::Code code, const std::string &params) {
+        return Error(Reply::reply(code, params));
+    }
+
+    static Error reply(Reply::Code code, const std::string &params,
+                       const std::string &trailing) {
+        return Error(Reply::reply(code, params, trailing));
+    }
 };

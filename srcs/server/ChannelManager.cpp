@@ -15,31 +15,6 @@ ChannelManager::findChannel_(const std::string &name) const {
     return channels_.find(Utils::foldCase(name));
 }
 
-// 'at' returns an existing channel with name equivalent to `name`,
-// or throw an error
-Channel &ChannelManager::at(const std::string &name) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
-    return it->second;
-}
-
-const Channel &ChannelManager::at(const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
-    if (it == channels_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
-    return it->second;
-}
-
-bool ChannelManager::hasChannel(const std::string &name) const {
-    return findChannel_(name) != channels_.end();
-}
-
-bool ChannelManager::isMember(Client &client, const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
-    return (it != channels_.end() && it->second.hasMember(client));
-}
-
 /*
 Channels names are strings (beginning with a '&', '#', '+' or '!' character) of
 length up to fifty (50) characters. It SHALL NOT contain any spaces (' '), a
@@ -56,11 +31,41 @@ bool ChannelManager::isChannelName_(const std::string &name) {
     return name.find_first_of(" \a,:*?") == std::string::npos;
 }
 
+void ChannelManager::cleanup_(std::map<std::string, Channel>::iterator it) {
+    if (!it->second.size())
+        channels_.erase(it);
+}
+
+// 'at' returns an existing channel with name equivalent to `name`,
+// or throw an error
+Channel &ChannelManager::at(const std::string &name) {
+    std::map<std::string, Channel>::iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
+    return it->second;
+}
+
+const Channel &ChannelManager::at(const std::string &name) const {
+    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    if (it == channels_.end())
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
+    return it->second;
+}
+
+bool ChannelManager::hasChannel(const std::string &name) const {
+    return findChannel_(name) != channels_.end();
+}
+
+bool ChannelManager::isMember(Client &client, const std::string &name) const {
+    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    return (it != channels_.end() && it->second.hasMember(client));
+}
+
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void ChannelManager::join(Client &client, const std::string &name,
                           const std::string &key) {
     if (!isChannelName_(name))
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     std::string                              folded = Utils::foldCase(name);
     std::map<std::string, Channel>::iterator it = channels_.find(folded);
     if (it == channels_.end()) {
@@ -78,24 +83,14 @@ void ChannelManager::part(Client &client, const std::string &name,
                           const std::string &msg) {
     std::map<std::string, Channel>::iterator it = findChannel_(name);
     if (it == channels_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     it->second.part(client, msg);
-    if (!it->second.size())
-        channels_.erase(it);
+    cleanup_(it);
 }
 
 // Parts client from all channels, deleting it if it's empty.
-// Broadcasts part message.
-void ChannelManager::partAll(Client &client, const std::string &msg) {
-    partAll_(client, msg, true);
-}
-
-// Parts client from all channels, deleting it if it's empty.
-void ChannelManager::quitAll(Client &client) {
-    partAll_(client);
-}
-
-void ChannelManager::partAll_(Client &client, const std::string &msg,
+// Broadcasts part message if `announce` is true.
+void ChannelManager::leaveAll(Client &client, const std::string &msg,
                               bool announce) {
     std::map<std::string, Channel>::iterator it = channels_.begin();
     while (it != channels_.end()) {
@@ -105,9 +100,8 @@ void ChannelManager::partAll_(Client &client, const std::string &msg,
         if (announce)
             cur->second.part(client, msg);
         else
-            cur->second.quit(client);
-        if (!cur->second.size())
-            channels_.erase(cur);
+            cur->second.remove(client);
+        cleanup_(cur);
     }
 }
 
@@ -115,7 +109,7 @@ void ChannelManager::partAll_(Client &client, const std::string &msg,
 void ChannelManager::removeChannel(const std::string &name) {
     std::map<std::string, Channel>::iterator it = findChannel_(name);
     if (it == channels_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHCHANNEL, name));
+        throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     channels_.erase(it);
 }
 

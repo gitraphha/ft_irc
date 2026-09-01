@@ -12,18 +12,23 @@ Channel::Channel(const std::string &name, const std::string &nameCaseFolded)
     : name_(name), nameCaseFolded_(nameCaseFolded), key_(), userLimit_(-1),
       createdTime_(std::time(NULL)), topicSetTime_() {}
 
+void Channel::requireMember_(Client &client) {
+    if (!hasMember(client))
+        throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
+}
+
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void Channel::join(Client &client, const std::string &key) {
     if (hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_USERONCHANNEL,
-                                 client.getNick() + " " + name_));
+        throw Error::reply(Reply::ERR_USERONCHANNEL,
+                           client.getNick() + " " + name_);
     bool inviteOnly = modes_.has(Mode::InviteOnly);
     if (inviteOnly && !client.isInvitedTo(nameCaseFolded_))
-        throw Error(Reply::reply(Reply::ERR_INVITEONLYCHAN, name_));
+        throw Error::reply(Reply::ERR_INVITEONLYCHAN, name_);
     if (!this->key_.empty() && this->key_ != key)
-        throw Error(Reply::reply(Reply::ERR_BADCHANNELKEY, name_));
+        throw Error::reply(Reply::ERR_BADCHANNELKEY, name_);
     if (getUserLimit() >= 0 && (ssize_t)size() >= getUserLimit())
-        throw Error(Reply::reply(Reply::ERR_CHANNELISFULL, name_));
+        throw Error::reply(Reply::ERR_CHANNELISFULL, name_);
     ModeSet newModes;
     if (size() == 0) {
         newModes += Mode::ChannelOperator;
@@ -34,30 +39,28 @@ void Channel::join(Client &client, const std::string &key) {
         client.removeInvite(nameCaseFolded_);
 }
 
-// Part parts `client` from the channel named `name`, deleting it if it's empty.
-// Broadcasts part message to all clients.
+// Part parts `client` from the channel and broadcasts part message to all
+// clients.
 void Channel::part(Client &client, const std::string &msg) {
-    if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+    requireMember_(client);
     broadcast(Reply::fromClient(client.getPrefix(), "PART", name_, msg));
     members_.remove(client);
 }
 
-// Quit parts `client` from the channel named `name`, deleting it if it's empty.
-void Channel::quit(Client &client) {
-    if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+// Remove parts `client` from the channel.
+void Channel::remove(Client &client) {
+    requireMember_(client);
     members_.remove(client);
 }
 
+// Kick parts `target` from the channel, if `client` has permissions to do so.
 void Channel::kick(Client &client, Client &target, const std::string &msg) {
-    if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+    requireMember_(client);
     if (!hasAtLeast(client, Mode::Halfop))
-        throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+        throw Error::reply(Reply::ERR_CHANOPRIVSNEEDED, name_);
     if (!hasMember(target))
-        throw Error(Reply::reply(Reply::ERR_USERNOTINCHANNEL,
-                                 target.getNick() + " " + name_));
+        throw Error::reply(Reply::ERR_USERNOTINCHANNEL,
+                           target.getNick() + " " + name_);
     broadcast(Reply::fromClient(client.getPrefix(), "KICK",
                                 name_ + " " + target.getNick(), msg));
     members_.remove(target);
@@ -86,9 +89,9 @@ const std::string &Channel::getTopic() const {
 // sets the topic of this channel, if the client is allowed to do so.
 void Channel::setTopic(Client &client, const std::string &topic) {
     if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+        throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
     if (modes_.has(Mode::OpOnlyTopic) && !hasAtLeast(client, Mode::Halfop))
-        throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+        throw Error::reply(Reply::ERR_CHANOPRIVSNEEDED, name_);
     topic_ = topic;
     topicSetBy_ = client.getNick();
     topicSetTime_ = std::time(NULL);
@@ -99,7 +102,7 @@ void Channel::setTopic(Client &client, const std::string &topic) {
 // topic is set.
 void Channel::sendTopic(const std::string &serverName, Client &client) const {
     if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+        throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
     if (topic_.empty()) {
         client.sendReply(serverName, Reply::reply(Reply::RPL_NOTOPIC, name_));
         return;
@@ -113,8 +116,8 @@ void Channel::sendTopic(const std::string &serverName, Client &client) const {
 }
 
 // send list of users in the channel to the given client
-// s toggle the secret channel flag -> if added, for non-members treat as
-// non-existent channel
+// Note: If MODE `s` secret channel flag is implemented: check is required so
+// non-members receive non-existent channel instead of a leak in client names
 void Channel::sendNames(const std::string &serverName, Client &client) const {
     client.sendReply(serverName, Reply::reply(Reply::RPL_NAMREPLY, "= " + name_,
                                               members_.namesList()));
@@ -124,12 +127,12 @@ void Channel::sendNames(const std::string &serverName, Client &client) const {
 // throws error when client cannot invite target to the channel
 void Channel::checkInvite(Client &client, Client &target) const {
     if (!hasMember(client))
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, name_));
+        throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
     if (hasMember(target))
-        throw Error(Reply::reply(Reply::ERR_USERONCHANNEL,
-                                 target.getNick() + " " + name_));
+        throw Error::reply(Reply::ERR_USERONCHANNEL,
+                           target.getNick() + " " + name_);
     if (inviteOnly() && !hasAtLeast(client, Mode::ChannelOperator))
-        throw Error(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+        throw Error::reply(Reply::ERR_CHANOPRIVSNEEDED, name_);
 }
 
 bool Channel::inviteOnly() const {

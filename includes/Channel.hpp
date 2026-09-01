@@ -34,12 +34,14 @@ class Channel {
     std::string topicSetBy_;
     std::time_t topicSetTime_;
 
+    void        requireMember_(Client &client);
+
   public:
     Channel(const std::string &name, const std::string &nameCaseFolded);
 
     void   join(Client &client, const std::string &key = "");
     void   part(Client &client, const std::string &msg = "");
-    void   quit(Client &client);
+    void   remove(Client &client);
     void   kick(Client &client, Client &target, const std::string &msg = "");
 
     size_t size() const;

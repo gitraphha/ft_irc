@@ -27,7 +27,7 @@ ClientManager::findClient_(const std::string &name) const {
 Client &ClientManager::at(const std::string &name) {
     std::map<std::string, Client *>::iterator it = findClient_(name);
     if (it == clients_.end())
-        throw Error(Reply::reply(Reply::ERR_NOSUCHNICK, name));
+        throw Error::reply(Reply::ERR_NOSUCHNICK, name);
     return *it->second;
 }
 
@@ -73,7 +73,7 @@ void ClientManager::remove(int fd, ChannelManager &cm) {
     std::map<std::string, Client *>::iterator it_cl = findClient_(nick);
     if (it_cl == clients_.end())
         return;
-    cm.quitAll(*it_cl->second);
+    cm.leaveAll(*it_cl->second);
     delete it_cl->second;
     clients_.erase(it_cl);
 }

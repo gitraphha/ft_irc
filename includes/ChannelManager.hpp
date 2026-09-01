@@ -11,9 +11,8 @@ class ChannelManager {
     findChannel_(const std::string &name);
     std::map<std::string, Channel>::const_iterator
                 findChannel_(const std::string &name) const;
-    void        partAll_(Client &client, const std::string &msg = "",
-                         bool announce = false);
     static bool isChannelName_(const std::string &name);
+    void        cleanup_(std::map<std::string, Channel>::iterator it);
 
   public:
     ChannelManager();
@@ -28,8 +27,8 @@ class ChannelManager {
                         const std::string &key = "");
     void           part(Client &client, const std::string &name,
                         const std::string &msg = "");
-    void           partAll(Client &client, const std::string &msg = "");
-    void           quitAll(Client &client);
+    void           leaveAll(Client &client, const std::string &msg = "",
+                            bool announce = false);
     void           removeChannel(const std::string &name);
 
     void           broadcast(const std::string &name, const std::string &msg,

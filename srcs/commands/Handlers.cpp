@@ -81,7 +81,7 @@ bool Handlers::join(Server &server, Client &client,
                     const std::vector<std::string> &params) {
     ChannelManager &cm = server.getChannelManager();
     if (params.size() == 1 && params.at(0) == "0") {
-        cm.partAll(client, client.getNick());
+        cm.leaveAll(client, client.getNick());
         return false;
     }
     std::vector<std::string> channels = Utils::split(params[0], ',');
@@ -143,6 +143,8 @@ bool Handlers::kick(Server &server, Client &client,
             Channel &ch = cm.at(chan);
             Client  &user = clm.at(users[i]);
             ch.kick(client, user, comment);
+            if (!ch.size())
+                cm.removeChannel(chan);
         } catch (const Error &e) {
             if (e.hasReply())
                 client.sendReply(server.serverName(), e.reply());
