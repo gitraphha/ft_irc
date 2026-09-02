@@ -40,7 +40,7 @@ Server::~Server() {
                 fd, Reply::build(serverName_, nickName,
                                  Reply::Message(-1, "ERROR",
                                                 "Server shutdown - goodbye.")));
-        	clients_.remove(fd);												
+            clients_.remove(fd);
         }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
