@@ -42,7 +42,6 @@ ircserv
 ircserv_debug
 ircserv_bonus
 ircserv_bonus_debug
-ircserv_bonus
 *.exe
 *.out
 *.app

@@ -13,7 +13,6 @@
 #define NETCATDBG 0 // For netcat debug
 
 class Socket {
-  public:
   private:
     struct SocketIOData {
         std::string readBuffer;
@@ -30,20 +29,21 @@ class Socket {
               discardMode(false), isSrvSocket(srvSocket), fdClosed(false) {}
     };
 
-  private:
     std::map<int, SocketIOData> sockIODataStore_;
     Logger const               &logger_;
+
+    bool updateBuffer_(int const fd);
+    size_t
+    bufferLengthAndSanityCheck_(int const fd /* , bool const isRegistered */);
 
   public:
     Socket(Logger const &logger) : logger_(logger) {}
 
     void        addSocket(int const fd, bool srvSocket);
-    bool        checkSocket_(struct pollfd &pfd);
+    bool        checkSocket(struct pollfd &pfd); // NOLINT
     std::string getCmdLine(int const fd, bool &buffHasMoreCmds);
-    size_t
-    bufferLengthAndSanityCheck_(int const fd /* , bool const isRegistered */);
-    bool sendMsg(int const fd, std::string const &msg);
-    void closeSocket_(int const fd);
+    bool        sendMsg(int const fd, std::string const &msg);
+    void        closeSocket(int const fd);
 
     bool socketClosed(int const fd) const {
         return (sockIODataStore_.find(fd) == sockIODataStore_.end());

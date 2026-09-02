@@ -35,6 +35,7 @@ class Server {
     void acceptClient_(int const serverFd);
     void processClientSockets_();
     void storePollFd_(int const socketFd, bool srvSocket);
+    void removePollFd_(int const idx);
     void setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                         bool &isReg);
     void log_(std::string const &msg, Logger::logMode const lm);

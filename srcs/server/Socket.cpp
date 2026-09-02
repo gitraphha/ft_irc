@@ -13,11 +13,11 @@ void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
 }
 
-bool Socket::checkSocket_(struct pollfd &pfd) {
+bool Socket::checkSocket(struct pollfd &pfd) {
     SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
     if ((pfd.revents & POLLERR)) {
         if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
-            closeSocket_(pfd.fd);
+            closeSocket(pfd.fd);
         else
             ++sIOD.recvErrorCount;
         return false;
@@ -25,20 +25,25 @@ bool Socket::checkSocket_(struct pollfd &pfd) {
     return true;
 }
 
+bool Socket::updateBuffer_(int const fd) {
+    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+    char                  recvBuffer[RECVBUFFLEN];
+    sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
+    if (sIOD.bytesRead <= 0) {
+        closeSocket(fd);
+        return false;
+    }
+    sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
+    return true;
+}
+
 std::string Socket::getCmdLine(int const fd, bool &buffHasMoreCmds) {
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
     std::string           cmdLine;
 
-    if (!buffHasMoreCmds) {
-        char recvBuffer[RECVBUFFLEN];
-        sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
-        if (sIOD.bytesRead > 0) {
-            sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
-        } else if (sIOD.bytesRead <= 0) {
-            closeSocket_(fd);
-            return std::string();
-        }
-    }
+    if (!buffHasMoreCmds)
+        updateBuffer_(fd);
+
     size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
     if (lfcrPos != std::string::npos) {
 #if NETCATDBG
@@ -73,7 +78,7 @@ size_t Socket::bufferLengthAndSanityCheck_(
     }
     if (sIOD.discardMode) {
         if (/* !isRegistered || */ sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-            closeSocket_(fd);
+            closeSocket(fd);
             return std::string::npos;
         }
         if (lfcrPos != std::string::npos) {
@@ -114,7 +119,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
             ++sIOD.sendErrorCount;
     }
     if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
-        closeSocket_(fd);
+        closeSocket(fd);
         success = false;
     }
 
@@ -145,7 +150,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     return true;
 }
 
-void Socket::closeSocket_(int const fd) {
+void Socket::closeSocket(int const fd) {
     SocketIOData &sIOD = sockIODataStore_.at(fd);
 
     std::ostringstream oss;
