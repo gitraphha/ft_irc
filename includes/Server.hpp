@@ -62,9 +62,9 @@ class Server {
     ClientManager     &getClientManager();
 
     // Pass-through interfaces
-    // void sendMsg(int const fd, std::string const &msg) {
-    //     sockets_.sendMsg(fd, msg);
-    // }
+    void sendMsg(int const fd, std::string const &msg) {
+        sockets_.sendMsg(fd, msg);
+    }
 
     // Pass-through interfaces
     void sendMsg(int const fd, std::string const &msg) {
