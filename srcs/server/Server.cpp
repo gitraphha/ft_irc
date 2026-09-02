@@ -25,15 +25,17 @@ Server::Server(int const port, std::string const &password)
  */
 Server::~Server() {
     while (!pollFds_.empty()) {
-        int const   fd = pollFds_.back().fd;
-        std::string nickName = clients_.at(fd)->getNick();
-        sockets_.sendMsg(
-            fd, Reply::build(
-                    serverName_, nickName,
-                    Reply::Message(-1, "ERROR", "Server shutdown - goodbye.")));
+        int const fd = pollFds_.back().fd;
+        if (!sockets_.isServerSocket(fd)) {
+            std::string nickName = clients_.at(fd)->getNick();
+            sockets_.sendMsg(
+                fd, Reply::build(serverName_, nickName,
+                                 Reply::Message(-1, "ERROR",
+                                                "Server shutdown - goodbye.")));
+        	clients_.remove(fd);												
+        }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        clients_.remove(fd);
     }
 }
 
