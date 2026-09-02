@@ -27,17 +27,17 @@ Server::Server(int const port, std::string const &password)
 	Cleanup
 	* going backwards through pollFds to ensure server sockets are closed last
  */
+/*
+	Cleanup
+	* going backwards through pollFds to ensure server sockets are closed last
+ */
 Server::~Server() {
+    std::string nickName /*= ...get from Manager */;
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
-        if (!sockets_.isServerSocket(fd)) {
-            std::string        nickName = clients_.at(fd).getNick();
-            std::ostringstream oss;
-            oss << "ERROR :" << serverName_ << " " << nickName
-                << " :Server shutdown - goodbye.";
-            sockets_.sendMsg(fd, oss.str());
-            clients_.remove(fd, channels_);
-        }
+        sockets_.sendMsg(
+            fd, Reply::build(serverName_, nickName,
+                             Reply::Message(-1, "Server shutdown - goodbye.")));
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
     }
