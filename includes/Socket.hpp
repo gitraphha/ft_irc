@@ -48,4 +48,10 @@ class Socket {
     bool socketClosed(int const fd) const {
         return (sockIODataStore_.find(fd) == sockIODataStore_.end());
     }
+
+    bool isServerSocket(int const fd) const {
+        if (!socketClosed(fd))
+            return sockIODataStore_.find(fd)->second.isSrvSocket;
+        return false;
+    };
 };
