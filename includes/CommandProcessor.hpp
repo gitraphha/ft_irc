@@ -11,15 +11,15 @@ typedef bool (*Handler)(Server &server, Client &client,
                         std::vector<std::string> &params);
 
 class Command {
-    bool usablePreReg_;
-    int  minParams_;
-    bool requiresOp_;
+    bool   usablePreReg_;
+    size_t minParams_;
+    bool   requiresOp_;
 
   public:
     Handler handler;
 
     Command() {};
-    Command(Handler h, bool preReg, int minP, bool op = false)
+    Command(Handler h, bool preReg, size_t minP, bool op = false)
         : usablePreReg_(preReg), minParams_(minP), requiresOp_(op),
           handler(h) {};
 
@@ -27,7 +27,7 @@ class Command {
         return usablePreReg_;
     }
 
-    int getMinParams() const {
+    size_t getMinParams() const {
         return minParams_;
     }
 

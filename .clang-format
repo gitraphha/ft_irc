@@ -7,7 +7,7 @@ IndentWidth: 4
 ColumnLimit: 80
 IndentCaseLabels: true
 AllowShortFunctionsOnASingleLine: Empty
-AlignConsecutiveDeclarations: AcrossEmptyLinesAndComments
+AlignConsecutiveDeclarations: true
 SeparateDefinitionBlocks: Always
 ReflowComments: false
 

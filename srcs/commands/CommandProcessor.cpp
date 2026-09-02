@@ -3,6 +3,7 @@
 #include "Client.hpp"
 #include "Errors.hpp"
 #include "Handlers.hpp"
+#include "Parser.hpp"
 #include "Server.hpp"
 
 Command &CommandProcessor::at_(const std::string &name) {
@@ -12,10 +13,9 @@ Command &CommandProcessor::at_(const std::string &name) {
     return it->second;
 }
 
-// TODO blnunez-
 bool CommandProcessor::parse(const std::string &line, std::string &cmd,
                              std::vector<std::string> &params) {
-    return false;
+    return Parser::parse(line, cmd, params);
 }
 
 // Register all commandsexecutable by a client connected to us.

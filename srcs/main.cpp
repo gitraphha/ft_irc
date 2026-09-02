@@ -1,4 +1,13 @@
-// # include "IRC.hpp"
+#include "Server.hpp"
+#include "SignalHandler.hpp"
+
+#include <cstdlib>
+#include <exception>
+#include <sstream>
+#include <string>
+
+static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+                                  std::string &password);
 
 /*
 	NAME:
@@ -38,7 +47,47 @@
 */
 
 int main(int argc, char **argv) {
-    (void)argv;
-    if (argc != 3)
-        return (1);
+    int         port = 0;
+    std::string password;
+
+    try {
+        if (!checkExtractCmdLnArgs(argc, argv, port, password))
+            return 1;
+
+        SignalHandler sigHandler;
+        Server        srv(port, password);
+        srv.run();
+
+    } catch (std::exception const &e) {
+        std::cerr << CCyan << " !!! Exception: " << e.what() << CReset
+                  << std::endl;
+        return 1;
+    }
+    std::cout << CGreen << "Clean exit." << CReset << std::endl;
+    return 0;
+}
+
+static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
+                                  std::string &password) {
+    std::istringstream iss;
+    std::string        remainder;
+    if (argc != 3) {
+        std::cerr << CYellow << "Usage: ./ircserv <int:port> <string:password>"
+                  << CReset << std::endl;
+        return false;
+    }
+
+    iss.str(argv[1]); // NOLINT
+    if (!((iss >> port) && (iss >> remainder).eof()))
+        throw std::runtime_error(
+            "Error while extracting port number from commandline parameter.");
+    if (port < 1 || port > 65535)
+        throw std::runtime_error("Error: port must be in the range 1-65535.");
+
+    iss.str(argv[2]); // NOLINT
+    if (!(iss >> password).eof())
+        throw std::runtime_error(
+            "Error while extracting password from commandline parameter.");
+
+    return true;
 }

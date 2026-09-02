@@ -15,7 +15,7 @@
  * Subtract 65 from the mode and use that bit of the uint32_t to represent it.
 */
 class ModeSet {
-    uint32_t    modes_[2];
+    uint32_t modes_[2];
 
     static void indexAndMask_(int mode, uint32_t &index, uint32_t &mask) {
         uint32_t position = (uint32_t)mode - MIN_MODE;
@@ -27,10 +27,10 @@ class ModeSet {
   public:
     ModeSet();
 
-    bool     has(int mode) const;
-    bool     hasAtLeast(const ModeSet &modes) const;
+    bool has(int mode) const;
+    bool hasAtLeast(const ModeSet &modes) const;
 
-    bool     set(int mode, bool on);
+    bool set(int mode, bool on);
 
     ModeSet &operator+=(const std::string &modes);
     ModeSet &operator-=(const std::string &modes);

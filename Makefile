@@ -13,10 +13,13 @@ DEBUG_BUILD_DIR	= build_debug
 SRCS_ROOT		= main
 
 SRCS_SERVER 	= Server \
+				  Socket \
 				  Client \
 				  ClientManager \
 				  Channel \
-				  ChannelManager
+				  ChannelManager \
+				  Logger \
+				  SignalHandler
 
 SRCS_COMMANDS	= CommandProcessor \
 				  Handlers
@@ -49,7 +52,7 @@ DEPS			= $(OBJS:.o=.d) $(DEBUG_OBJS:.o=.d)
 CXX				= c++
 CXXFLAGS		= -Wall -Wextra -Werror -pedantic -std=c++98
 IFLAGS			= -I$(INC_DIR)
-DFLAGS			= -DDEBUG -g -fsanitize=address
+DFLAGS			= -DDEBUG -g3 -O0 -fsanitize=address
 DEBUG_CXXFLAGS	= $(CXXFLAGS) $(DFLAGS)
 
 # ---- Rules -------------------------------------------------------------------
@@ -74,7 +77,7 @@ tidy:
 
 tidy-all:
 	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
-	  | xargs -0 clang-tidy -- $(CXXFLAGS) $(IFLAGS)
+	  | xargs -0 -I {} clang-tidy {} -- $(CXXFLAGS) $(IFLAGS)
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
