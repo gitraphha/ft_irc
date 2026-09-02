@@ -125,6 +125,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         success = false;
     }
 
+#if NETCATDBG
     std::ostringstream oss;
     oss << "SendMsg event:\n"
         << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
@@ -140,6 +141,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         oss << " sent to FD: " << fd;
         logger_.logMsg(oss.str(), Logger::lmInfo);
     }
+#endif
 
     if (!success)
         return false;
