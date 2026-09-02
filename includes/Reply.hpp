@@ -272,8 +272,10 @@ Use "*" for `nick` until the client has registered (pre-001).
 inline std::string build(const std::string &server, const std::string &nick,
                          const Message &msg) {
     std::ostringstream ss;
-    ss << ":" << server << " " << std::setw(3) << std::setfill('0') << msg.code
-       << " " << nick;
+    ss << ":" << server;
+    if (msg.code > 0)
+        ss << " " << std::setw(3) << std::setfill('0') << msg.code;
+    ss << " " << nick;
     if (!msg.params.empty())
         ss << " " << msg.params;
     if (msg.hasTrailing)
