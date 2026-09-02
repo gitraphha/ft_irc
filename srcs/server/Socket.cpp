@@ -30,7 +30,9 @@ bool Socket::updateBuffer_(int const fd) {
     char                  recvBuffer[RECVBUFFLEN];
     sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
     if (sIOD.bytesRead <= 0) {
-        closeSocket(fd);
+        ++sIOD.recvErrorCount;
+        if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+            closeSocket(fd);
         return false;
     }
     sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
