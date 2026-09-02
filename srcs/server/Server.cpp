@@ -33,7 +33,7 @@ Server::~Server() {
                     Reply::Message(-1, "ERROR", "Server shutdown - goodbye.")));
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        // inform Account Manager of connection abort
+        clients_.remove(fd);		
     }
 }
 
@@ -160,7 +160,7 @@ void Server::processClientSockets_() {
 
         if (sockets_.socketClosed(pfd.fd)) {
             removePollFd_(pfd.fd);
-            // inform Account Manager of connection abort
+            clients_.remove(pfd.fd);
         }
     }
 }
