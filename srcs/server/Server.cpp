@@ -52,7 +52,6 @@ Server::~Server() {
         }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        clients_.remove(fd);
     }
 }
 
