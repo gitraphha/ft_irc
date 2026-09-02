@@ -50,13 +50,9 @@ class Server {
 
     void run();
 
-    ClientManager &getClientManager() {
-        return clients_;
-    }
-
-    const std::string &serverName() const {
-        return serverName_;
-    }
+    const std::string &getServerName() const;
+    ChannelManager    &getChannelManager();
+    ClientManager     &getClientManager();
 
     bool tryRegister(Client &client) {
         (void)client;

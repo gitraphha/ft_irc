@@ -56,11 +56,11 @@ class Channel {
     void checkInvite(Client &client, Client &target) const;
 
     bool inviteOnly() const;
+    bool hasMember(Client &client) const;
+    bool hasTopic() const;
     bool hasAtLeast(Client &client, int mode) const;
     bool hasAtLeast(Client &client, const ModeSet &required) const;
     bool clientHasPrivsOver(Client &client, Client &target) const;
-    bool hasMember(Client &client) const;
-    bool hasTopic() const;
 
     void broadcast(const std::string &msg, const Client *skip = 0) const;
 };

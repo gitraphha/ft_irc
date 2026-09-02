@@ -86,7 +86,11 @@ const std::string &Channel::getTopic() const {
     return topic_;
 }
 
-// sets the topic of this channel, if the client is allowed to do so.
+/*
+Sets the topic of this channel, if the client is allowed to do so.
+NOTE: topic_ can be "", so you cannot use Reply::fromClient here as it ignores
+trailing if trailing is empty.
+*/
 void Channel::setTopic(Client &client, const std::string &topic) {
     if (!hasMember(client))
         throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
@@ -95,11 +99,14 @@ void Channel::setTopic(Client &client, const std::string &topic) {
     topic_ = topic;
     topicSetBy_ = client.getNick();
     topicSetTime_ = std::time(NULL);
-    broadcast(Reply::fromClient(client.getPrefix(), "TOPIC", name_, topic_));
+    broadcast(":" + client.getPrefix() + " TOPIC " + name_ + " :" + topic_ +
+              "\r\n");
 }
 
-// sends the channel topic, topicSetBy and topicSetTime to the given client if
-// topic is set.
+/*
+Sends the channel topic, topicSetBy and topicSetTime to the given client if
+topic is set.
+*/
 void Channel::sendTopic(const std::string &serverName, Client &client) const {
     if (!hasMember(client))
         throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);

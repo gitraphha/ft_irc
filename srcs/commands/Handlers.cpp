@@ -6,15 +6,7 @@
 #include "Utils.hpp"
 
 bool Handlers::cap(Server &server, Client &client,
-                   std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::invite(Server &server, Client &client,
-                      std::vector<std::string> &params) {
+                   const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -46,14 +38,14 @@ bool Handlers::invite(Server &server, Client &client,
             chan.checkInvite(client, target);
         }
         target.addInvite(params[1]);
-        client.sendReply(server.serverName(),
+        client.sendReply(server.getServerName(),
                          Reply::reply(Reply::RPL_INVITING,
                                       params[1] + " " + target.getNick()));
         target.send(Reply::fromClient(client.getPrefix(), "INVITE",
                                       target.getNick() + " " + params[1]));
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.serverName(), e.reply());
+            client.sendReply(server.getServerName(), e.reply());
     }
     return false;
 }
@@ -88,7 +80,7 @@ bool Handlers::join(Server &server, Client &client,
     std::vector<std::string> keys = params.size() > 1
                                         ? Utils::split(params[1], ',')
                                         : std::vector<std::string>();
-    const std::string       &serverName = server.serverName();
+    const std::string       &serverName = server.getServerName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -123,7 +115,7 @@ bool Handlers::kick(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::vector<std::string> users = Utils::split(params[1], ',');
     if (channels.size() != users.size() && channels.size() != 1) {
-        client.sendReply(server.serverName(),
+        client.sendReply(server.getServerName(),
                          Reply::reply(Reply::ERR_NEEDMOREPARAMS, "KICK"));
         return false;
     }
@@ -144,9 +136,57 @@ bool Handlers::kick(Server &server, Client &client,
             cm.kick(client, chan, user, comment);
         } catch (const Error &e) {
             if (e.hasReply())
-                client.sendReply(server.serverName(), e.reply());
+                client.sendReply(server.getServerName(), e.reply());
         }
     }
+    return false;
+}
+
+bool Handlers::kill(Server &server, Client &client,
+                    const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
+    return false;
+}
+
+bool Handlers::mode(Server &server, Client &client,
+                    const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
+    return false;
+}
+
+bool Handlers::names(Server &server, Client &client,
+                     const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
+    return false;
+}
+
+bool Handlers::nick(Server &server, Client &client,
+                    const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
+    return false;
+}
+
+bool Handlers::message(Server &server, Client &client,
+                       const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
+    return false;
+}
+
+bool Handlers::oper(Server &server, Client &client,
+                    const std::vector<std::string> &params) {
+    (void)server;
+    (void)client;
+    (void)params;
     return false;
 }
 
@@ -163,7 +203,7 @@ bool Handlers::part(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::string     reason = (params.size() > 1) ? params[1] : client.getNick();
     ChannelManager &cm = server.getChannelManager();
-    const std::string &serverName = server.serverName();
+    const std::string &serverName = server.getServerName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -177,72 +217,8 @@ bool Handlers::part(Server &server, Client &client,
     return false;
 }
 
-bool Handlers::kick(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::kill(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::mode(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::names(Server &server, Client &client,
-                     std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::nick(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::message(Server &server, Client &client,
-                       std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::oper(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::part(Server &server, Client &client,
-                    std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
 bool Handlers::pass(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -250,7 +226,7 @@ bool Handlers::pass(Server &server, Client &client,
 }
 
 bool Handlers::ping(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -258,7 +234,7 @@ bool Handlers::ping(Server &server, Client &client,
 }
 
 bool Handlers::pong(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -266,7 +242,7 @@ bool Handlers::pong(Server &server, Client &client,
 }
 
 bool Handlers::quit(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -274,7 +250,7 @@ bool Handlers::quit(Server &server, Client &client,
 }
 
 bool Handlers::rehash(Server &server, Client &client,
-                      std::vector<std::string> &params) {
+                      const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -282,7 +258,7 @@ bool Handlers::rehash(Server &server, Client &client,
 }
 
 bool Handlers::rename(Server &server, Client &client,
-                      std::vector<std::string> &params) {
+                      const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -306,16 +282,16 @@ bool Handlers::topic(Server &server, Client &client,
         if (params.size() > 1)
             ch.setTopic(client, params[1]);
         else
-            ch.sendTopic(server.serverName(), client);
+            ch.sendTopic(server.getServerName(), client);
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.serverName(), e.reply());
+            client.sendReply(server.getServerName(), e.reply());
     }
     return false;
 }
 
 bool Handlers::user(Server &server, Client &client,
-                    std::vector<std::string> &params) {
+                    const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -323,7 +299,7 @@ bool Handlers::user(Server &server, Client &client,
 }
 
 bool Handlers::version(Server &server, Client &client,
-                       std::vector<std::string> &params) {
+                       const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -331,7 +307,7 @@ bool Handlers::version(Server &server, Client &client,
 }
 
 bool Handlers::who(Server &server, Client &client,
-                   std::vector<std::string> &params) {
+                   const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
@@ -339,9 +315,9 @@ bool Handlers::who(Server &server, Client &client,
 }
 
 bool Handlers::whois(Server &server, Client &client,
-                     std::vector<std::string> &params) {
+                     const std::vector<std::string> &params) {
     (void)server;
     (void)client;
     (void)params;
-	return false;
+    return false;
 }

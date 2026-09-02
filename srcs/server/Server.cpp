@@ -100,7 +100,7 @@ void Server::processServerSocketData_() {
 void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                             bool &isReg) {
     try {
-        *clntPtr = clients_.at(fd);
+        *clntPtr = &clients_.at(fd);
         if (*clntPtr && (*clntPtr)->isRegistered()) {
             isReg = true;
             nick = (*clntPtr)->getNick();
@@ -192,6 +192,18 @@ void Server::removePollFd_(int const idx) {
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
     logger_.logMsg(msg, lm);
+}
+
+const std::string &Server::getServerName() const {
+    return serverName_;
+}
+
+ChannelManager &Server::getChannelManager() {
+    return channels_;
+}
+
+ClientManager &Server::getClientManager() {
+    return clients_;
 }
 
 /*
