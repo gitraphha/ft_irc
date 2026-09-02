@@ -44,7 +44,8 @@ std::string Socket::getCmdLine(int const fd, bool &buffHasMoreCmds) {
     std::string           cmdLine;
 
     if (!buffHasMoreCmds)
-        updateBuffer_(fd);
+        if (!updateBuffer_(fd))
+            return cmdLine;
 
     size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
     if (lfcrPos != std::string::npos) {
