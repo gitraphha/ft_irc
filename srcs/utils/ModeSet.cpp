@@ -21,6 +21,16 @@ bool ModeSet::hasAtLeast(const ModeSet &modes) const {
     return true;
 }
 
+int ModeSet::highestUserMode() const {
+    size_t total = Mode::totalUserModes;
+    for (size_t i = 0; i < total; i++) {
+        int m = Mode::channelUserModes[i];
+        if (has(m))
+            return m;
+    }
+    return Mode::NoMode;
+}
+
 // set `mode` to be on or off, return whether the value actually changed
 bool ModeSet::set(int mode, bool on) {
     if (mode < MIN_MODE || mode > MAX_MODE)

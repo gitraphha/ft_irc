@@ -8,7 +8,7 @@ class Server;
 class Client;
 
 typedef bool (*Handler)(Server &server, Client &client,
-                        std::vector<std::string> &params);
+                        const std::vector<std::string> &params);
 
 class Command {
     bool   usablePreReg_;
@@ -18,7 +18,6 @@ class Command {
   public:
     Handler handler;
 
-    Command() {};
     Command(Handler h, bool preReg, size_t minP, bool op = false)
         : usablePreReg_(preReg), minParams_(minP), requiresOp_(op),
           handler(h) {};
