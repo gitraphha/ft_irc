@@ -33,7 +33,7 @@ Server::~Server() {
                     Reply::Message(-1, "ERROR", "Server shutdown - goodbye.")));
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        clients_.remove(fd);		
+        clients_.remove(fd);
     }
 }
 
@@ -185,6 +185,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
+    clients_.add(new Client(), clientFd);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
