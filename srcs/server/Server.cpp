@@ -30,7 +30,6 @@ Server::Server(int const port, std::string const &password)
 	* going backwards through pollFds to ensure server sockets are closed last
  */
 Server::~Server() {
-    std::string nickName /*= ...get from Manager */;
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
