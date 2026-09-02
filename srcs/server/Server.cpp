@@ -20,21 +20,15 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
-      password_(password), logger_(serverName_ + ": "), sockets_(logger_),
-      numServerSockets_(0) {
-    std::time_t now = std::time(0);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
-                  std::localtime(&now));
-    createdAt_ = buf;
-}
+    : serverName_(SERVER_NAME), port_(port), password_(password),
+      logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
 
 /*
 	Cleanup
 	* going backwards through pollFds to ensure server sockets are closed last
  */
 Server::~Server() {
+    std::string nickName /*= ...get from Manager */;
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
