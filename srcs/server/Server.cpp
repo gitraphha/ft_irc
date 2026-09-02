@@ -24,14 +24,16 @@ Server::Server(int const port, std::string const &password)
 	* going backwards through pollFds to ensure server sockets are closed last
  */
 Server::~Server() {
-    std::string nickName /*= ...get from Manager */;
     while (!pollFds_.empty()) {
-        int const fd = pollFds_.back().fd;
+        int const   fd = pollFds_.back().fd;
+        std::string nickName = clients_.at(fd)->getNick();
         sockets_.sendMsg(
-            fd, Reply::build(serverName_, nickName,
-                             Reply::Message(-1, "Server shutdown - goodbye.")));
+            fd, Reply::build(
+                    serverName_, nickName,
+                    Reply::Message(-1, "ERROR", "Server shutdown - goodbye.")));
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
+        // inform Account Manager of connection abort
     }
 }
 
