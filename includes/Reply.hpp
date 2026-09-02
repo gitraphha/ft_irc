@@ -208,16 +208,16 @@ inline const char *text(Code code) {
 struct Message {
     Code        code;
     std::string params;
-    bool        has_trailing;
+    bool        hasTrailing;
     std::string trailing;
 
-    Message() : code(), has_trailing(false) {}
+    Message() : code(), hasTrailing(false) {}
 
     Message(Code c, const std::string &p)
-        : code(c), params(p), has_trailing(false) {}
+        : code(c), params(p), hasTrailing(false) {}
 
     Message(Code c, const std::string &p, const std::string &t)
-        : code(c), params(p), has_trailing(true), trailing(t) {}
+        : code(c), params(p), hasTrailing(true), trailing(t) {}
 };
 
 // reply() with default text from text().
@@ -271,7 +271,7 @@ inline std::string build(const std::string &server, const std::string &nick,
        << " " << nick;
     if (!msg.params.empty())
         ss << " " << msg.params;
-    if (msg.has_trailing)
+    if (msg.hasTrailing)
         ss << " :" << msg.trailing;
     ss << "\r\n";
     return ss.str();
