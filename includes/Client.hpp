@@ -23,7 +23,8 @@ class Client {
     std::set<std::string> invitedTo_;
 
   public:
-    Client() : registered_(false), passAccepted_(false), oper_(false) {}
+    Client()
+        : nick_("*"), registered_(false), passAccepted_(false), oper_(false) {}
 
     std::string getNick() const;
     std::string getNickCaseFolded() const;
