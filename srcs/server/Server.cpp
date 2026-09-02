@@ -21,7 +21,7 @@ Server::Server(int const port, std::string const &password)
 
 Server::~Server() {
     while (!pollFds_.empty()) {
-        sockets_.closeSocket_(pollFds_.back().fd);
+        sockets_.closeSocket(pollFds_.back().fd);
         pollFds_.erase(--pollFds_.end());
     }
 }
@@ -116,40 +116,36 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (sockets_.checkSocket_(pfd)) {
-            if (pfd.revents & POLLIN) {
-                Client     *client = 0;
-                std::string nickName = "*";
-                bool        clntIsReg = false;
-                setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
+        if (sockets_.checkSocket(pfd) && (pfd.revents & POLLIN)) {
+            Client     *client = 0;
+            std::string nickName = "*";
+            bool        clntIsReg = false;
+            setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
 
-                std::string cmdLine;
-                bool        buffHasMoreCmds = false;
-                do {
-                    try {
-                        cmdLine = sockets_.getCmdLine(pfd.fd, buffHasMoreCmds);
-                        if (!cmdLine.empty())
-                            cmds_.run(*this, *client, cmdLine);
-                    } catch (Error const &e) {
-                        if (e.hasReply()) {
-                            sockets_.sendMsg(
-                                pfd.fd,
-                                Reply::build(serverName_, nickName, e.reply()));
-                        } else {
-                            std::string tmp(
-                                "Error while trying to get/execute cmd:\n");
-                            tmp.append("'" + cmdLine + "'\n" + e.what());
-                            log_(tmp, Logger::lmExcept);
-                        }
+            std::string cmdLine;
+            bool        buffHasMoreCmds = false;
+            do {
+                try {
+                    cmdLine = sockets_.getCmdLine(pfd.fd, buffHasMoreCmds);
+                    if (!cmdLine.empty())
+                        cmds_.run(*this, *client, cmdLine);
+                } catch (Error const &e) {
+                    if (e.hasReply()) {
+                        sockets_.sendMsg(
+                            pfd.fd,
+                            Reply::build(serverName_, nickName, e.reply()));
+                    } else {
+                        std::string tmp(
+                            "Error while trying to get/execute cmd:\n");
+                        tmp.append("'" + cmdLine + "'\n" + e.what());
+                        log_(tmp, Logger::lmExcept);
                     }
-                } while (buffHasMoreCmds);
-            }
+                }
+            } while (buffHasMoreCmds);
         }
-        if (sockets_.socketClosed(pfd.fd)) {
-            std::vector<struct pollfd>::difference_type dist =
-                static_cast<std::vector<struct pollfd>::difference_type>(idx);
-            pollFds_.erase(pollFds_.begin() + dist);
-        }
+
+        if (sockets_.socketClosed(pfd.fd))
+            removePollFd_(pfd.fd);
     }
 }
 
@@ -186,6 +182,12 @@ void Server::storePollFd_(int const socketFd, bool srvSocket) {
 
     pollFds_.push_back(pfd);
     sockets_.addSocket(socketFd, srvSocket);
+}
+
+void Server::removePollFd_(int const idx) {
+    std::vector<struct pollfd>::difference_type dist =
+        static_cast<std::vector<struct pollfd>::difference_type>(idx);
+    pollFds_.erase(pollFds_.begin() + dist);
 }
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
