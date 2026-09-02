@@ -19,9 +19,18 @@ Server::Server(int const port, std::string const &password)
     : serverName_(SERVER_NAME), port_(port), password_(password),
       logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
 
+/*
+	Cleanup
+	* going backwards through pollFds to ensure server sockets are closed last
+ */
 Server::~Server() {
+    std::string nickName /*= ...get from Manager */;
     while (!pollFds_.empty()) {
-        sockets_.closeSocket(pollFds_.back().fd);
+        int const fd = pollFds_.back().fd;
+        sockets_.sendMsg(
+            fd, Reply::build(serverName_, nickName,
+                             Reply::Message(-1, "Server shutdown - goodbye.")));
+        sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
     }
 }
@@ -117,10 +126,13 @@ void Server::processClientSockets_() {
         pollfd &pfd = pollFds_.at(idx);
 
         if (sockets_.checkSocket(pfd) && (pfd.revents & POLLIN)) {
+
+            // to be replaced by a request to some sort of manager
             Client     *client = 0;
             std::string nickName = "*";
             bool        clntIsReg = false;
             setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
+            // end: to be replaced by a request to some sort of manager
 
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
@@ -144,8 +156,10 @@ void Server::processClientSockets_() {
             } while (buffHasMoreCmds);
         }
 
-        if (sockets_.socketClosed(pfd.fd))
+        if (sockets_.socketClosed(pfd.fd)) {
             removePollFd_(pfd.fd);
+            // inform Account Manager of connection abort
+        }
     }
 }
 
