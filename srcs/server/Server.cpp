@@ -41,7 +41,7 @@ Server::~Server() {
                     Reply::Message(-1, "ERROR", "Server shutdown - goodbye.")));
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        // inform Account Manager of connection abort
+        clients_.remove(fd);		
     }
 }
 
