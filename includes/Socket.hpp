@@ -8,7 +8,7 @@
 
 #define RECVBUFFLEN 1024
 #define MAXMSGLEN 512
-#define SOCKETERRORLIMIT 8
+#define SOCKETERRORLIMIT 3
 
 #define NETCATDBG 0 // For netcat debug
 
