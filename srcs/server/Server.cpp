@@ -52,7 +52,7 @@ Server::~Server() {
         }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
-        // inform Account Manager of connection abort
+        clients_.remove(fd);		
     }
 }
 
