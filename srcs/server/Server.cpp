@@ -32,7 +32,7 @@ Server::~Server() {
                 fd, Reply::build(serverName_, nickName,
                                  Reply::Message(-1, "ERROR",
                                                 "Server shutdown - goodbye.")));
-        	clients_.remove(fd);												
+            clients_.remove(fd);
         }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
@@ -40,13 +40,13 @@ Server::~Server() {
 }
 
 void Server::setupServerSockets_() {
-    int              domArr[] = {AF_INET, AF_INET6};
-    std::vector<int> domains(domArr,  // NOLINT
-                             domArr + // NOLINT
-                                 (sizeof(domArr) / sizeof(domArr[0])));
+    static int const              domArr[] = {AF_INET, AF_INET6};
+    static std::vector<int> const domains(
+        // NOLINTNEXTLINE
+        domArr, domArr + (sizeof(domArr) / sizeof(domArr[0])));
     for (size_t idx = 0; idx < domains.size(); ++idx) {
         try {
-            createServerSocket_(domains[idx]);
+            createServerSocket_(domains.at(idx));
         } catch (std::exception const &e) {
             log_(e.what(), Logger::lmExcept);
         }
@@ -102,7 +102,7 @@ void Server::processServerSocketData_() {
     for (size_t idx = 0;
          !SignalHandler::stopLoopSignalReceived() && idx < numServerSockets_;
          ++idx) {
-        struct pollfd const &serverPollFds = pollFds_[idx];
+        struct pollfd const &serverPollFds = pollFds_.at(idx);
         if ((serverPollFds.revents & POLLERR))
             throw std::runtime_error("Server socket error.");
         if (serverPollFds.revents & POLLIN)
