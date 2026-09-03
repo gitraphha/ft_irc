@@ -29,6 +29,7 @@ class ModeSet {
 
     bool has(int mode) const;
     bool hasAtLeast(const ModeSet &modes) const;
+    int  highestUserMode() const;
 
     bool set(int mode, bool on);
 

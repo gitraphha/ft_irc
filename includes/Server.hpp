@@ -49,6 +49,10 @@ class Server {
 
     void run();
 
+    const std::string &getServerName() const;
+    ChannelManager    &getChannelManager();
+    ClientManager     &getClientManager();
+
     // Pass-through interfaces
     // void sendMsg(int const fd, std::string const &msg) {
     //     sockets_.sendMsg(fd, msg);

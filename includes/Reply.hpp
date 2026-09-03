@@ -65,6 +65,7 @@ enum Code {
     RPL_CHANNELMODEIS = 324, // <channel> <mode> <mode params>
     RPL_NOTOPIC = 331,       // <channel> :No topic is set
     RPL_TOPIC = 332,         // <channel> :<topic>
+    RPL_TOPICWHOTIME = 333,  // <channel> <setnick> <setat>
     RPL_INVITING = 341,      // <channel> <nick>
     RPL_VERSION = 351,       // <version>.<debuglevel> <server> :<comments>
     RPL_NAMREPLY = 353, // "=" <channel> :[prefix]<nick> *( " " [prefix]<nick> )
@@ -190,6 +191,7 @@ inline const char *text(Code code) {
         case RPL_ISUPPORT:
         case RPL_CHANNELMODEIS:
         case RPL_TOPIC:
+        case RPL_TOPICWHOTIME:
         case RPL_INVITING:
         case RPL_VERSION:
         case RPL_NAMREPLY:
@@ -204,18 +206,18 @@ inline const char *text(Code code) {
 // It deliberately does not include the receiver nick or the server name;
 // build() injects those when the reply is actually sent.
 struct Message {
-    int         code;
+    Code        code;
     std::string params;
-    bool        has_trailing;
+    bool        hasTrailing;
     std::string trailing;
 
-    Message() : code(), has_trailing(false) {}
+    Message() : code(), hasTrailing(false) {}
 
-    Message(int c, const std::string &p)
-        : code(c), params(p), has_trailing(false) {}
+    Message(Code c, const std::string &p)
+        : code(c), params(p), hasTrailing(false) {}
 
-    Message(int c, const std::string &p, const std::string &t)
-        : code(c), params(p), has_trailing(true), trailing(t) {}
+    Message(Code c, const std::string &p, const std::string &t)
+        : code(c), params(p), hasTrailing(true), trailing(t) {}
 };
 
 // reply() with default text from text().
@@ -239,6 +241,22 @@ inline Message reply(Code code, const std::string &params,
     return Message(code, params, trailing);
 }
 
+// returns formatted string ( :<prefix> <COMMAND> <params> [ :trailing ] )
+inline std::string fromClient(const std::string &prefix, const std::string &cmd,
+                              const std::string &params,
+                              const std::string &trailing = "") {
+    std::string out = ":";
+    if (!prefix.empty())
+        out += prefix + " ";
+    out += cmd;
+    if (!params.empty())
+        out += " " + params;
+    if (!trailing.empty())
+        out += " :" + trailing;
+    out += "\r\n";
+    return out;
+}
+
 /*
 builds the complete line layout for `msg`, addressed to `nick`:
   ":<server> <code> <nick> <body>\r\n"
@@ -255,7 +273,7 @@ inline std::string build(const std::string &server, const std::string &nick,
     ss << " " << nick;
     if (!msg.params.empty())
         ss << " " << msg.params;
-    if (msg.has_trailing)
+    if (msg.hasTrailing)
         ss << " :" << msg.trailing;
     ss << "\r\n";
     return ss.str();

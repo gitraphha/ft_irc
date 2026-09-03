@@ -27,12 +27,12 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            std::string nickName = clients_.at(fd)->getNick();
-            sockets_.sendMsg(
-                fd, Reply::build(serverName_, nickName,
-                                 Reply::Message(-1, "ERROR",
-                                                "Server shutdown - goodbye.")));
-            clients_.remove(fd);
+            std::string        nickName = clients_.at(fd).getNick();
+            std::ostringstream oss;
+            oss << "ERROR :" << serverName_ << " " << nickName
+                << " :Server shutdown - goodbye.";
+            sockets_.sendMsg(fd, oss.str());
+            clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
@@ -113,7 +113,7 @@ void Server::processServerSocketData_() {
 void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                             bool &isReg) {
     try {
-        *clntPtr = clients_.at(fd);
+        *clntPtr = &clients_.at(fd);
         if (*clntPtr && (*clntPtr)->isRegistered()) {
             isReg = true;
             nick = (*clntPtr)->getNick();
@@ -162,7 +162,7 @@ void Server::processClientSockets_() {
 
         if (sockets_.socketClosed(pfd.fd)) {
             removePollFd_(pfd.fd);
-            clients_.remove(pfd.fd);
+            clients_.remove(pfd.fd, channels_);
         }
     }
 }
@@ -187,7 +187,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(new Client(), clientFd);
+    clients_.add(*(new Client()), clientFd);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
@@ -211,6 +211,18 @@ void Server::removePollFd_(int const idx) {
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
     logger_.logMsg(msg, lm);
+}
+
+const std::string &Server::getServerName() const {
+    return serverName_;
+}
+
+ChannelManager &Server::getChannelManager() {
+    return channels_;
+}
+
+ClientManager &Server::getClientManager() {
+    return clients_;
 }
 
 /*

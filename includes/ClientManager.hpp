@@ -5,6 +5,7 @@
 #include <map>
 
 // draft: to be completed by blnunez-
+class ChannelManager;
 
 class ClientManager {
     std::map<std::string, Client *> clients_;
@@ -26,10 +27,10 @@ class ClientManager {
     ~ClientManager();
     ClientManager();
 
-    Client *at(const std::string &name);
-    Client *at(int fd);
+    Client &at(const std::string &name);
+    Client &at(int fd);
 
     bool hasClient(const std::string &name) const;
-    bool add(Client *client, int fd);
-    void remove(int fd);
+    bool add(Client &client, int fd);
+    void remove(int fd, ChannelManager &cm);
 };

@@ -88,6 +88,12 @@ void Client::send(const std::string &msg) {
     sendBuffer_ += msg;
 }
 
+void Client::sendReply(const std::string    &serverName,
+                       const Reply::Message &msg) {
+    const std::string &name = registered_ ? nick_ : "*";
+    sendBuffer_ += Reply::build(serverName, name, msg);
+}
+
 void Client::appendToRecvBuffer(const std::string &bytes) {
     recvBuffer_ += bytes;
 }

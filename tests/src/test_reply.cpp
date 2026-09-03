@@ -40,7 +40,7 @@ int main() {
                               Reply::reply(Reply::ERR_INPUTTOOLONG, ""));
 
     try {
-        throw Error(Reply::reply(Reply::ERR_NOTONCHANNEL, "#chan"));
+        throw Error::reply(Reply::ERR_NOTONCHANNEL, "#chan");
     } catch (const Error &e) {
         std::cout << "caught, hasReply=" << e.hasReply() << "\n";
         if (e.hasReply())
@@ -55,7 +55,7 @@ int main() {
     }
 
     try {
-        throw Error(Reply::reply(Reply::ERR_USERNOTINCHANNEL, "bob #chan"));
+        throw Error::reply(Reply::ERR_USERNOTINCHANNEL, "bob #chan");
     } catch (const Error &e) {
         std::cout << "caught, hasReply=" << e.hasReply() << "\n";
         if (e.hasReply())

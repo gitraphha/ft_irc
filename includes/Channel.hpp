@@ -34,18 +34,33 @@ class Channel {
     std::string topicSetBy_;
     std::time_t topicSetTime_;
 
-  public:
-    Channel(const std::string &name, const std::string &nameCaseFolded,
-            const std::string &key = "");
+    void requireMember_(Client &client);
 
-    void join(Client *client, const std::string &key = "");
-    void part(Client *client);
+  public:
+    Channel(const std::string &name, const std::string &nameCaseFolded);
+
+    void join(Client &client, const std::string &key = "");
+    void part(Client &client, const std::string &msg = "");
+    void remove(Client &client);
+    void kick(Client &client, Client &target, const std::string &msg = "");
 
     size_t             size() const;
+    const std::string &getName() const;
     const std::string &getNameCaseFolded() const;
     ssize_t            getUserLimit() const;
-    bool               hasMember(Client *client) const;
-    bool hasAtLeast(Client *client, const ModeSet &required) const;
+    const std::string &getTopic() const;
+
+    void setTopic(Client &client, const std::string &topic);
+    void sendTopic(const std::string &serverName, Client &client) const;
+    void sendNames(const std::string &serverName, Client &client) const;
+    void checkInvite(Client &client, Client &target) const;
+
+    bool inviteOnly() const;
+    bool hasMember(Client &client) const;
+    bool hasTopic() const;
+    bool hasAtLeast(Client &client, int mode) const;
+    bool hasAtLeast(Client &client, const ModeSet &required) const;
+    bool clientHasPrivsOver(Client &client, Client &target) const;
 
     void broadcast(const std::string &msg, const Client *skip = 0) const;
 };

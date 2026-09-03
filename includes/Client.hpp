@@ -5,6 +5,8 @@
  * command handlers own validation and IRC behavior.
  */
 
+#include "Reply.hpp"
+
 #include <cstddef>
 #include <set>
 #include <string>
@@ -50,9 +52,10 @@ class Client {
     void addInvite(const std::string &name);
     void removeInvite(const std::string &name);
 
-    void               send(const std::string &msg);
-    void               appendToRecvBuffer(const std::string &bytes);
-    bool               extractLine(std::string &line);
+    void send(const std::string &msg);
+    void sendReply(const std::string &serverName, const Reply::Message &msg);
+    void appendToRecvBuffer(const std::string &bytes);
+    bool extractLine(std::string &line);
     std::size_t        recvBufferSize() const;
     const std::string &getSendBuffer() const;
     void               consumeSendBuffer(std::size_t count);
