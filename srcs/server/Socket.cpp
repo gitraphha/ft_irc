@@ -39,7 +39,7 @@ bool Socket::updateBuffer_(int const fd) {
     return true;
 }
 
-std::string Socket::getCmdLine(int const fd, bool &buffHasMoreCmds) {
+std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
     std::string           cmdLine;
 

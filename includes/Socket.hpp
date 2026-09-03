@@ -41,7 +41,7 @@ class Socket {
 
     void        addSocket(int const fd, bool srvSocket);
     bool        checkSocket(struct pollfd &pfd); // NOLINT
-    std::string getCmdLine(int const fd, bool &buffHasMoreCmds);
+    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds);
     bool        sendMsg(int const fd, std::string const &msg);
     void        closeSocket(int const fd);
 
