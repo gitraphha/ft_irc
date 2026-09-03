@@ -166,6 +166,7 @@ void Server::removeClosedSockets_() {
     for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
         pollfd &pfd = pollFds_.at(idx);
         if (sockets_.socketClosed(pfd.fd)) {
+            removePollFd_(pfd.fd);
             clients_.remove(pfd.fd, channels_);
             removePollFd_(pfd.fd);
             --idx;
