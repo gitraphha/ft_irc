@@ -154,7 +154,8 @@ void Server::processClientSockets_() {
             bool        buffHasMoreCmds = false;
             do {
                 try {
-                    cmdLine = sockets_.getCmdLine(pfd.fd, buffHasMoreCmds);
+                    cmdLine =
+                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
                     if (!cmdLine.empty())
                         cmds_.run(*this, *client, cmdLine);
                 } catch (Error const &e) {
