@@ -197,7 +197,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(clientFd);
+    clients_.add(*(new Client()), clientFd);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
