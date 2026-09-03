@@ -27,7 +27,19 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            std::string        nickName = clients_.at(fd).getNick();
+            std::string nickName;
+            try {
+                nickName = clients_.at(fd).getNick();
+            } catch (std::exception const &e) {
+                logger_.logMsg("\n Cannot get client object:"
+                               "\n starting from a second client, the object "
+                               "isn't correctly created"
+                               "\n in function bool ClientManager::add(Client "
+                               "&client, int fd)"
+                               "\n Exception: " +
+                                   std::string(e.what()),
+                               Logger::lmError);
+            }
             std::ostringstream oss;
             oss << "ERROR :" << serverName_ << " " << nickName
                 << " :Server shutdown - goodbye.";
