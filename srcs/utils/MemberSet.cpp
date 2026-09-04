@@ -71,7 +71,7 @@ void MemberSet::send(const std::string &msg, const Client *skip) const {
 
 // returns the list of users joined to the channel
 std::string MemberSet::namesList() const {
-    std::string                                 out;
+    std::string               out;
     MemberMap::const_iterator it = members_.begin();
     for (; it != members_.end(); it++) {
         if (!it->first)
