@@ -150,11 +150,56 @@ bool Handlers::kill(Server &server, Client &client,
     return false;
 }
 
+/*
+Channel Mode
+  MODE <channel> *( ( "-" / "+" ) *<modes> *<modeparams> )
+
+  The MODE command is provided so that users may query and change the
+  characteristics of a channel.
+
+  The available modes are as follows:
+    i - toggle the invite-only channel flag;
+	k - set/remove the channel key (password);
+	l - set/remove the user limit to channel;
+    o - give/take channel operator privilege;
+	t - toggle the topic settable by channel operator only flag;
+
+Note: Only handles channel modes and channel user modes, but not
+client (userhost) modes.
+*/
 bool Handlers::mode(Server &server, Client &client,
                     const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
+    const std::string &serverName = server.getServerName();
+    try {
+        Channel &chan = server.getChannelManager().at(params[0]);
+        if (params.size() < 2) {
+            const std::string modes = chan.modeString(client);
+            client.sendReply(serverName,
+                             Reply::reply(Reply::RPL_CHANNELMODEIS,
+                                          chan.getName() + " " + modes));
+            return false;
+        }
+        std::string              unknown;
+        std::vector<std::string> modeParams(params.begin() + 1, params.end());
+        Mode::ModeChanges        changes =
+            Mode::parseChannelModeChanges(modeParams, unknown);
+        std::string::const_iterator it = unknown.begin();
+        for (; it != unknown.end(); it++) {
+            client.sendReply(serverName,
+                             Reply::reply(Reply::ERR_UNKNOWNMODE,
+                                          Mode::toString(*it),
+                                          "is unknown mode char to me for " +
+                                              chan.getName()));
+        }
+        if (!changes.size())
+            return false;
+        Mode::ModeChanges applied =
+            chan.applyChannelModeChanges(server, client, changes);
+        chan.broadcastCmodeChanges(client, applied);
+    } catch (const Error &e) {
+        if (e.hasReply())
+            client.sendReply(serverName, e.reply());
+    }
     return false;
 }
 

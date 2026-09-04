@@ -17,21 +17,15 @@
 class ModeSet {
     uint32_t modes_[2];
 
-    static void indexAndMask_(int mode, uint32_t &index, uint32_t &mask) {
-        uint32_t position = (uint32_t)mode - MIN_MODE;
-        index = position / 32;
-        uint32_t bit = position % 32;
-        mask = 1U << bit;
-    }
+    static void indexAndMask_(int mode, uint32_t &index, uint32_t &mask);
 
   public:
     ModeSet();
 
-    bool has(int mode) const;
-    bool hasAtLeast(const ModeSet &modes) const;
+    bool hasMode(int mode) const;
     int  highestUserMode() const;
 
-    bool set(int mode, bool on);
+    bool setMode(int mode, bool add);
 
     ModeSet &operator+=(const std::string &modes);
     ModeSet &operator-=(const std::string &modes);

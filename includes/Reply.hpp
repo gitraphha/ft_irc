@@ -94,23 +94,24 @@ enum Code {
     ERR_NICKNAMEINUSE = 433,    // <nick> :Nickname is already in use     (NICK)
     ERR_USERNOTINCHANNEL =
         441, // <nick> <channel> :They aren't on that channel (KICK, MODE +o)
-    ERR_NOTONCHANNEL = 442,  // <channel> :You're not on that channel
-    ERR_USERONCHANNEL = 443, // <user> <channel> :is already on channel (INVITE)
-    ERR_USERSDISABLED = 446, // :USERS has been disabled                (USERS)
-    ERR_NOTREGISTERED = 451, // :You have not registered
-    ERR_NEEDMOREPARAMS = 461,   // <command> :Not enough parameters
+    ERR_NOTONCHANNEL = 442,   // <channel> :You're not on that channel
+    ERR_USERONCHANNEL = 443,  // <user> <channel> :is already on channel
+    ERR_USERSDISABLED = 446,  // :USERS has been disabled                (USERS)
+    ERR_NOTREGISTERED = 451,  // :You have not registered
+    ERR_NEEDMOREPARAMS = 461, // <command> :Not enough parameters
     ERR_ALREADYREGISTRED = 462, // :Unauthorized command (already registered)
     ERR_PASSWDMISMATCH =
         464,          // :Password incorrect                    (PASS, OPER)
-    ERR_KEYSET = 467, // <channel> :Channel key already set     (MODE +k)
+    ERR_KEYSET = 467, // <channel> :Channel key already set
     ERR_CHANNELISFULL = 471, // <channel> :Cannot join channel (+l)
-    ERR_UNKNOWNMODE =
-        472, // <char> :is unknown mode char to me for <channel> (MODE)
+    ERR_UNKNOWNMODE = 472,   // <char> :is unknown mode char to me for <channel>
     ERR_INVITEONLYCHAN = 473, // <channel> :Cannot join channel (+i)
     ERR_BADCHANNELKEY = 475,  // <channel> :Cannot join channel (+k)
     ERR_NOPRIVILEGES = 481,   // :Permission Denied- You're not an IRC operator
     ERR_CHANOPRIVSNEEDED = 482, // <channel> :You're not channel operator
-    ERR_NOOPERHOST = 491        // :No O-lines for your host             (OPER)
+    ERR_NOOPERHOST = 491,       // :No O-lines for your host             (OPER)
+    ERR_INVALIDMODEPARAM =
+        696 // <target chan/user> <mode char> <parameter> :<description>
 };
 
 // text() is the default trailing text of a fixed-text reply, or "" when the
@@ -197,6 +198,7 @@ inline const char *text(Code code) {
         case RPL_NAMREPLY:
         case ERR_NORECIPIENT:
         case ERR_UNKNOWNMODE:
+        case ERR_INVALIDMODEPARAM:
             return "";
     }
     return "";

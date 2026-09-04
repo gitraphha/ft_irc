@@ -5,6 +5,8 @@
 
 #include <map>
 
+typedef std::map<Client *, ModeSet> MemberMap;
+
 /*
  * MemberSet stores Client * and ModeSet
  * The server needs to loop through this and remove client, before freeing
@@ -12,7 +14,7 @@
 */
 
 class MemberSet {
-    std::map<Client *, ModeSet> members_;
+    MemberMap members_;
 
   public:
     MemberSet() {};
@@ -23,12 +25,11 @@ class MemberSet {
 
     void add(Client &client, const ModeSet &modes);
     void remove(Client &client);
-    void setModes(Client &client, const ModeSet &modes);
+    bool setMode(Client &client, int mode, bool add);
 
     size_t size() const;
     bool   has(Client &client) const;
     bool   hasAtLeast(Client &client, int mode) const;
-    bool   hasAtLeast(Client &client, const ModeSet &modes) const;
 
     void        send(const std::string &msg, const Client *skip = 0) const;
     std::string namesList() const;
