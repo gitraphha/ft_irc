@@ -4,8 +4,7 @@
 
 #include <map>
 
-class ChannelManager {
-    std::map<std::string, Channel> channels_;
+typedef std::map<std::string, Channel> ChannelMap;
 
     std::map<std::string, Channel>::iterator
     findChannel_(const std::string &name);

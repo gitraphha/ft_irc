@@ -7,27 +7,30 @@
 
 ChannelManager::ChannelManager() {}
 
-std::map<std::string, Channel>::iterator
-ChannelManager::findChannel_(const std::string &name) {
+ChannelMap::iterator ChannelManager::findChannel_(const std::string &name) {
+    if (!isChannelName_(name))
+        return channels_.end();
     return channels_.find(Utils::foldCase(name));
 }
 
-std::map<std::string, Channel>::const_iterator
+ChannelMap::const_iterator
 ChannelManager::findChannel_(const std::string &name) const {
+    if (!isChannelName_(name))
+        return channels_.end();
     return channels_.find(Utils::foldCase(name));
 }
 
-std::map<std::string, Channel>::iterator
+ChannelMap::iterator
 ChannelManager::findChannelOrThrow_(const std::string &name) {
-    std::map<std::string, Channel>::iterator it = findChannel_(name);
+    ChannelMap::iterator it = findChannel_(name);
     if (it == channels_.end())
         throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     return it;
 }
 
-std::map<std::string, Channel>::const_iterator
+ChannelMap::const_iterator
 ChannelManager::findChannelOrThrow_(const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    ChannelMap::const_iterator it = findChannel_(name);
     if (it == channels_.end())
         throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     return it;
@@ -49,7 +52,7 @@ bool ChannelManager::isChannelName(const std::string &name) {
     return name.find_first_of(" \a,:*?") == std::string::npos;
 }
 
-void ChannelManager::cleanup_(std::map<std::string, Channel>::iterator it) {
+void ChannelManager::cleanup_(ChannelMap::iterator it) {
     if (!it->second.size())
         channels_.erase(it);
 }
@@ -69,7 +72,7 @@ bool ChannelManager::hasChannel(const std::string &name) const {
 }
 
 bool ChannelManager::isMember(Client &client, const std::string &name) const {
-    std::map<std::string, Channel>::const_iterator it = findChannel_(name);
+    ChannelMap::const_iterator it = findChannel_(name);
     return (it != channels_.end() && it->second.hasMember(client));
 }
 
@@ -78,8 +81,8 @@ void ChannelManager::join(Client &client, const std::string &name,
                           const std::string &key) {
     if (!isChannelName(name))
         throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
-    std::string                              folded = Utils::foldCase(name);
-    std::map<std::string, Channel>::iterator it = channels_.find(folded);
+    std::string          folded = Utils::foldCase(name);
+    ChannelMap::iterator it = channels_.find(folded);
     if (it == channels_.end()) {
         Channel newChannel(name, folded);
         newChannel.join(client, key);
@@ -93,14 +96,14 @@ void ChannelManager::join(Client &client, const std::string &name,
 // Broadcasts part message to all clients.
 void ChannelManager::part(Client &client, const std::string &name,
                           const std::string &msg) {
-    std::map<std::string, Channel>::iterator it = findChannelOrThrow_(name);
+    ChannelMap::iterator it = findChannelOrThrow_(name);
     it->second.part(client, msg);
     cleanup_(it);
 }
 
 void ChannelManager::kick(Client &client, const std::string &name,
                           Client &target, const std::string &msg) {
-    std::map<std::string, Channel>::iterator it = findChannelOrThrow_(name);
+    ChannelMap::iterator it = findChannelOrThrow_(name);
     it->second.kick(client, target, msg);
     cleanup_(it);
 }
@@ -109,9 +112,9 @@ void ChannelManager::kick(Client &client, const std::string &name,
 // Broadcasts part message if `announce` is true.
 void ChannelManager::leaveAll(Client &client, const std::string &msg,
                               bool announce) {
-    std::map<std::string, Channel>::iterator it = channels_.begin();
+    ChannelMap::iterator it = channels_.begin();
     while (it != channels_.end()) {
-        std::map<std::string, Channel>::iterator cur = it++;
+        ChannelMap::iterator cur = it++;
         if (!cur->second.hasMember(client))
             continue;
         if (announce)
