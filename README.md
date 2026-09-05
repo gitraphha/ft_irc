@@ -1,25 +1,20 @@
 *This project has been created as part of the 42 curriculum by blnunez-, kmurugan, rhaas.*
 
-# ft_irc - IRC server
+# <p align="center"> ft_irc - IRC Server </p>
 
 ## Description
 
 ### 42 Project | Internet Relay Chat in C++98
 
 ### Objective
-Build an IRC server in C++98 that implements...
-
+Build an IRC server in C++98 that handles multiple concurrent clients over TCP, implementing the core IRC protocol (registration, channels, modes, private messaging, and operator commands) over an event-driven sockets layer.
 
 ### Overview
-...
+**ft_irc** is a 42 project that teaches event-driven I/O, the poll/epoll multiplexing model, and the IRC protocol. The server listens on a given port and password, accepts multiple clients via non-blocking sockets, registers them with PASS/NICK/USER, and lets them join channels, exchange private and channel messages, and manage channels with KICK/INVITE/TOPIC/MODE and operator privileges.
 
 ---
 
 ## Instructions
-
-### Requirements
-
--
 
 ### Compile & Run
 
@@ -30,6 +25,60 @@ make && ./ircserv <port> <password>
 # bonus
 make bonus && ./ircserv_bonus <port> <password>
 ```
+
+**NOTE:** The server binds an IPv4 and an IPv6 listening socket (`IPV6_V6ONLY`) and multiplexes them with `poll`. Connect with any IRC client (e.g. `irssi`) or a raw `nc` session.
+
+```sh
+# connect with netcat and register
+nc <host> <port>
+PASS <password>
+NICK blnunez-
+USER blnunez- 0 * :Bastien
+JOIN #general
+```
+
+Port must be in the range `1-65535`, a password must be supplied.
+
+---
+
+## IRC Command & Message Reference
+
+### Registration
+- `PASS <password>` — authenticate during registration.
+- `NICK <nickname>` — set/change the nick.
+- `USER <nick> <mode> <unused> <realname>` — complete registration credentials.
+- `PING`/`PONG` — keepalive and latency check.
+
+### Channels
+- `JOIN <#channel> [<key>]` — join (or create) a channel; optional key for `+k`.
+- `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
+- `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
+- `INVITE <nick> <#channel>` — invite a user (subject to `+i`).
+- `TOPIC <#channel> [<topic>]` — view/set the topic (may require `+t`).
+- `NAMES <#channel>` — list current members.
+- `MODE <#channel> [modes]` — view/set channel modes and user modes.
+
+### Messaging
+- `PRIVMSG <target> <message>` — send a message.
+- `NOTICE <target> <message>` — send a notice (no auto-reply / CTCP handling).
+
+### Server / Operations
+- `OPER <nick> <password>` — become an IRC operator.
+- `QUIT [<msg>]` — leave the network.
+
+### Channel Modes
+| Mode | Argument | Meaning |
+|------|----------|---------|
+| `i`  | no  | Invite-only channel (`JOIN` requires an invite) |
+| `t`  | no  | Only operators may set the topic |
+| `k`  | yes | Channel key (password) required to join |
+| `o`  | yes | Grant/revoke operator privilege to a member |
+| `l`  | yes | User limit — max concurrent members |
+
+### Channel User Modes
+`q` Founder · `a` Admin · `o` Operator · `h` Half-operator · `v` Voice
+
+Modes act on the target `nick`: hosts `~` founder, `&` admin, `@` operator, `%` half-op, `+` voice. Privileges are rank-ordered (Founder > Admin > Operator > Half-op > Voice > none) and rules enforcing who may act on whom are checked on every MODE/KICK.
 
 ---
 
@@ -57,46 +106,54 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 ## Key Challenges & Solutions
 
-### Topic
+TODO: add poll and client
 
-**Challenge:** 
+### Protocol-Correct Error Replies
 
-**Solution:** 
+**Challenge:** Every command can fail in several ways (wrong channel, no such nick, missing params, insufficient privileges) and each failure must produce the correct RFC 2812 numeric to the client.
+
+**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text. A central `Error` exception carries a pre-built reply. Command processing throws `Error::reply(...)` on the first invalid condition and the server loop catches it once, formats `:server <code> <nick> <params> :<text>\r\n`, and sends it — guaranteeing exactly one well-formed reply per failure and keeping handlers free of repetitive error plumbing.
+
+### Channel Lifetime & Ownership
+
+**Challenge:** Channels are created on join, destroyed when the last member parts, and must never hold a pointer to a freed `Client`.
+
+**Solution:** `ChannelManager` owns `Channel` objects in a case-folded map and cleans up empty channels after PART/KICK/leaveAll. `MemberSet` stores `Client*` + `ModeSet`. `ClientManager::remove` first parts the client from every channel (via `ChannelManager::leaveAll`) before freeing the `Client`, so channel member vectors never dangle.
 
 ---
 
 ## Resources
 
 ### IRC protocol
-[RFC 2810 - IRC: Architecture](https://rfc-editor.org/rfc/rfc2810)
-[RFC 2811 - IRC: Channel Management](https://rfc-editor.org/rfc/rfc2811)
-[RFC 2812 - IRC: Client Protocol](https://rfc-editor.org/rfc/rfc2812)
-[RFC 2813 - IRC: Server Protocol](https://rfc-editor.org/rfc/rfc2813)
-[ircgod](https://ircgod.com)
-[Model IRC client protocol](https://modern.ircdocs.horse)
+- [RFC 2810 - IRC: Architecture](https://rfc-editor.org/rfc/rfc2810)
+- [RFC 2811 - IRC: Channel Management](https://rfc-editor.org/rfc/rfc2811)
+- [RFC 2812 - IRC: Client Protocol](https://rfc-editor.org/rfc/rfc2812)
+- [RFC 2813 - IRC: Server Protocol](https://rfc-editor.org/rfc/rfc2813)
+- [ircgod](https://ircgod.com)
+- [Model IRC client protocol](https://modern.ircdocs.horse)
 
 ### rfc reading tips
-[Tips for Reading RFCs](https://www.rfc-editor.org/series/rfc-tips/)
+- [Tips for Reading RFCs](https://www.rfc-editor.org/series/rfc-tips/)
 
 ### Reference IRC client and server
-[Server: ergo chat (formerly Oragono)](https://github.com/ergochat/ergo)
-[Client: irssi](https://github.com/irssi/irssi)
+- [Server: ergo chat (formerly Oragono)](https://github.com/ergochat/ergo)
+- [Client: irssi](https://github.com/irssi/irssi)
 
 ### Sockets
-[Sockets & Networking](https://web.mit.edu/6.031/www/sp19/classes/23-sockets-networking/)
-[All about sockets](https://docs.oracle.com/javase/tutorial/networking/sockets/index.html)
-
-[CS107 Sockets Programming](https://web.stanford.edu/class/archive/cs/cs107/cs107.1238/lectures/20/)
-[Beej's Guide to Network Programming](https://beej.us/guide/bgnet/) - What is a
+- [Sockets & Networking](https://web.mit.edu/6.031/www/sp19/classes/23-sockets-networking/)
+- [All about sockets](https://docs.oracle.com/javase/tutorial/networking/sockets/index.html)
+- [CS107 Sockets Programming](https://web.stanford.edu/class/archive/cs/cs107/cs107.1238/lectures/20/)
+- [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/) - What is a
 	socket?, IP Addresses, structs, and Data Munging, Jumping from IPv4 to IPv6,
 	System Calls or Bust
 
 ### DCC protocol
-[Direct Client-to-Client protocol (DCC)](https://modern.ircdocs.horse/dcc.html)
+- [Direct Client-to-Client protocol (DCC)](https://modern.ircdocs.horse/dcc.html)
 
 ### Use of AI
 
-- 
-- 
+- Learning and verification: Clarifying IRC numeric replies, and the RFC 2812 grammar.
+- Documentation: Proofreading and refining the README and project descriptions.
+- Testing and debugging: Generating protocol-level test scenarios and reviewing edge cases.
 
 ---
