@@ -11,11 +11,13 @@
 #include <vector>
 
 #define SERVER_NAME "irc.local"
+#define SERVER_VERSION "1.0"
 #define MAX_CONNECTIONS 512
 
 class Server {
   private:
     std::string serverName_;
+    std::string serverVersion_;
     int         port_;
     std::string password_;
 
@@ -51,6 +53,7 @@ class Server {
     void run();
 
     const std::string &getServerName() const;
+    const std::string &getServerVersion() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
 
