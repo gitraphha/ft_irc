@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <climits>
 #include <cstdlib>
 #include <sstream>
 #include <string>
@@ -43,11 +44,11 @@ static inline std::vector<std::string> split(const std::string &s, char delim) {
 static inline int toPosInt(const std::string &s) {
     if (s.empty())
         return -1;
-    char *ptr = nullptr;
+    char *ptr = NULL;
     long  val = strtol(s.c_str(), &ptr, 10);
     if (ptr || val <= 0 || val > INT_MAX)
         return -1;
-    return (int)val;
+    return static_cast<int>(val);
 }
 
 // joins 3 strings with space character. optional usage for 2 strings

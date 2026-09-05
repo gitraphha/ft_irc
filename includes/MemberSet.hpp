@@ -5,6 +5,7 @@
 
 #include <map>
 #include <set>
+#include <string>
 
 typedef std::map<Client *, ModeSet> MemberMap;
 

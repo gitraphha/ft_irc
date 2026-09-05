@@ -1,5 +1,7 @@
 #include "ModeSet.hpp"
 
+#include <climits>
+
 ModeSet::ModeSet() : modes_() {
     modes_[0] = 0;
     modes_[1] = 0;
@@ -7,7 +9,7 @@ ModeSet::ModeSet() : modes_() {
 
 void ModeSet::indexAndMask_(int mode, uint32_t &index, uint32_t &mask) {
     static const int bitsPerInt = sizeof(uint32_t) * CHAR_BIT; // 4 * 8 = 32
-    uint32_t         position = (uint32_t)mode - MIN_MODE;
+    uint32_t         position = static_cast<uint32_t>(mode) - MIN_MODE;
     index = position / bitsPerInt;
     uint32_t bit = position % bitsPerInt;
     mask = 1U << bit;

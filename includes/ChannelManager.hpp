@@ -3,6 +3,7 @@
 #include "Channel.hpp"
 
 #include <map>
+#include <string>
 
 typedef std::map<std::string, Channel> ChannelMap;
 

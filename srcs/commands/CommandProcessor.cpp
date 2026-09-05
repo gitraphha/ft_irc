@@ -7,6 +7,8 @@
 #include "Registration.hpp"
 #include "Server.hpp"
 
+#include <utility>
+
 Command &CommandProcessor::at_(const std::string &name) {
     std::map<std::string, Command>::iterator it = commands_.find(name);
     if (it == commands_.end())

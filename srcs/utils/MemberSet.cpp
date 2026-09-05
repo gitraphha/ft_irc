@@ -1,7 +1,5 @@
 #include "MemberSet.hpp"
 
-#include "Errors.hpp"
-
 #include <utility> // std::make_pair
 
 MemberSet::MemberSet(Client &client) {

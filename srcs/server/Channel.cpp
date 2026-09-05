@@ -6,7 +6,6 @@
 #include "Server.hpp"
 #include "Utils.hpp"
 
-#include <algorithm>
 #include <sstream>
 
 // userLimit 0 means no limit is set
@@ -25,7 +24,7 @@ void Channel::join(Client &client, const std::string &key) {
         throw Error::reply(Reply::ERR_INVITEONLYCHAN, name_);
     if (!this->key_.empty() && this->key_ != key)
         throw Error::reply(Reply::ERR_BADCHANNELKEY, name_);
-    if (userLimit_ > 0 && size() >= (size_t)userLimit_)
+    if (userLimit_ > 0 && size() >= static_cast<size_t>(userLimit_))
         throw Error::reply(Reply::ERR_CHANNELISFULL, name_);
     ModeSet newModes;
     if (!size())
