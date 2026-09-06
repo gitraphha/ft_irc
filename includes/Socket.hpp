@@ -1,10 +1,12 @@
 #pragma once
 
-#include "Logger.hpp"
+#include "Logger.hpp" // for Logger
 
-#include <map>
-#include <string>
-#include <sys/socket.h>
+#include <map>         // for map, operator==
+#include <stddef.h>    // for size_t
+#include <string>      // for string, basic_string
+#include <sys/types.h> // for ssize_t
+#include <utility>     // for pair
 
 #define RECVBUFFLEN 1024
 #define MAXMSGLEN 512

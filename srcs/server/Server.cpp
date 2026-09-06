@@ -1,14 +1,18 @@
 #include "Server.hpp"
 
-#include "Errors.hpp"
-#include "ServerHelper.hpp"
-#include "SignalHandler.hpp"
+#include "Client.hpp"        // for Client
+#include "Errors.hpp"        // for Error
+#include "Reply.hpp"         // for build
+#include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
+#include "SignalHandler.hpp" // for SignalHandler
 
-#include <exception>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <sys/poll.h>
+#include <exception>    // for exception
+#include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
+#include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
+#include <sstream>      // for basic_ostringstream
+#include <stdexcept>    // for runtime_error, invalid_argument
+#include <string>       // for allocator, char_traits, basic_string
+#include <sys/socket.h> // for setsockopt, AF_INET6, AF_INET, accept
 
 /*
     Server Constructor

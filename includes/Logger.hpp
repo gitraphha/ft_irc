@@ -1,11 +1,7 @@
 #pragma once
 
-#include "colours.hpp"
-
-#include <cstring>
-#include <ctime>
-#include <iostream>
-#include <string>
+#include <ctime>  // for localtime, strftime, time, time_t
+#include <string> // for basic_string, string
 
 class Logger {
     std::string prefix_;
