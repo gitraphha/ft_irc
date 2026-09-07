@@ -4,6 +4,10 @@
 
 #include <algorithm>
 
+int Client::getFd() const {
+    return fd_;
+}
+
 std::string Client::getNick() const {
     return nick_;
 }
