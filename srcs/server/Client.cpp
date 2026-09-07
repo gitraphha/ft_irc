@@ -40,10 +40,14 @@ bool Client::hasPassAccepted() const {
     return passAccepted_;
 }
 
+// "nick!user@host", or "*" until NICK and USER are both known. The host is
+// set by the server from the accepted socket address; until then (or if it
+// never is) "localhost" keeps the prefix well-formed for clients.
 std::string Client::getPrefix() const {
-    if (!hasIdentity() || hostname_.empty())
+    if (!hasIdentity())
         return "*";
-    return nick_ + "!" + username_ + "@" + hostname_;
+    return nick_ + "!" + username_ + "@" +
+           (hostname_.empty() ? std::string("localhost") : hostname_);
 }
 
 bool Client::hasIdentity() const {
@@ -94,7 +98,9 @@ void Client::send(const std::string &msg) {
 
 void Client::sendReply(const std::string    &serverName,
                        const Reply::Message &msg) {
-    const std::string &name = registered_ ? nick_ : "*";
+    // Address the nick as soon as one is known: 431/432/433/464 all arrive
+    // before registration completes.
+    const std::string &name = nick_.empty() ? "*" : nick_;
     sendBuffer_ += Reply::build(serverName, name, msg);
 }
 

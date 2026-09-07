@@ -247,14 +247,17 @@ inline Message reply(Code code, const std::string &params,
 // returns formatted string ( :<prefix> <COMMAND> <params> [ :trailing ] )
 inline std::string fromClient(const std::string &prefix, const std::string &cmd,
                               const std::string &params,
-                              const std::string &trailing = "") {
-    std::string out = ":";
-    if (!prefix.empty())
-        out += prefix + " ";
+                              const std::string &trailing = "",
+                              bool               forceTrailing = false) {
+    std::string out;
+    if (!prefix.empty()) // a server-originated line ("ERROR :...") has none
+        out += ":" + prefix + " ";
     out += cmd;
     if (!params.empty())
         out += " " + params;
-    if (!trailing.empty())
+    // forceTrailing keeps the ":" for a trailing that is legitimately empty:
+    // "CAP * LS :" (no capabilities), "TOPIC #chan :" (topic cleared).
+    if (!trailing.empty() || forceTrailing)
         out += " :" + trailing;
     out += "\r\n";
     return out;
