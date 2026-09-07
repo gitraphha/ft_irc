@@ -46,7 +46,7 @@ static inline int toPosInt(const std::string &s) {
         return -1;
     char *ptr = NULL;
     long  val = strtol(s.c_str(), &ptr, 10);
-    if (ptr || val <= 0 || val > INT_MAX)
+    if (*ptr || val <= 0 || val > INT_MAX)
         return -1;
     return static_cast<int>(val);
 }
