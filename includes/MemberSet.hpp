@@ -4,6 +4,7 @@
 #include "ModeSet.hpp"
 
 #include <map>
+#include <set>
 
 /*
  * MemberSet stores Client * and ModeSet
@@ -15,7 +16,7 @@ class MemberSet {
     std::map<Client *, ModeSet> members_;
 
   public:
-    MemberSet() {};
+    MemberSet(){};
     MemberSet(Client &client);
     MemberSet(Client &client, const ModeSet &modes);
 
@@ -32,4 +33,7 @@ class MemberSet {
 
     void        send(const std::string &msg, const Client *skip = 0) const;
     std::string namesList() const;
+    // collect adds every member to `out` (a set, so a client in several
+    // channels is only counted once by the caller).
+    void collect(std::set<Client *> &out) const;
 };

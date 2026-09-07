@@ -171,3 +171,7 @@ bool Channel::hasTopic() const {
 void Channel::broadcast(const std::string &msg, const Client *skip) const {
     members_.send(msg, skip);
 }
+
+void Channel::collectMembers(std::set<Client *> &out) const {
+    members_.collect(out);
+}

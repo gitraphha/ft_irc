@@ -39,4 +39,8 @@ class ChannelManager {
 
     void broadcast(const std::string &name, const std::string &msg,
                    const Client *skip = 0) const;
+    // broadcastToPeers sends `msg` once to every client that shares at least
+    // one channel with `client` (not to `client` itself). Used by QUIT and by
+    // NICK changes, which every peer must see exactly once.
+    void broadcastToPeers(Client &client, const std::string &msg) const;
 };
