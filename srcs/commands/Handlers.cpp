@@ -5,13 +5,7 @@
 #include "Server.hpp"
 #include "Utils.hpp"
 
-bool Handlers::cap(Server &server, Client &client,
-                   const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
+// PASS, NICK, USER, CAP and tryRegister live in Registration.cpp.
 
 /*
 INVITE <nickname> <channel>
@@ -197,14 +191,6 @@ bool Handlers::names(Server &server, Client &client,
     return false;
 }
 
-bool Handlers::nick(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
 bool Handlers::message(Server &server, Client &client,
                        const std::vector<std::string> &params) {
     (void)server;
@@ -245,14 +231,6 @@ bool Handlers::part(Server &server, Client &client,
                 client.sendReply(serverName, e.reply());
         }
     }
-    return false;
-}
-
-bool Handlers::pass(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
     return false;
 }
 
@@ -318,14 +296,6 @@ bool Handlers::topic(Server &server, Client &client,
         if (e.hasReply())
             client.sendReply(server.getServerName(), e.reply());
     }
-    return false;
-}
-
-bool Handlers::user(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
     return false;
 }
 

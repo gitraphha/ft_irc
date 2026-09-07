@@ -240,6 +240,10 @@ const std::string &Server::getServerVersion() const {
     return serverVersion_;
 }
 
+const std::string &Server::getPassword() const {
+    return password_;
+}
+
 ChannelManager &Server::getChannelManager() {
     return channels_;
 }
