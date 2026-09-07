@@ -23,7 +23,9 @@ SRCS_SERVER 	= Server \
 
 SRCS_COMMANDS	= CommandProcessor \
 				  Handlers \
-				  Registration
+				  Registration \
+				  Connection \
+				  Messaging
 
 SRCS_UTILS		= MemberSet \
 				  ModeSet

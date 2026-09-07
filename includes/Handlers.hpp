@@ -44,7 +44,9 @@ bool names(Server &server, Client &client,
 bool nick(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool message(Server &server, Client &client,
-             const std::vector<std::string> &params);
+             const std::vector<std::string> &params); // PRIVMSG, next branch
+bool notice(Server &server, Client &client,
+            const std::vector<std::string> &params);
 bool oper(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool part(Server &server, Client &client,
