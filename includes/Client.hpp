@@ -26,7 +26,7 @@ class Client {
 
   public:
     Client()
-        : nick_("*"), registered_(false), passAccepted_(false), oper_(false) {}
+        : registered_(false), passAccepted_(false), oper_(false) {}
 
     std::string getNick() const;
     std::string getNickCaseFolded() const;
