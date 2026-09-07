@@ -1,14 +1,16 @@
 #pragma once
 
-#include "ChannelManager.hpp"
-#include "ClientManager.hpp"
-#include "CommandProcessor.hpp"
-#include "Logger.hpp"
-#include "Socket.hpp"
+#include "ChannelManager.hpp"   // for ChannelManager
+#include "ClientManager.hpp"    // for ClientManager
+#include "CommandProcessor.hpp" // for CommandProcessor
+#include "Logger.hpp"           // for Logger
+#include "Socket.hpp"           // for Socket
 
-#include <poll.h>
-#include <string>
-#include <vector>
+#include <poll.h>   // for pollfd
+#include <stddef.h> // for size_t
+#include <string>   // for string, basic_string
+#include <vector>   // for vector
+class Client;
 
 #define SERVER_NAME "irc.local"
 #define MAX_CONNECTIONS 512

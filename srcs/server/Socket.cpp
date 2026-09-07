@@ -1,13 +1,13 @@
 #include "Socket.hpp"
 
-#include "Errors.hpp"
-#include "Reply.hpp"
-#include "ServerHelper.hpp"
+#include "Errors.hpp"       // for Error
+#include "Reply.hpp"        // for reply, Code
+#include "ServerHelper.hpp" // for getAdressFamilyStr, sockAddrFamily
 
-#include <exception>
-#include <sstream>
-#include <sys/poll.h>
-#include <unistd.h>
+#include <poll.h>       // for pollfd, POLLERR
+#include <sstream>      // for basic_ostringstream, basic_ostream, oper...
+#include <sys/socket.h> // for recv, send, MSG_NOSIGNAL
+#include <unistd.h>     // for close
 
 void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));

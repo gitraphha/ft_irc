@@ -1,10 +1,8 @@
 #include "SignalHandler.hpp"
 
-#include <arpa/inet.h>
-#include <csignal>
-#include <exception>
-#include <iostream>
-#include <sys/poll.h>
+#include <csignal>   // for sigaction, sig_atomic_t, sigemptyset, SIGINT
+#include <stddef.h>  // for NULL
+#include <stdexcept> // for runtime_error
 
 /*
 	Signal handling
