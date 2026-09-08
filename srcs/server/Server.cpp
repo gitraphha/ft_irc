@@ -178,8 +178,9 @@ void Server::processClientSockets_() {
         }
 
         if (sockets_.socketClosed(pfd.fd)) {
-            removePollFd_(pfd.fd);
             clients_.remove(pfd.fd, channels_);
+            removePollFd_(idx);
+            --idx;
         }
     }
 }
