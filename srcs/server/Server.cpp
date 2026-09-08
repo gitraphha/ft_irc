@@ -20,8 +20,9 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), port_(port), password_(password),
-      logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
+    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
+      password_(password), logger_(serverName_ + ": "), sockets_(logger_),
+      numServerSockets_(0) {}
 
 /*
 	Cleanup
@@ -233,6 +234,10 @@ void Server::log_(std::string const &msg, Logger::logMode const lm) {
 
 const std::string &Server::getServerName() const {
     return serverName_;
+}
+
+const std::string &Server::getServerVersion() const {
+    return serverVersion_;
 }
 
 ChannelManager &Server::getChannelManager() {

@@ -77,6 +77,7 @@ enum Code {
     // errors 400-599 (RFC 2812 section 5.2)
     ERR_NOSUCHNICK =
         401, // <nickname> :No such nick/channel       (PRIVMSG, INVITE)
+    ERR_NOSUCHSERVER = 402, // <server name> :No such server
     ERR_NOSUCHCHANNEL =
         403, // <channel> :No such channel             (JOIN/PART/KICK/INVITE/TOPIC/MODE/PRIVMSG)
     ERR_CANNOTSENDTOCHAN =
@@ -131,6 +132,8 @@ inline const char *text(Code code) {
         // fixed-text errors
         case ERR_NOSUCHNICK:
             return "No such nick/channel";
+        case ERR_NOSUCHSERVER:
+            return "No such server";
         case ERR_NOSUCHCHANNEL:
             return "No such channel";
         case ERR_CANNOTSENDTOCHAN:
