@@ -1,14 +1,18 @@
 #include "Server.hpp"
 
-#include "Errors.hpp"
-#include "ServerHelper.hpp"
-#include "SignalHandler.hpp"
+#include "Client.hpp"        // for Client
+#include "Errors.hpp"        // for Error
+#include "Reply.hpp"         // for build
+#include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
+#include "SignalHandler.hpp" // for SignalHandler
 
-#include <exception>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <sys/poll.h>
+#include <exception>    // for exception
+#include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
+#include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
+#include <sstream>      // for basic_ostringstream
+#include <stdexcept>    // for runtime_error, invalid_argument
+#include <string>       // for allocator, char_traits, basic_string
+#include <sys/socket.h> // for setsockopt, AF_INET6, AF_INET, accept
 
 /*
     Server Constructor
@@ -20,21 +24,46 @@ Server::Server(int const port, std::string const &password)
       password_(password), logger_(serverName_ + ": "), sockets_(logger_),
       numServerSockets_(0) {}
 
+/*
+	Cleanup
+	* going backwards through pollFds to ensure server sockets are closed last
+ */
 Server::~Server() {
     while (!pollFds_.empty()) {
-        sockets_.closeSocket(pollFds_.back().fd);
+        int const fd = pollFds_.back().fd;
+        if (!sockets_.isServerSocket(fd)) {
+            std::string nickName;
+            try {
+                nickName = clients_.at(fd).getNick();
+            } catch (std::exception const &e) {
+                logger_.logMsg("\n Cannot get client object:"
+                               "\n starting from a second client, the object "
+                               "isn't correctly created"
+                               "\n in function bool ClientManager::add(Client "
+                               "&client, int fd)"
+                               "\n Exception: " +
+                                   std::string(e.what()),
+                               Logger::lmError);
+            }
+            std::ostringstream oss;
+            oss << "ERROR :" << serverName_ << " " << nickName
+                << " :Server shutdown - goodbye.";
+            sockets_.sendMsg(fd, oss.str());
+            clients_.remove(fd, channels_);
+        }
+        sockets_.closeSocket(fd);
         pollFds_.erase(--pollFds_.end());
     }
 }
 
 void Server::setupServerSockets_() {
-    int              domArr[] = {AF_INET, AF_INET6};
-    std::vector<int> domains(domArr,  // NOLINT
-                             domArr + // NOLINT
-                                 (sizeof(domArr) / sizeof(domArr[0])));
+    static int const              domArr[] = {AF_INET, AF_INET6};
+    static std::vector<int> const domains(
+        // NOLINTNEXTLINE
+        domArr, domArr + (sizeof(domArr) / sizeof(domArr[0])));
     for (size_t idx = 0; idx < domains.size(); ++idx) {
         try {
-            createServerSocket_(domains[idx]);
+            createServerSocket_(domains.at(idx));
         } catch (std::exception const &e) {
             log_(e.what(), Logger::lmExcept);
         }
@@ -90,7 +119,7 @@ void Server::processServerSocketData_() {
     for (size_t idx = 0;
          !SignalHandler::stopLoopSignalReceived() && idx < numServerSockets_;
          ++idx) {
-        struct pollfd const &serverPollFds = pollFds_[idx];
+        struct pollfd const &serverPollFds = pollFds_.at(idx);
         if ((serverPollFds.revents & POLLERR))
             throw std::runtime_error("Server socket error.");
         if (serverPollFds.revents & POLLIN)
@@ -118,16 +147,20 @@ void Server::processClientSockets_() {
         pollfd &pfd = pollFds_.at(idx);
 
         if (sockets_.checkSocket(pfd) && (pfd.revents & POLLIN)) {
+
+            // to be replaced by a request to some sort of manager
             Client     *client = 0;
             std::string nickName = "*";
             bool        clntIsReg = false;
             setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
+            // end: to be replaced by a request to some sort of manager
 
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
                 try {
-                    cmdLine = sockets_.getCmdLine(pfd.fd, buffHasMoreCmds);
+                    cmdLine =
+                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
                     if (!cmdLine.empty())
                         cmds_.run(*this, *client, cmdLine);
                 } catch (Error const &e) {
@@ -145,8 +178,11 @@ void Server::processClientSockets_() {
             } while (buffHasMoreCmds);
         }
 
-        if (sockets_.socketClosed(pfd.fd))
-            removePollFd_(pfd.fd);
+        if (sockets_.socketClosed(pfd.fd)) {
+            clients_.remove(pfd.fd, channels_);
+            removePollFd_(idx);
+            --idx;
+        }
     }
 }
 
@@ -170,6 +206,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
+    clients_.add(*(new Client()), clientFd);
 
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"

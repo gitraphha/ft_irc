@@ -1,9 +1,11 @@
 #include "Server.hpp"
 #include "SignalHandler.hpp"
+#include "colours.hpp" // for CReset, CCyan, CGreen, CYellow
 
-#include <cstdlib>
 #include <exception>
+#include <iostream> // for cerr, cout
 #include <sstream>
+#include <stdexcept> // for runtime_error
 #include <string>
 
 static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,

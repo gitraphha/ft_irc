@@ -1,14 +1,16 @@
 #pragma once
 
-#include "Logger.hpp"
+#include "Logger.hpp" // for Logger
 
-#include <map>
-#include <string>
-#include <sys/socket.h>
+#include <map>         // for map, operator==
+#include <stddef.h>    // for size_t
+#include <string>      // for string, basic_string
+#include <sys/types.h> // for ssize_t
+#include <utility>     // for pair
 
 #define RECVBUFFLEN 1024
 #define MAXMSGLEN 512
-#define SOCKETERRORLIMIT 8
+#define SOCKETERRORLIMIT 3
 
 #define NETCATDBG 0 // For netcat debug
 
@@ -41,11 +43,17 @@ class Socket {
 
     void        addSocket(int const fd, bool srvSocket);
     bool        checkSocket(struct pollfd &pfd); // NOLINT
-    std::string getCmdLine(int const fd, bool &buffHasMoreCmds);
+    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds);
     bool        sendMsg(int const fd, std::string const &msg);
     void        closeSocket(int const fd);
 
     bool socketClosed(int const fd) const {
         return (sockIODataStore_.find(fd) == sockIODataStore_.end());
     }
+
+    bool isServerSocket(int const fd) const {
+        if (!socketClosed(fd))
+            return sockIODataStore_.find(fd)->second.isSrvSocket;
+        return false;
+    };
 };

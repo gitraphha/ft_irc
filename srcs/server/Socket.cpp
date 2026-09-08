@@ -1,13 +1,13 @@
 #include "Socket.hpp"
 
-#include "Errors.hpp"
-#include "Reply.hpp"
-#include "ServerHelper.hpp"
+#include "Errors.hpp"       // for Error
+#include "Reply.hpp"        // for reply, Code
+#include "ServerHelper.hpp" // for getAdressFamilyStr, sockAddrFamily
 
-#include <exception>
-#include <sstream>
-#include <sys/poll.h>
-#include <unistd.h>
+#include <poll.h>       // for pollfd, POLLERR
+#include <sstream>      // for basic_ostringstream, basic_ostream, oper...
+#include <sys/socket.h> // for recv, send, MSG_NOSIGNAL
+#include <unistd.h>     // for close
 
 void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
@@ -30,19 +30,22 @@ bool Socket::updateBuffer_(int const fd) {
     char                  recvBuffer[RECVBUFFLEN];
     sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
     if (sIOD.bytesRead <= 0) {
-        closeSocket(fd);
+        ++sIOD.recvErrorCount;
+        if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+            closeSocket(fd);
         return false;
     }
     sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
     return true;
 }
 
-std::string Socket::getCmdLine(int const fd, bool &buffHasMoreCmds) {
+std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
     std::string           cmdLine;
 
     if (!buffHasMoreCmds)
-        updateBuffer_(fd);
+        if (!updateBuffer_(fd))
+            return cmdLine;
 
     size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
     if (lfcrPos != std::string::npos) {
@@ -123,6 +126,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         success = false;
     }
 
+#if NETCATDBG
     std::ostringstream oss;
     oss << "SendMsg event:\n"
         << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
@@ -138,6 +142,7 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         oss << " sent to FD: " << fd;
         logger_.logMsg(oss.str(), Logger::lmInfo);
     }
+#endif
 
     if (!success)
         return false;
