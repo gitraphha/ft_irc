@@ -79,6 +79,9 @@ tidy-all:
 	@find srcs includes -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 \
 	  | xargs -0 -I {} clang-tidy {} -- $(CXXFLAGS) $(IFLAGS)
 
+iwyu: fclean
+	make -k CXX=include-what-you-use CXXFLAGS="-Xiwyu --error_always"
+
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
 

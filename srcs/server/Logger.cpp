@@ -1,5 +1,9 @@
 #include "Logger.hpp"
 
+#include "colours.hpp" // for CGreen, CMgnta, CRed, CReset, CYellow
+
+#include <iostream> // for basic_ostream, operator<<, basic_ios, cerr, cout
+
 /*
    Log strings in four categories (severity) in different colours
    to stdout/stderr respectively.
