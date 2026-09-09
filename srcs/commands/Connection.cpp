@@ -36,9 +36,7 @@ bool Handlers::quit(Server &server, Client &client,
     if (client.isRegistered())
         server.getChannelManager().broadcastToPeers(
             client, Reply::fromClient(client.getPrefix(), "QUIT", "", reason));
-    // A server-originated line has no prefix, so it is built by hand here.
-    client.send("ERROR :Closing link: (" + client.getPrefix() +
-                ") [Quit: " + reason + "]\r\n");
+    client.send(client.closingLink("Quit: " + reason));
     return true;
 }
 

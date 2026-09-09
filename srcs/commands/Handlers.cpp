@@ -6,8 +6,7 @@
 #include "Utils.hpp"
 
 // PASS, NICK, USER, CAP and tryRegister live in Registration.cpp.
-// QUIT, PING, PONG live in Connection.cpp; NOTICE (and later PRIVMSG) in
-// Messaging.cpp.
+// QUIT, PING, PONG live in Connection.cpp; PRIVMSG and NOTICE in Messaging.cpp.
 
 /*
 INVITE <nickname> <channel>
@@ -190,14 +189,6 @@ bool Handlers::names(Server &server, Client &client,
                              Reply::reply(Reply::RPL_ENDOFNAMES, chans[i]));
         }
     }
-    return false;
-}
-
-bool Handlers::message(Server &server, Client &client,
-                       const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
     return false;
 }
 

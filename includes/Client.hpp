@@ -46,6 +46,9 @@ class Client {
     std::string getPrefix() const;
     // Nick the numerics are addressed to: "*" until the client has one.
     std::string getReplyTarget() const;
+    // "ERROR :Closing link: (nick!user@host) [reason]", the line a client gets
+    // right before its connection is closed (QUIT, wrong PASS, shutdown).
+    std::string closingLink(const std::string &reason) const;
     bool        hasIdentity() const;
     void        setNick(const std::string &name);
     void        setUser(const std::string &user, const std::string &real);

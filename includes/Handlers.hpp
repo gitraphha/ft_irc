@@ -43,8 +43,6 @@ bool names(Server &server, Client &client,
            const std::vector<std::string> &params);
 bool nick(Server &server, Client &client,
           const std::vector<std::string> &params);
-bool message(Server &server, Client &client,
-             const std::vector<std::string> &params); // PRIVMSG, next branch
 bool notice(Server &server, Client &client,
             const std::vector<std::string> &params);
 bool oper(Server &server, Client &client,
@@ -57,6 +55,8 @@ bool ping(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool pong(Server &server, Client &client,
           const std::vector<std::string> &params);
+bool privmsg(Server &server, Client &client,
+             const std::vector<std::string> &params);
 bool quit(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool rehash(Server &server, Client &client,

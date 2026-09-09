@@ -27,16 +27,24 @@ static bool contains(const std::string &hay, const std::string &needle) {
 }
 
 // A registered client with a nick, user and host, plus a way to feed it lines.
+// The Client is owned by the server's ClientManager, like in the real loop.
 struct Conn {
     Server          &server;
     CommandProcessor cmds;
-    Client           client;
+    Client          &client;
     bool             closed;
     std::string      error;
 
-    Conn(Server &s, const std::string &nick) : server(s), closed(false) {
+    static int nextFd() {
+        static int fd = 4;
+        return fd++;
+    }
+
+    Conn(Server &s, const std::string &nick)
+        : server(s), client(*new Client(nextFd())), closed(false) {
         cmds.registerCommands();
-        client.setNick(nick);
+        s.getClientManager().add(client.getFd(), &client);
+        s.getClientManager().setNick(client, nick);
         client.setUser(nick.substr(0, 1), nick);
         client.setHostname("h");
         client.setRegistered(true);
@@ -78,7 +86,7 @@ int main() {
         report(c.send("PONG abc") && c.drain().empty(),
                "PONG accepted silently");
 
-        Client           fresh; // not registered: PING must still work
+        Client           fresh(9); // not registered: PING must still work
         CommandProcessor cp;
         cp.registerCommands();
         bool threw = false;
@@ -153,9 +161,47 @@ int main() {
                "NOTICE without target -> silence (no 411)");
         report(c.send("NOTICE #room") && c.drain().empty(),
                "NOTICE without text -> silence (no 412)");
-        // NOTICE to an existing nick goes through ClientManager::at(nick);
-        // that path is exercised end to end with nc, together with
-        // feat/connection-registration, which owns how clients are added.
+        report(a.send("NOTICE bob :hey") && a.drain().empty() &&
+                   b.drain() == ":alice!a@h NOTICE bob :hey\r\n",
+               "NOTICE to a nick: only that nick gets it");
+    }
+
+    {
+        std::cout << "[PRIVMSG delivers and replies on errors]\n";
+        Server          server(6667, "secret");
+        Conn            a(server, "alice");
+        Conn            b(server, "bob");
+        Conn            c(server, "carol");
+        ChannelManager &cm = server.getChannelManager();
+        cm.join(a.client, "#room");
+        cm.join(b.client, "#room");
+        a.drain();
+        b.drain();
+
+        report(a.send("PRIVMSG #room :hello") && a.drain().empty(),
+               "channel PRIVMSG: sender is not echoed");
+        report(b.drain() == ":alice!a@h PRIVMSG #room :hello\r\n",
+               "channel PRIVMSG: other member receives it");
+        report(a.send("PRIVMSG bob :hi bob") && a.drain().empty() &&
+                   b.drain() == ":alice!a@h PRIVMSG bob :hi bob\r\n",
+               "PRIVMSG to a nick");
+        report(c.send("PRIVMSG #room :hi") &&
+                   contains(c.drain(), " 404 carol #room "),
+               "PRIVMSG to a channel you are not in -> 404");
+        report(c.send("PRIVMSG #nochan :hi") &&
+                   contains(c.drain(), " 403 carol #nochan "),
+               "PRIVMSG to an unknown channel -> 403");
+        report(c.send("PRIVMSG nobody :hi") &&
+                   contains(c.drain(), " 401 carol nobody "),
+               "PRIVMSG to an unknown nick -> 401");
+        report(c.send("PRIVMSG") && contains(c.drain(), " 411 carol "),
+               "PRIVMSG without target -> 411");
+        report(c.send("PRIVMSG #room") && contains(c.drain(), " 412 carol "),
+               "PRIVMSG without text -> 412");
+        report(a.send("PRIVMSG bob,#room :both") && a.drain().empty() &&
+                   b.drain() == ":alice!a@h PRIVMSG bob :both\r\n"
+                                ":alice!a@h PRIVMSG #room :both\r\n",
+               "PRIVMSG with two targets");
     }
 
     std::cout << "\n"
