@@ -99,7 +99,7 @@ void sendWelcome(Server &server, Client &client) {
                      name + " " + server.getServerVersion() + " o itkol"));
     sendReply(server, client,
               Reply::reply(Reply::RPL_ISUPPORT,
-                           "CHANTYPES=# NICKLEN=30 CHANMODES=,k,l,it "
+                           "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
                            "PREFIX=(o)@ CASEMAPPING=rfc1459",
                            "are supported by this server"));
     // No MOTD: irssi (and most clients) consider registration finished only

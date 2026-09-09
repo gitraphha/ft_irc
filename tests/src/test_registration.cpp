@@ -99,7 +99,7 @@ int main() {
                "003 created");
         report(contains(w, ":irc.local 004 bob irc.local 1.0 o itkol"),
                "004 myinfo");
-        report(contains(w, ":irc.local 005 bob CHANTYPES=# NICKLEN=30"),
+        report(contains(w, ":irc.local 005 bob CHANTYPES=&#+! NICKLEN=30"),
                "005 isupport");
         report(contains(w, ":irc.local 422 bob :MOTD File is missing\r\n"),
                "422 nomotd ends the burst");
