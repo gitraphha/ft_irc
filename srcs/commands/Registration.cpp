@@ -46,11 +46,6 @@
 
 namespace {
 
-// Nick the replies are addressed to: "*" until the client has one.
-std::string target(const Client &client) {
-    return client.getNick().empty() ? "*" : client.getNick();
-}
-
 void sendReply(Server &server, Client &client, const Reply::Message &msg) {
     client.sendReply(server.getServerName(), msg);
 }
@@ -120,9 +115,9 @@ bool Handlers::cap(Server &server, Client &client,
                    const std::vector<std::string> &params) {
     const std::string sub = Parser::upperCase(params[0]);
     if (sub == "LS" || sub == "LIST")
-        sendRaw(server, client, "CAP", target(client) + " " + sub);
+        sendRaw(server, client, "CAP", client.getReplyTarget() + " " + sub);
     else if (sub == "REQ")
-        sendRaw(server, client, "CAP", target(client) + " NAK",
+        sendRaw(server, client, "CAP", client.getReplyTarget() + " NAK",
                 params.size() > 1 ? params[1] : "");
     // END and anything else: nothing to do
     return false;

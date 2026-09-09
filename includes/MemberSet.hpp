@@ -16,7 +16,7 @@ class MemberSet {
     std::map<Client *, ModeSet> members_;
 
   public:
-    MemberSet(){};
+    MemberSet() {};
     MemberSet(Client &client);
     MemberSet(Client &client, const ModeSet &modes);
 

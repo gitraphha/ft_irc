@@ -98,10 +98,13 @@ void Client::send(const std::string &msg) {
 
 void Client::sendReply(const std::string    &serverName,
                        const Reply::Message &msg) {
-    // Address the nick as soon as one is known: 431/432/433/464 all arrive
-    // before registration completes.
-    const std::string &name = nick_.empty() ? "*" : nick_;
-    sendBuffer_ += Reply::build(serverName, name, msg);
+    sendBuffer_ += Reply::build(serverName, getReplyTarget(), msg);
+}
+
+// 431/432/433/464 all arrive before registration completes, so the nick is
+// used as soon as there is one.
+std::string Client::getReplyTarget() const {
+    return nick_.empty() ? "*" : nick_;
 }
 
 void Client::appendToRecvBuffer(const std::string &bytes) {
