@@ -46,17 +46,6 @@
 
 namespace {
 
-void sendReply(Server &server, Client &client, const Reply::Message &msg) {
-    client.sendReply(server.getServerName(), msg);
-}
-
-// Non-numeric line originating from the server, e.g. ":irc.local CAP * LS :"
-void sendRaw(Server &server, Client &client, const std::string &cmd,
-             const std::string &params, const std::string &trailing = "") {
-    client.send(
-        Reply::fromClient(server.getServerName(), cmd, params, trailing, true));
-}
-
 // RFC 2812 2.3.1:
 //   nickname = ( letter / special ) *8( letter / digit / special / "-" )
 //   special  = %x5B-60 / %x7B-7D  ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
@@ -81,29 +70,29 @@ bool isValidNick(const std::string &nick) {
 
 void sendWelcome(Server &server, Client &client) {
     const std::string name = server.getServerName();
-    sendReply(server, client,
-              Reply::reply(Reply::RPL_WELCOME, "",
-                           "Welcome to the Internet Relay Network " +
-                               client.getPrefix()));
-    sendReply(server, client,
-              Reply::reply(Reply::RPL_YOURHOST, "",
-                           "Your host is " + name + ", running version " +
-                               server.getServerVersion()));
-    sendReply(server, client,
-              Reply::reply(Reply::RPL_CREATED, "",
+    client.sendReply(name,
+                     Reply::reply(Reply::RPL_WELCOME, "",
+                                  "Welcome to the Internet Relay Network " +
+                                      client.getPrefix()));
+    client.sendReply(name, Reply::reply(Reply::RPL_YOURHOST, "",
+                                        "Your host is " + name +
+                                            ", running version " +
+                                            server.getServerVersion()));
+    client.sendReply(
+        name, Reply::reply(Reply::RPL_CREATED, "",
                            "This server was created " + server.getCreatedAt()));
     // <servername> <version> <available user modes> <available channel modes>
-    sendReply(server, client,
-              Reply::reply(Reply::RPL_MYINFO,
+    client.sendReply(
+        name, Reply::reply(Reply::RPL_MYINFO,
                            name + " " + server.getServerVersion() + "  itkol"));
-    sendReply(server, client,
-              Reply::reply(Reply::RPL_ISUPPORT,
-                           "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
-                           "PREFIX=(o)@ CASEMAPPING=rfc1459",
-                           "are supported by this server"));
+    client.sendReply(name,
+                     Reply::reply(Reply::RPL_ISUPPORT,
+                                  "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
+                                  "PREFIX=(o)@ CASEMAPPING=rfc1459",
+                                  "are supported by this server"));
     // No MOTD: irssi (and most clients) consider registration finished only
     // after RPL_ENDOFMOTD (376) or ERR_NOMOTD (422).
-    sendReply(server, client, Reply::reply(Reply::ERR_NOMOTD, ""));
+    client.sendReply(name, Reply::reply(Reply::ERR_NOMOTD, ""));
 }
 
 } // namespace
@@ -113,11 +102,15 @@ void sendWelcome(Server &server, Client &client) {
 bool Handlers::cap(Server &server, Client &client,
                    const std::vector<std::string> &params) {
     const std::string sub = Parser::upperCase(params[0]);
+    const std::string target = client.getReplyTarget();
     if (sub == "LS" || sub == "LIST")
-        sendRaw(server, client, "CAP", client.getReplyTarget() + " " + sub);
+        // trailing required - create custom string directly
+        client.send(":" + server.getServerName() + " CAP " + target + " " +
+                    sub + " :\r\n");
     else if (sub == "REQ")
-        sendRaw(server, client, "CAP", client.getReplyTarget() + " NAK",
-                params.size() > 1 ? params[1] : "");
+        client.send(Reply::fromClient(server.getServerName(), "CAP",
+                                      target + " NAK",
+                                      params.size() > 1 ? params[1] : ""));
     // END and anything else: nothing to do
     return false;
 }
@@ -178,10 +171,10 @@ bool Handlers::tryRegister(Server &server, Client &client) {
     if (client.isRegistered() || !client.hasIdentity())
         return false;
     if (!client.hasPassAccepted()) {
-        sendReply(server, client, Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
-        client.send(Reply::fromClient("", "ERROR", "",
-                                      "Closing link: (" + client.getPrefix() +
-                                          ") [Password incorrect]"));
+        client.sendReply(server.getServerName(),
+                         Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
+        client.send("ERROR :Closing link: (" + client.getPrefix() +
+                    ") [Password incorrect]\r\n");
         return true; // event loop: flush, then close the connection
     }
     client.setRegistered(true);
