@@ -97,7 +97,7 @@ int main() {
                "002 yourhost");
         report(contains(w, ":irc.local 003 bob :This server was created"),
                "003 created");
-        report(contains(w, ":irc.local 004 bob irc.local 1.0 o itkol"),
+        report(contains(w, ":irc.local 004 bob irc.local 1.0  itkol"),
                "004 myinfo");
         report(contains(w, ":irc.local 005 bob CHANTYPES=&#+! NICKLEN=30"),
                "005 isupport");

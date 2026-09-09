@@ -93,10 +93,9 @@ void sendWelcome(Server &server, Client &client) {
               Reply::reply(Reply::RPL_CREATED, "",
                            "This server was created " + server.getCreatedAt()));
     // <servername> <version> <available user modes> <available channel modes>
-    sendReply(
-        server, client,
-        Reply::reply(Reply::RPL_MYINFO,
-                     name + " " + server.getServerVersion() + "  itkol"));
+    sendReply(server, client,
+              Reply::reply(Reply::RPL_MYINFO,
+                           name + " " + server.getServerVersion() + "  itkol"));
     sendReply(server, client,
               Reply::reply(Reply::RPL_ISUPPORT,
                            "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
