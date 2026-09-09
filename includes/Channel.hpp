@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <ctime>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -63,4 +64,5 @@ class Channel {
     bool clientHasPrivsOver(Client &client, Client &target) const;
 
     void broadcast(const std::string &msg, const Client *skip = 0) const;
+    void collectMembers(std::set<Client *> &out) const;
 };

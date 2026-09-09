@@ -6,7 +6,27 @@
 class Client;
 class Server;
 
+/*
+ * Every handler has the same shape:
+ *   return true  -> the connection must be closed once pending output is
+ *                   flushed (QUIT, password mismatch on registration, ...)
+ *   return false -> keep the connection
+ *   throw Error  -> abort the command; the event loop sends the numeric reply
+ *                   carried by the Error. Commands that take a comma-separated
+ *                   target list catch Error per target instead, so one bad
+ *                   target does not abort the rest.
+ *
+ * PASS / NICK / USER / CAP and tryRegister live in Registration.cpp
+ * (RFC 2812 section 3.1); the rest in Handlers.cpp.
+ */
+
 namespace Handlers {
+// tryRegister is called by CommandProcessor::run after every command of an
+// unregistered client. Once NICK and USER are both known it either completes
+// the registration (001-005 + 422) or, if PASS did not match, sends 464 and
+// asks for the connection to be closed (returns true).
+bool tryRegister(Server &server, Client &client);
+
 bool cap(Server &server, Client &client,
          const std::vector<std::string> &params);
 bool invite(Server &server, Client &client,

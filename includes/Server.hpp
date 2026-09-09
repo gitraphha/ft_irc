@@ -20,6 +20,7 @@ class Server {
   private:
     std::string serverName_;
     std::string serverVersion_;
+    std::string createdAt_;
     int         port_;
     std::string password_;
 
@@ -55,6 +56,8 @@ class Server {
 
     const std::string &getServerName() const;
     const std::string &getServerVersion() const;
+    const std::string &getCreatedAt() const;
+    const std::string &getPassword() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
 
@@ -62,9 +65,4 @@ class Server {
     // void sendMsg(int const fd, std::string const &msg) {
     //     sockets_.sendMsg(fd, msg);
     // }
-
-    bool tryRegister(Client &client) {
-        (void)client;
-        return true;
-    };
 };

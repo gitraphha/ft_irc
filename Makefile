@@ -22,7 +22,8 @@ SRCS_SERVER 	= Server \
 				  SignalHandler
 
 SRCS_COMMANDS	= CommandProcessor \
-				  Handlers
+				  Handlers \
+				  Registration
 
 SRCS_UTILS		= MemberSet \
 				  ModeSet
