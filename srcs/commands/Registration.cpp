@@ -96,7 +96,7 @@ void sendWelcome(Server &server, Client &client) {
     sendReply(
         server, client,
         Reply::reply(Reply::RPL_MYINFO,
-                     name + " " + server.getServerVersion() + " o itkol"));
+                     name + " " + server.getServerVersion() + "  itkol"));
     sendReply(server, client,
               Reply::reply(Reply::RPL_ISUPPORT,
                            "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
