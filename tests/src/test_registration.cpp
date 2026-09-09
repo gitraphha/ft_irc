@@ -202,7 +202,7 @@ int main() {
         report(!c.send("USER b 0 * :B") && contains(c.error, " 462 "),
                "USER after registration -> 462");
         report(c.send("NICK robert"), "NICK change accepted");
-        report(c.drain() == ":bob!b@h NICK :robert\r\n",
+        report(c.drain() == ":bob!b@h NICK robert\r\n",
                "rename echoed with the old prefix");
         report(server.getClientManager().hasNick("robert") &&
                    !server.getClientManager().hasNick("bob"),

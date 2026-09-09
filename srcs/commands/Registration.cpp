@@ -39,7 +39,6 @@
 
 #include <cctype>
 #include <cstring>
-#include <ctime>
 #include <string>
 #include <vector>
 
@@ -70,31 +69,19 @@ bool isSpecial(char c) {
     return std::strchr("[]\\`_^{|}", c) != 0 && c != '\0';
 }
 
+// First char: letter or special. The rest: letter, digit, special or '-'.
 bool isValidNick(const std::string &nick) {
     if (nick.empty() || nick.size() > NICKLEN)
         return false;
-    unsigned char first = static_cast<unsigned char>(nick[0]);
-    if (!std::isalpha(first) && !isSpecial(nick[0]))
+    unsigned char c = static_cast<unsigned char>(nick[0]);
+    if (!std::isalpha(c) && !isSpecial(nick[0]))
         return false;
     for (std::string::size_type i = 1; i < nick.size(); i++) {
-        unsigned char c = static_cast<unsigned char>(nick[i]);
+        c = static_cast<unsigned char>(nick[i]);
         if (!std::isalnum(c) && !isSpecial(nick[i]) && nick[i] != '-')
             return false;
     }
     return true;
-}
-
-// The time this server started, formatted once ("Tue Sep  1 21:40:00 2026").
-const std::string &createdAt() {
-    static std::string created;
-    if (created.empty()) {
-        std::time_t now = std::time(0);
-        char        buf[64];
-        std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
-                      std::localtime(&now));
-        created = buf;
-    }
-    return created;
 }
 
 void sendWelcome(Server &server, Client &client) {
@@ -109,7 +96,7 @@ void sendWelcome(Server &server, Client &client) {
                                server.getServerVersion()));
     sendReply(server, client,
               Reply::reply(Reply::RPL_CREATED, "",
-                           "This server was created " + createdAt()));
+                           "This server was created " + server.getCreatedAt()));
     // <servername> <version> <available user modes> <available channel modes>
     sendReply(
         server, client,
@@ -168,17 +155,16 @@ bool Handlers::nick(Server &server, Client &client,
     if (!sameClient && clients.hasNick(nick))
         throw Error::reply(Reply::ERR_NICKNAMEINUSE, nick);
 
-    if (!client.isRegistered()) {
-        clients.setNick(client, nick);
-        return false;
+    if (client.isRegistered()) {
+        // Registered client renaming itself: everyone who can see it - itself
+        // and every peer sharing a channel - gets the change, with the OLD
+        // prefix.
+        const std::string notice =
+            Reply::fromClient(client.getPrefix(), "NICK", nick);
+        client.send(notice);
+        server.getChannelManager().broadcastToPeers(client, notice);
     }
-    // Registered client renaming itself: everyone who can see it - itself
-    // and every peer sharing a channel - gets the change, with the OLD prefix.
-    const std::string notice =
-        Reply::fromClient(client.getPrefix(), "NICK", "", nick);
     clients.setNick(client, nick);
-    client.send(notice);
-    server.getChannelManager().broadcastToPeers(client, notice);
     return false;
 }
 

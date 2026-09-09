@@ -1,7 +1,6 @@
 #include "ClientManager.hpp"
 
 #include "ChannelManager.hpp"
-
 #include "Errors.hpp"
 #include "Utils.hpp"
 
@@ -61,8 +60,8 @@ void ClientManager::setNick(Client &client, const std::string &nick) {
         byNick_.erase(client.getNickCaseFolded());
     client.setNick(nick);
     if (!nick.empty())
-        byNick_.insert(std::make_pair(client.getNickCaseFolded(),
-                                      client.getFd()));
+        byNick_.insert(
+            std::make_pair(client.getNickCaseFolded(), client.getFd()));
 }
 
 // parts the client from every channel before freeing it, so no MemberSet is

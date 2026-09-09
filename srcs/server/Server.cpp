@@ -22,7 +22,13 @@
 Server::Server(int const port, std::string const &password)
     : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
       password_(password), logger_(serverName_ + ": "), sockets_(logger_),
-      numServerSockets_(0) {}
+      numServerSockets_(0) {
+    std::time_t now = std::time(0);
+    char        buf[64];
+    std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
+                  std::localtime(&now));
+    createdAt_ = buf;
+}
 
 /*
 	Cleanup
@@ -238,6 +244,10 @@ const std::string &Server::getServerName() const {
 
 const std::string &Server::getServerVersion() const {
     return serverVersion_;
+}
+
+const std::string &Server::getCreatedAt() const {
+    return createdAt_;
 }
 
 const std::string &Server::getPassword() const {

@@ -20,6 +20,7 @@ class Server {
   private:
     std::string serverName_;
     std::string serverVersion_;
+    std::string createdAt_;
     int         port_;
     std::string password_;
 
@@ -55,6 +56,7 @@ class Server {
 
     const std::string &getServerName() const;
     const std::string &getServerVersion() const;
+    const std::string &getCreatedAt() const;
     const std::string &getPassword() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
