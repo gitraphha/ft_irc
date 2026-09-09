@@ -239,7 +239,7 @@ int main() {
         report(server.getClientManager().find(9) == 0,
                "find unknown fd -> NULL");
         c.send("NICK bob");
-        server.getClientManager().remove(4);
+        server.getClientManager().remove(4, server.getChannelManager());
         report(!server.getClientManager().hasNick("bob") &&
                    !server.getClientManager().hasClient(4),
                "remove drops fd and nick index");
@@ -251,7 +251,7 @@ int main() {
             threw = e.hasReply() && e.reply().code == Reply::ERR_NOSUCHNICK;
         }
         report(threw, "at(unknown nick) throws ERR_NOSUCHNICK");
-        server.getClientManager().remove(9);
+        server.getClientManager().remove(9, server.getChannelManager());
         report(true, "remove(unknown fd) is a no-op");
     }
 

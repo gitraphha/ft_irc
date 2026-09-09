@@ -21,6 +21,8 @@
 
 #include <cstddef>
 #include <map>
+
+class ChannelManager;
 #include <string>
 
 class ClientManager {
@@ -55,5 +57,7 @@ class ClientManager {
     void setNick(Client &client, const std::string &nick);
     // remove deletes the client owning `fd`; no-op if unknown. The caller
     // parts it from its channels first (ChannelManager::leaveAll).
-    void remove(int fd);
+    // Only Server calls this: it parts the client from every channel, frees
+    // it, and the caller has to close the socket too.
+    void remove(int fd, ChannelManager &cm);
 };

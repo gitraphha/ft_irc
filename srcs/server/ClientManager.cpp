@@ -1,5 +1,7 @@
 #include "ClientManager.hpp"
 
+#include "ChannelManager.hpp"
+
 #include "Errors.hpp"
 #include "Utils.hpp"
 
@@ -63,11 +65,14 @@ void ClientManager::setNick(Client &client, const std::string &nick) {
                                       client.getFd()));
 }
 
-void ClientManager::remove(int fd) {
+// parts the client from every channel before freeing it, so no MemberSet is
+// left pointing to freed memory
+void ClientManager::remove(int fd, ChannelManager &cm) {
     std::map<int, Client *>::iterator it = byFd_.find(fd);
     if (it == byFd_.end())
         return;
     Client *client = it->second;
+    cm.leaveAll(*client);
     if (!client->getNick().empty())
         byNick_.erase(client->getNickCaseFolded());
     byFd_.erase(it);
