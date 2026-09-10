@@ -143,22 +143,9 @@ void Server::processServerSocketData_() {
     }
 
     // DEBUG check if cleanup works correctly
-    static size_t crash = 0;
-    if (++crash > 5)
-        throw std::runtime_error("Server socket error.");
-}
-
-void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
-                            bool &isReg) {
-    try {
-        *clntPtr = &clients_.at(fd);
-        if (*clntPtr && (*clntPtr)->isRegistered()) {
-            isReg = true;
-            nick = (*clntPtr)->getNick();
-        }
-    } catch (std::exception const &e) {
-        log_(e.what(), Logger::lmWarn);
-    }
+    // static size_t crash = 0;
+    // if (++crash > 5)
+    //     throw std::runtime_error("DBG: Server socket error.");
 }
 
 void Server::processClientSockets_() {
@@ -168,14 +155,6 @@ void Server::processClientSockets_() {
         pollfd &pfd = pollFds_.at(idx);
 
         if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
-
-            // // to be replaced by a request to some sort of manager
-            // Client     *client = 0;
-            // std::string nickName = "*";
-            // bool        clntIsReg = false;
-            // setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
-            // // end: to be replaced by a request to some sort of manager
-
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
@@ -244,11 +223,11 @@ void Server::acceptClient_(int const serverFd) {
     storePollFd_(clientFd, false);
     clients_.add(clientFd, serverName_);
 
-#if NETCATDBG
-    std::cout << "Client connected:\n"
-              << " fd: " << clientFd << "\n"
-              << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
-#endif
+    std::ostringstream oss;
+    oss << "Client connected:"
+        << " fd:" << clientFd
+        << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
+    log_(oss.str(), Logger::lmInfo);
 }
 
 void Server::storePollFd_(int const socketFd, bool srvSocket) {
