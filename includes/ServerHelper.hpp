@@ -106,4 +106,16 @@ inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
     return oss.str();
 }
 
+class pfdHasFd {
+  private:
+    int const fd_;
+
+  public:
+    pfdHasFd(int fd) : fd_(fd) {}
+
+    bool operator()(pollfd const pfd) const {
+        return (pfd.fd == fd_);
+    }
+};
+
 } // namespace srvHelp

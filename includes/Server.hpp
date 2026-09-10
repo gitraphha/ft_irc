@@ -36,8 +36,9 @@ class Server {
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
     void processClientSockets_();
+    void removeClosedSockets_();
     void storePollFd_(int const socketFd, bool srvSocket);
-    void removePollFd_(int const idx);
+    void removePollFd_(int const fd);
     void setClientInfo_(int fd, Client **clntPtr, std::string &nick,
                         bool &isReg);
     void log_(std::string const &msg, Logger::logMode const lm);
@@ -50,16 +51,13 @@ class Server {
     ~Server();
 
     void run();
+    void sendMsg(int const fd, std::string const &msg);
 
     const std::string &getServerName() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
 
     // Pass-through interfaces
-    // void sendMsg(int const fd, std::string const &msg) {
-    //     sockets_.sendMsg(fd, msg);
-    // }
-
     bool tryRegister(Client &client) {
         (void)client;
         return true;

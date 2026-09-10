@@ -9,6 +9,7 @@
 #include <exception>    // for exception
 #include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
+#include <set>
 #include <sstream>      // for basic_ostringstream
 #include <stdexcept>    // for runtime_error, invalid_argument
 #include <string>       // for allocator, char_traits, basic_string
@@ -31,6 +32,10 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
+            // Update after Call client member function for shutdown notice message!
+            // after PR feat/cmds2: implement QUIT, PING, PONG and NOTICE - #38#
+//#define REMOVE_ME
+#ifndef REMOVE_ME
             std::string nickName;
             try {
                 nickName = clients_.at(fd).getNick();
@@ -48,10 +53,15 @@ Server::~Server() {
             oss << "ERROR :" << serverName_ << " " << nickName
                 << " :Server shutdown - goodbye.";
             sockets_.sendMsg(fd, oss.str());
+#else
+            Client &client = clients_.at(fd);
+            client.sendClosingMsg("Server shutdown - goodbye");
+#endif
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
-        pollFds_.erase(--pollFds_.end());
+        this->removePollFd_(fd);
+        // pollFds_.erase(--pollFds_.end());
     }
 }
 
@@ -124,6 +134,11 @@ void Server::processServerSocketData_() {
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
     }
+
+    // DEBUG check if cleanup works correctly
+    static size_t crash = 0;
+    if (++crash > 5)
+        throw std::runtime_error("Server socket error.");
 }
 
 void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
@@ -145,41 +160,56 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (sockets_.checkSocket(pfd) && (pfd.revents & POLLIN)) {
+        if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
 
-            // to be replaced by a request to some sort of manager
-            Client     *client = 0;
-            std::string nickName = "*";
-            bool        clntIsReg = false;
-            setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
-            // end: to be replaced by a request to some sort of manager
+            // // to be replaced by a request to some sort of manager
+            // Client     *client = 0;
+            // std::string nickName = "*";
+            // bool        clntIsReg = false;
+            // setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
+            // // end: to be replaced by a request to some sort of manager
 
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
-                try {
-                    cmdLine =
-                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                    if (!cmdLine.empty())
-                        cmds_.run(*this, *client, cmdLine);
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        sockets_.sendMsg(
-                            pfd.fd,
-                            Reply::build(serverName_, nickName, e.reply()));
-                    } else {
-                        std::string tmp(
-                            "Error while trying to get/execute cmd:\n");
-                        tmp.append("'" + cmdLine + "'\n" + e.what());
-                        log_(tmp, Logger::lmExcept);
+                // try {
+                cmdLine =
+                    sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+                if (!cmdLine.empty()) {
+                    // returns true if connection is to be closed
+                    // only happens after a QUIT cmd or maybe after too many ERR_INPUTTOOLONG
+                    if (cmds_.run(
+                            *this,
+                            /* should soon be: pfd.fd */ clients_.at(pfd.fd),
+                            cmdLine)) {
+                        sockets_.closeSocket(pfd.fd);
+                        break;
                     }
                 }
+                // } catch (Error const &e) {
+                //     if (e.hasReply()) {
+                //         sockets_.sendMsg(
+                //             pfd.fd,
+                //             Reply::build(serverName_, nickName, e.reply()));
+                //     } else {
+                //         std::string tmp(
+                //             "Error while trying to get/execute cmd:\n");
+                //         tmp.append("'" + cmdLine + "'\n" + e.what());
+                //         log_(tmp, Logger::lmExcept);
+                //     }
+                // }
             } while (buffHasMoreCmds);
         }
+    }
+    removeClosedSockets_();
+}
 
+void Server::removeClosedSockets_() {
+    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+        pollfd &pfd = pollFds_.at(idx);
         if (sockets_.socketClosed(pfd.fd)) {
             clients_.remove(pfd.fd, channels_);
-            removePollFd_(idx);
+            removePollFd_(pfd.fd);
             --idx;
         }
     }
@@ -207,9 +237,11 @@ void Server::acceptClient_(int const serverFd) {
     storePollFd_(clientFd, false);
     clients_.add(*(new Client()), clientFd);
 
+#if NETCATDBG
     std::cout << "Client connected:\n"
               << " fd: " << clientFd << "\n"
               << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
+#endif
 }
 
 void Server::storePollFd_(int const socketFd, bool srvSocket) {
@@ -221,10 +253,11 @@ void Server::storePollFd_(int const socketFd, bool srvSocket) {
     sockets_.addSocket(socketFd, srvSocket);
 }
 
-void Server::removePollFd_(int const idx) {
-    std::vector<struct pollfd>::difference_type dist =
-        static_cast<std::vector<struct pollfd>::difference_type>(idx);
-    pollFds_.erase(pollFds_.begin() + dist);
+void Server::removePollFd_(int const fd) {
+    std::vector<pollfd>::iterator it =
+        std::find_if(pollFds_.begin(), pollFds_.end(), srvHelp::pfdHasFd(fd));
+    if (it != pollFds_.end())
+        pollFds_.erase(it);
 }
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
@@ -264,5 +297,14 @@ void Server::run() {
 
         processServerSocketData_();
         processClientSockets_();
+    }
+}
+
+void Server::sendMsg(int const fd, std::string const &msg) {
+    if (!sockets_.sendMsg(fd, msg)) {
+        // will be done at the end of a poll loop
+
+        // clients_.remove(fd, channels_);
+        // removePollFd_(fd);
     }
 }

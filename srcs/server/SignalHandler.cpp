@@ -52,7 +52,7 @@ SignalHandler::SignalHandler() {
     stopSignals_.push_back(SIGTERM);
 
     if (!setStopSignals_(handleStopSignals_))
-        throw std::runtime_error("std::signal failed");
+        throw std::runtime_error("Setting stop signals failed");
 }
 
 /*
