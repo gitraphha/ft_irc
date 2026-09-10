@@ -183,6 +183,13 @@ void Server::processClientSockets_() {
                 }
 #endif
             } while (buffHasMoreCmds);
+
+            Client *client = clients_.find(pfd.fd);
+            if (client && !client->getSendBuffer().empty()) {
+                const std::string &out = client->getSendBuffer();
+                sockets_.sendMsg(pfd.fd, out);
+                client->consumeSendBuffer(out.size());
+            }
         }
     }
     removeClosedSockets_();
