@@ -10,7 +10,7 @@ class Logger {
     static std::string nowStr() {
         time_t     now = time(0);
         struct tm *timeinfo = localtime(&now);
-        char       buffer[32];
+        char       buffer[32]; // NOLINT
         strftime(&buffer[0], sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
         return std::string(&buffer[0]);
     }

@@ -60,4 +60,9 @@ class Server {
     const std::string &getPassword() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
+
+    // Pass-through interfaces
+    void sendMsg(int const fd, std::string const &msg) {
+        sockets_.sendMsg(fd, msg);
+    }
 };

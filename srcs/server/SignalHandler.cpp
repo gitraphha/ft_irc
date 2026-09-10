@@ -56,8 +56,8 @@ SignalHandler::SignalHandler() {
 }
 
 /*
-	SignalHandler Destructor
-		* reset signal handling to default
+ * SignalHandler Destructor
+   * reset signal handling to default
 */
 SignalHandler::~SignalHandler() {
     setStopSignals_(SIG_DFL);

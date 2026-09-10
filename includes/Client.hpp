@@ -29,8 +29,8 @@ class Client {
     Client()
         : fd_(-1), registered_(false), passAccepted_(false), oper_(false) {}
 
-    explicit Client(int fd, std::string const &serverName)
-        : fd_(fd), hostname_(serverName), registered_(false),
+    explicit Client(int fd, std::string const &clientHost)
+        : fd_(fd), hostname_(clientHost), registered_(false),
           passAccepted_(false), oper_(false) {}
 
     int         getFd() const;

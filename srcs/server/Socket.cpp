@@ -17,6 +17,10 @@ bool Socket::checkSocket4Recv(struct pollfd &pfd) {
     if (socketClosed(pfd.fd))
         return false;
 
+bool Socket::checkSocket4Recv(struct pollfd &pfd) {
+    if (socketClosed(pfd.fd))
+        return false;
+
     SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
     if ((pfd.revents & POLLERR)) {
         if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
@@ -64,14 +68,6 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
         return "";
 
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
-#if NETCATDBG
-    {
-        std::ostringstream oss;
-        oss << "You are client fd " << fd << ": \n"
-            << "Srv received: " << std::string(sIOD.readBuffer) << std::endl;
-        sendMsg(fd, oss.str());
-    }
-#endif
     std::string cmdLine;
     cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
     sIOD.recvErrorCount = 0;
