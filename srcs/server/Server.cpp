@@ -41,7 +41,7 @@ Server::~Server() {
         if (!sockets_.isServerSocket(fd)) {
             // Update after Call client member function for shutdown notice message!
             // after PR feat/cmds2: implement QUIT, PING, PONG and NOTICE - #38#
-//#define REMOVE_ME
+#define REMOVE_ME
 #ifndef REMOVE_ME
             std::string nickName;
             try {
@@ -68,7 +68,6 @@ Server::~Server() {
         }
         sockets_.closeSocket(fd);
         this->removePollFd_(fd);
-        // pollFds_.erase(--pollFds_.end());
     }
 }
 
@@ -156,32 +155,39 @@ void Server::processClientSockets_() {
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
-                // try {
-                cmdLine =
-                    sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                if (!cmdLine.empty()) {
-                    // returns true if connection is to be closed
-                    // only happens after a QUIT cmd or maybe after too many ERR_INPUTTOOLONG
-                    if (cmds_.run(
-                            *this,
-                            /* should soon be: pfd.fd */ clients_.at(pfd.fd),
-                            cmdLine)) {
-                        sockets_.closeSocket(pfd.fd);
-                        break;
+#define ERRMSG2CLIENTBYEXCEPT
+#ifdef ERRMSG2CLIENTBYEXCEPT
+                try {
+#endif
+                    cmdLine =
+                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+                    if (!cmdLine.empty()) {
+                        // returns true if connection is to be closed
+                        // only happens after a QUIT cmd or maybe after too many ERR_INPUTTOOLONG
+                        if (cmds_.run(*this,
+                                      /* should soon be: pfd.fd */
+                                      clients_.at(pfd.fd), cmdLine)) {
+                            sockets_.closeSocket(pfd.fd);
+                            break;
+                        }
+                    }
+#ifdef ERRMSG2CLIENTBYEXCEPT
+                } catch (Error const &e) {
+                    if (e.hasReply()) {
+                        Client     *client = clients_.find(pfd.fd);
+                        std::string nickName =
+                            (client ? client->getNick() : "dbgDummyNick");
+                        sockets_.sendMsg(
+                            pfd.fd,
+                            Reply::build(serverName_, nickName, e.reply()));
+                    } else {
+                        std::string tmp(
+                            "Error while trying to get/execute cmd:\n");
+                        tmp.append("'" + cmdLine + "'\n" + e.what());
+                        log_(tmp, Logger::lmExcept);
                     }
                 }
-                // } catch (Error const &e) {
-                //     if (e.hasReply()) {
-                //         sockets_.sendMsg(
-                //             pfd.fd,
-                //             Reply::build(serverName_, nickName, e.reply()));
-                //     } else {
-                //         std::string tmp(
-                //             "Error while trying to get/execute cmd:\n");
-                //         tmp.append("'" + cmdLine + "'\n" + e.what());
-                //         log_(tmp, Logger::lmExcept);
-                //     }
-                // }
+#endif
             } while (buffHasMoreCmds);
         }
     }
@@ -219,7 +225,12 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(clientFd, serverName_);
+
+    std::string clientIP;
+    uint16_t    port;
+    srvHelp::getIPandPort(sockAddrIn46, srvHelp::getSaFamily(sockAddrIn46),
+                          port, clientIP);
+    clients_.add(clientFd, clientIP);
 
     std::ostringstream oss;
     oss << "Client connected:"
