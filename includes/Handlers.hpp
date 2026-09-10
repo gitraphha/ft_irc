@@ -21,12 +21,6 @@ class Server;
  */
 
 namespace Handlers {
-// tryRegister is called by CommandProcessor::run after every command of an
-// unregistered client. Once NICK and USER are both known it either completes
-// the registration (001-005 + 422) or, if PASS did not match, sends 464 and
-// asks for the connection to be closed (returns true).
-bool tryRegister(Server &server, Client &client);
-
 bool cap(Server &server, Client &client,
          const std::vector<std::string> &params);
 bool invite(Server &server, Client &client,

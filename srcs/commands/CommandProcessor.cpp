@@ -4,6 +4,7 @@
 #include "Errors.hpp"
 #include "Handlers.hpp"
 #include "Parser.hpp"
+#include "Registration.hpp"
 #include "Server.hpp"
 
 Command &CommandProcessor::at_(const std::string &name) {
@@ -64,7 +65,7 @@ bool CommandProcessor::run(Server &server, Client &client,
     bool exiting = cmd.handler(server, client, params);
     // after each command, see if we can send registration to the client
     if (!exiting && !client.isRegistered())
-        exiting = Handlers::tryRegister(server, client);
+        exiting = Registration::tryRegister(server, client);
     return exiting;
 }
 
