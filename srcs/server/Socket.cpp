@@ -81,16 +81,16 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
         (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
         sIOD.discardMode = true;
         msgTooLong = true;
-        // ++sIOD.recvErrorCount;
     }
     if (sIOD.discardMode) {
-        // if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-        //     closeSocket(fd);
-        //     return std::string::npos;
-        // }
+        if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+            closeSocket(fd);
+            return std::string::npos;
+        }
         if (lfcrPos != std::string::npos) {
             rdBuffer.erase(0, lfcrPos + 2);
             sIOD.discardMode = false;
+            sIOD.recvErrorCount = 0;
             lfcrPos = rdBuffer.find("\r\n");
         } else /* lfcrPos == std::string::npos */ {
             if ('\r' == *rdBuffer.rbegin())
@@ -99,9 +99,6 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
                 rdBuffer.clear();
         }
     }
-    // if (msgTooLong)
-    //     throw Error(Reply::reply(Reply::ERR_INPUTTOOLONG, ""));
-
     return lfcrPos;
 }
 
