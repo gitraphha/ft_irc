@@ -94,7 +94,10 @@ static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
 
     std::istringstream issPass(argv[2]); // NOLINT
     if (!(issPass >> password).eof()) {
-        toCerr("Error while extracting password from commandline parameter.",
+        toCerr("Error while extracting password from commandline parameter '" +
+                   issPass.str() +
+                   "'\n      Make sure it consist of alphanumeric characters "
+                   "without spaces",
                CRed);
         return false;
     }
