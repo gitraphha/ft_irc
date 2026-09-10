@@ -291,12 +291,3 @@ void Server::run() {
         processClientSockets_();
     }
 }
-
-void Server::sendMsg(int const fd, std::string const &msg) {
-    if (!sockets_.sendMsg(fd, msg)) {
-        // will be done at the end of a poll loop
-
-        // clients_.remove(fd, channels_);
-        // removePollFd_(fd);
-    }
-}

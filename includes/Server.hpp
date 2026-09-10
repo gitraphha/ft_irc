@@ -52,7 +52,6 @@ class Server {
     ~Server();
 
     void run();
-    void sendMsg(int const fd, std::string const &msg);
 
     const std::string &getServerName() const;
     const std::string &getServerVersion() const;

@@ -17,10 +17,6 @@ bool Socket::checkSocket4Recv(struct pollfd &pfd) {
     if (socketClosed(pfd.fd))
         return false;
 
-bool Socket::checkSocket4Recv(struct pollfd &pfd) {
-    if (socketClosed(pfd.fd))
-        return false;
-
     SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
     if ((pfd.revents & POLLERR)) {
         if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
