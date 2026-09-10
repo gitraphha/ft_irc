@@ -72,7 +72,7 @@ Server::~Server() {
     }
 }
 
-void Server::setupServerSockets_() {
+bool Server::setupServerSockets_() {
     static int const              domArr[] = {AF_INET, AF_INET6};
     static std::vector<int> const domains(
         // NOLINTNEXTLINE
@@ -84,8 +84,11 @@ void Server::setupServerSockets_() {
             log_(e.what(), Logger::lmExcept);
         }
     }
-    if (numServerSockets_ == 0)
-        throw std::runtime_error("No server socket could be setup correctly.");
+    if (numServerSockets_ == 0) {
+        log_("No server socket could be setup correctly.", Logger::lmError);
+        return false;
+    }
+    return true;
 }
 
 /*
@@ -141,11 +144,6 @@ void Server::processServerSocketData_() {
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
     }
-
-    // DEBUG check if cleanup works correctly
-    // static size_t crash = 0;
-    // if (++crash > 5)
-    //     throw std::runtime_error("DBG: Server socket error.");
 }
 
 void Server::processClientSockets_() {
@@ -282,7 +280,8 @@ ClientManager &Server::getClientManager() {
 	* handles client connect and disconnect scenarios
 */
 void Server::run() {
-    setupServerSockets_();
+    if (!setupServerSockets_())
+        return;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);

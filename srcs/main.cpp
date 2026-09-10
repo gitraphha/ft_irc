@@ -69,27 +69,35 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+static void toCerr(std::string const &msg, std::string const &colour) {
+    std::cerr << colour << msg << CReset << std::endl;
+}
+
 static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
                                   std::string &password) {
-    std::istringstream iss;
-    std::string        remainder;
     if (argc != 3) {
-        std::cerr << CYellow << "Usage: ./ircserv <int:port> <string:password>"
-                  << CReset << std::endl;
+        toCerr("Usage: ./ircserv <int:port> <string:password>", CYellow);
         return false;
     }
 
-    iss.str(argv[1]); // NOLINT
-    if (!((iss >> port) && (iss >> remainder).eof()))
-        throw std::runtime_error(
-            "Error while extracting port number from commandline parameter.");
-    if (port < 1 || port > 65535)
-        throw std::runtime_error("Error: port must be in the range 1-65535.");
+    std::istringstream issPort(argv[1]); // NOLINT
+    std::string        remainder;
+    if (!((issPort >> port) && (issPort >> remainder).eof())) {
+        toCerr("Error while extracting port number from commandline parameter.",
+               CRed);
+        return false;
+    }
+    if (port < 1 || port > 65535) {
+        toCerr("Error: port must be in the range 1-65535.", CRed);
+        return false;
+    }
 
-    iss.str(argv[2]); // NOLINT
-    if (!(iss >> password).eof())
-        throw std::runtime_error(
-            "Error while extracting password from commandline parameter.");
+    std::istringstream issPass(argv[2]); // NOLINT
+    if (!(issPass >> password).eof()) {
+        toCerr("Error while extracting password from commandline parameter.",
+               CRed);
+        return false;
+    }
 
     return true;
 }
