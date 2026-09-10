@@ -1,7 +1,5 @@
 #include "Socket.hpp"
 
-#include "Errors.hpp"       // for Error
-#include "Reply.hpp"        // for reply, Code
 #include "ServerHelper.hpp" // for getAdressFamilyStr, sockAddrFamily
 
 #include <poll.h>       // for pollfd, POLLERR
@@ -64,7 +62,7 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
         return "";
 
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
-    std::string cmdLine;
+    std::string           cmdLine;
     cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
     sIOD.recvErrorCount = 0;
     sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
