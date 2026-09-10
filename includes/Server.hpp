@@ -11,17 +11,6 @@
 #include <string>   // for string, basic_string
 #include <vector>   // for vector
 class Client;
-#include "ChannelManager.hpp"   // for ChannelManager
-#include "ClientManager.hpp"    // for ClientManager
-#include "CommandProcessor.hpp" // for CommandProcessor
-#include "Logger.hpp"           // for Logger
-#include "Socket.hpp"           // for Socket
-
-#include <poll.h>   // for pollfd
-#include <stddef.h> // for size_t
-#include <string>   // for string, basic_string
-#include <vector>   // for vector
-class Client;
 
 #define SERVER_NAME "irc.local"
 #define SERVER_VERSION "1.0"
