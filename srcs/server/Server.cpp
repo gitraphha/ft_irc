@@ -21,13 +21,10 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), port_(port), password_(password),
+    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION),
+      createdAt_(Logger::nowStr()), port_(port), password_(password),
       logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
 
-/*
-	Cleanup
-	* going backwards through pollFds to ensure server sockets are closed last
- */
 /*
 	Cleanup
 	* going backwards through pollFds to ensure server sockets are closed last
