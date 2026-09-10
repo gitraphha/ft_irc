@@ -1,6 +1,8 @@
 #pragma once
 
 #include <algorithm>
+#include <climits>
+#include <cstdlib>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -37,6 +39,22 @@ static inline std::vector<std::string> split(const std::string &s, char delim) {
     while (std::getline(iss, token, delim))
         out.push_back(token);
     return out;
+}
+
+static inline int toPosInt(const std::string &s) {
+    if (s.empty())
+        return -1;
+    char *ptr = NULL;
+    long  val = strtol(s.c_str(), &ptr, 10);
+    if (*ptr || val <= 0 || val > INT_MAX)
+        return -1;
+    return static_cast<int>(val);
+}
+
+// joins 3 strings with space character. optional usage for 2 strings
+static inline std::string join3(const std::string &a, const std::string &b,
+                                const std::string &c = "") {
+    return a + " " + b + " " + (c.empty() ? "" : " " + c);
 }
 
 } // namespace Utils

@@ -1,11 +1,21 @@
 #include "ModeSet.hpp"
 
-ModeSet::ModeSet() {
+#include <climits>
+
+ModeSet::ModeSet() : modes_() {
     modes_[0] = 0;
     modes_[1] = 0;
 }
 
-bool ModeSet::has(int mode) const {
+void ModeSet::indexAndMask_(int mode, uint32_t &index, uint32_t &mask) {
+    static const int bitsPerInt = sizeof(uint32_t) * CHAR_BIT; // 4 * 8 = 32
+    uint32_t         position = static_cast<uint32_t>(mode) - MIN_MODE;
+    index = position / bitsPerInt;
+    uint32_t bit = position % bitsPerInt;
+    mask = 1U << bit;
+}
+
+bool ModeSet::hasMode(int mode) const {
     if (mode < MIN_MODE || mode > MAX_MODE)
         return false;
     uint32_t index, mask;
@@ -13,36 +23,24 @@ bool ModeSet::has(int mode) const {
     return (modes_[index] & mask) != 0;
 }
 
-bool ModeSet::hasAtLeast(const ModeSet &modes) const {
-    for (uint32_t i = MIN_MODE; i <= MAX_MODE; i++) {
-        if (modes.has(i) && !has(i))
-            return false;
-    }
-    return true;
-}
-
 int ModeSet::highestUserMode() const {
-    size_t total = Mode::totalUserModes;
+    size_t total = Mode::totalChannelUserModes;
     for (size_t i = 0; i < total; i++) {
         int m = Mode::channelUserModes[i];
-        if (has(m))
+        if (hasMode(m))
             return m;
     }
     return Mode::NoMode;
 }
 
-// set `mode` to be on or off, return whether the value actually changed
-bool ModeSet::set(int mode, bool on) {
+// returns true if the mode was changed.
+bool ModeSet::setMode(int mode, bool add) {
     if (mode < MIN_MODE || mode > MAX_MODE)
         return false;
     uint32_t index, mask;
     indexAndMask_(mode, index, mask);
-    uint32_t desired;
     uint32_t current = modes_[index];
-    if (on)
-        desired = current | mask;
-    else
-        desired = current & (~mask);
+    uint32_t desired = add ? (current | mask) : (current & (~mask));
     if (current == desired)
         return false;
     modes_[index] = desired;
@@ -52,7 +50,7 @@ bool ModeSet::set(int mode, bool on) {
 ModeSet &ModeSet::operator+=(const std::string &modes) {
     std::string::const_iterator it = modes.begin();
     for (; it != modes.end(); it++) {
-        set(*it, true);
+        setMode(*it, true);
     }
     return *this;
 }
@@ -60,17 +58,17 @@ ModeSet &ModeSet::operator+=(const std::string &modes) {
 ModeSet &ModeSet::operator-=(const std::string &modes) {
     std::string::const_iterator it = modes.begin();
     for (; it != modes.end(); it++) {
-        set(*it, false);
+        setMode(*it, false);
     }
     return *this;
 }
 
 ModeSet &ModeSet::operator+=(int mode) {
-    set(mode, true);
+    setMode(mode, true);
     return *this;
 }
 
 ModeSet &ModeSet::operator-=(int mode) {
-    set(mode, false);
+    setMode(mode, false);
     return *this;
 }

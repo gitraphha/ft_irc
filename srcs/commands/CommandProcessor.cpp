@@ -7,6 +7,8 @@
 #include "Registration.hpp"
 #include "Server.hpp"
 
+#include <utility>
+
 Command &CommandProcessor::at_(const std::string &name) {
     std::map<std::string, Command>::iterator it = commands_.find(name);
     if (it == commands_.end())
@@ -57,6 +59,9 @@ bool CommandProcessor::run(Server &server, Client &client,
     Command &cmd = at_(name);
     if (!client.isRegistered() && !cmd.isUsablePreReg())
         throw Error::reply(Reply::ERR_NOTREGISTERED, "");
+    if (client.isRegistered() &&
+        (cmd.handler == Handlers::pass || cmd.handler == Handlers::user))
+        throw Error::reply(Reply::ERR_ALREADYREGISTRED, "");
     if (cmd.getRequiresOp() && !client.isOperator())
         throw Error::reply(Reply::ERR_NOPRIVILEGES, "");
     if (params.size() < cmd.getMinParams())

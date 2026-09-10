@@ -57,6 +57,12 @@ Server::~Server() {
 #else
             Client &client = clients_.at(fd);
             client.sendClosingMsg("Server shutdown - goodbye");
+
+            // REMOVE ME --->
+            const std::string &out = client.getSendBuffer();
+            sockets_.sendMsg(fd, out);
+            client.consumeSendBuffer(out.size());
+            // <--- REMOVE ME
 #endif
             clients_.remove(fd, channels_);
         }
@@ -184,12 +190,14 @@ void Server::processClientSockets_() {
 #endif
             } while (buffHasMoreCmds);
 
+            // REMOVE ME --->
             Client *client = clients_.find(pfd.fd);
             if (client && !client->getSendBuffer().empty()) {
                 const std::string &out = client->getSendBuffer();
                 sockets_.sendMsg(pfd.fd, out);
                 client->consumeSendBuffer(out.size());
             }
+            // <--- REMOVE ME
         }
     }
     removeClosedSockets_();
