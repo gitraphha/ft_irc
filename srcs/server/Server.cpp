@@ -29,10 +29,6 @@ Server::Server(int const port, std::string const &password)
 	Cleanup
 	* going backwards through pollFds to ensure server sockets are closed last
  */
-/*
-	Cleanup
-	* going backwards through pollFds to ensure server sockets are closed last
- */
 Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
