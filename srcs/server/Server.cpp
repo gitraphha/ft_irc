@@ -33,28 +33,6 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            // Update after Call client member function for shutdown notice message!
-            // after PR feat/cmds2: implement QUIT, PING, PONG and NOTICE - #38#
-#define REMOVE_ME
-#ifndef REMOVE_ME
-            std::string nickName;
-            try {
-                nickName = clients_.at(fd).getNick();
-            } catch (std::exception const &e) {
-                logger_.logMsg("\n Cannot get client object:"
-                               "\n starting from a second client, the object "
-                               "isn't correctly created"
-                               "\n in function bool ClientManager::add(Client "
-                               "&client, int fd)"
-                               "\n Exception: " +
-                                   std::string(e.what()),
-                               Logger::lmError);
-            }
-            std::ostringstream oss;
-            oss << "ERROR :" << serverName_ << " " << nickName
-                << " :Server shutdown - goodbye.";
-            sockets_.sendMsg(fd, oss.str());
-#else
             Client &client = clients_.at(fd);
             client.sendClosingMsg("Server shutdown - goodbye");
 
@@ -63,7 +41,7 @@ Server::~Server() {
             sockets_.sendMsg(fd, out);
             client.consumeSendBuffer(out.size());
             // <--- REMOVE ME
-#endif
+
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
@@ -163,10 +141,7 @@ void Server::processClientSockets_() {
                         sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
                     if (!cmdLine.empty()) {
                         // returns true if connection is to be closed
-                        // only happens after a QUIT cmd or maybe after too many ERR_INPUTTOOLONG
-                        if (cmds_.run(*this,
-                                      /* should soon be: pfd.fd */
-                                      clients_.at(pfd.fd), cmdLine)) {
+                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
                             sockets_.closeSocket(pfd.fd);
                             break;
                         }

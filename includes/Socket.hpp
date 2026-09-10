@@ -12,8 +12,6 @@
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 3
 
-#define NETCATDBG 0 // For netcat debug
-
 class Socket {
   private:
     struct SocketIOData {

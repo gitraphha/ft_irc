@@ -108,25 +108,9 @@ inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
     sa_family_t const saFamily = getSaFamily(sockAddrIn46);
 
     uint16_t    portNumber = 0;
-    std::string addrStr("No addr:port information.");
+    std::string addrStr;
     getIPandPort(sockAddrIn46, saFamily, portNumber, addrStr);
 
-    // if (saFamily == AF_INET) {
-    //     addrPtr = &sockAddrIn46.sai4.sin_addr;
-    //     portNumber = ntohs(sockAddrIn46.sai4.sin_port);
-    // } else if (saFamily == AF_INET6) {
-    //     addrPtr = &sockAddrIn46.sai6.sin6_addr;
-    //     portNumber = ntohs(sockAddrIn46.sai6.sin6_port);
-    // }
-    // char const *addrStrPtr =
-    //     inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
-
-    // std::string addrStr("No addr:port information.");
-    // if (addrStrPtr) {
-    //     addrStr.assign(addrStrPtr);
-    //     if (saFamily == AF_INET6)
-    //         addrStr = "[" + addrStr + "]";
-    // }
     std::ostringstream oss;
     oss << " AF:" << getAdressFamilyStr(saFamily) << " addr:port: " << addrStr
         << ":" << std::dec << portNumber;
@@ -134,6 +118,10 @@ inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
     return oss.str();
 }
 
+/*
+ * Functor that can be used in std::find_if
+ * workaround since we are stuck with c++98 without lambdas
+ */
 class PfdHasFd {
   private:
     int const fd_;
