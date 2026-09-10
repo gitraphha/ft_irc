@@ -236,7 +236,7 @@ void Server::acceptClient_(int const serverFd) {
     storePollFd_(clientFd, false);
 
     std::string clientIP;
-    uint16_t    port;
+    uint16_t    port = 0;
     srvHelp::getIPandPort(sockAddrIn46, srvHelp::getSaFamily(sockAddrIn46),
                           port, clientIP);
     clients_.add(clientFd, clientIP);
@@ -259,7 +259,7 @@ void Server::storePollFd_(int const socketFd, bool srvSocket) {
 
 void Server::removePollFd_(int const fd) {
     std::vector<pollfd>::iterator it =
-        std::find_if(pollFds_.begin(), pollFds_.end(), srvHelp::pfdHasFd(fd));
+        std::find_if(pollFds_.begin(), pollFds_.end(), srvHelp::PfdHasFd(fd));
     if (it != pollFds_.end())
         pollFds_.erase(it);
 }
