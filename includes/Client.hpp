@@ -29,8 +29,9 @@ class Client {
     Client()
         : fd_(-1), registered_(false), passAccepted_(false), oper_(false) {}
 
-    explicit Client(int fd)
-        : fd_(fd), registered_(false), passAccepted_(false), oper_(false) {}
+    explicit Client(int fd, std::string const &serverName)
+        : fd_(fd), hostname_(serverName), registered_(false),
+          passAccepted_(false), oper_(false) {}
 
     int         getFd() const;
     std::string getNick() const;

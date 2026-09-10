@@ -242,7 +242,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(clientFd);
+    clients_.add(clientFd, serverName_);
 
 #if NETCATDBG
     std::cout << "Client connected:\n"

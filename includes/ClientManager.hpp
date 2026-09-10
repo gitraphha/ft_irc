@@ -50,8 +50,8 @@ class ClientManager {
     std::size_t size() const;
 
     // add takes a file descriptor of a newly created socket
-	// returns false if `fd` is already present.
-    bool add(int fd);
+    // returns false if `fd` is already present.
+    bool add(int fd, std::string const &serverName);
     // setNick changes `client`'s nick and keeps the nick index in sync.
     // The caller validates the nick and checks hasNick() first.
     void setNick(Client &client, const std::string &nick);
