@@ -6,13 +6,13 @@
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
+#include <algorithm>    // for find_if
 #include <exception>    // for exception
-#include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
-#include <set>
-#include <sstream>      // for basic_ostringstream
+#include <sstream>      // for basic_ostringstream, basic_ostream, ope...
 #include <stdexcept>    // for runtime_error, invalid_argument
-#include <string>       // for allocator, char_traits, basic_string
+#include <stdint.h>     // for uint16_t
+#include <string>       // for allocator, basic_string, char_traits
 #include <sys/socket.h> // for setsockopt, AF_INET6, AF_INET, accept
 
 /*

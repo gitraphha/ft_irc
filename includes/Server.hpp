@@ -10,7 +10,6 @@
 #include <stddef.h> // for size_t
 #include <string>   // for string, basic_string
 #include <vector>   // for vector
-class Client;
 
 #define SERVER_NAME "irc.local"
 #define SERVER_VERSION "1.0"
