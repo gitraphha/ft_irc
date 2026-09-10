@@ -6,6 +6,7 @@
 #include "Utils.hpp"
 
 // PASS, NICK, USER, CAP and tryRegister live in Registration.cpp.
+// QUIT, PING, PONG live in Connection.cpp; PRIVMSG and NOTICE in Messaging.cpp.
 
 /*
 INVITE <nickname> <channel>
@@ -191,14 +192,6 @@ bool Handlers::names(Server &server, Client &client,
     return false;
 }
 
-bool Handlers::message(Server &server, Client &client,
-                       const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
 bool Handlers::oper(Server &server, Client &client,
                     const std::vector<std::string> &params) {
     (void)server;
@@ -231,30 +224,6 @@ bool Handlers::part(Server &server, Client &client,
                 client.sendReply(serverName, e.reply());
         }
     }
-    return false;
-}
-
-bool Handlers::ping(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::pong(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::quit(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
     return false;
 }
 

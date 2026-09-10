@@ -4,6 +4,7 @@
 #include "Errors.hpp"
 #include "Handlers.hpp"
 #include "Parser.hpp"
+#include "Registration.hpp"
 #include "Server.hpp"
 
 Command &CommandProcessor::at_(const std::string &name) {
@@ -27,14 +28,14 @@ void CommandProcessor::registerCommands() {
     add("KILL", Command(Handlers::kill, false, 1, true));
     add("MODE", Command(Handlers::mode, false, 1));
     add("NAMES", Command(Handlers::names, false, 0));
-    add("NICK", Command(Handlers::nick, true, 0)); // 431, not 461
-    add("NOTICE", Command(Handlers::message, false, 2));
+    add("NICK", Command(Handlers::nick, true, 0));      // 431, not 461
+    add("NOTICE", Command(Handlers::notice, false, 0)); // never replies
     add("OPER", Command(Handlers::oper, false, 1));
     add("PART", Command(Handlers::part, false, 1));
     add("PASS", Command(Handlers::pass, true, 1));
-    add("PING", Command(Handlers::ping, true, 1));
-    add("PONG", Command(Handlers::pong, true, 1));
-    add("PRIVMSG", Command(Handlers::message, false, 2));
+    add("PING", Command(Handlers::ping, true, 0)); // 409, not 461
+    add("PONG", Command(Handlers::pong, true, 0));
+    add("PRIVMSG", Command(Handlers::privmsg, false, 0)); // 411/412
     add("QUIT", Command(Handlers::quit, true, 0));
     add("REHASH", Command(Handlers::rehash, false, 0, true));
     add("RENAME", Command(Handlers::rename, false, 2));
@@ -64,7 +65,7 @@ bool CommandProcessor::run(Server &server, Client &client,
     bool exiting = cmd.handler(server, client, params);
     // after each command, see if we can send registration to the client
     if (!exiting && !client.isRegistered())
-        exiting = Handlers::tryRegister(server, client);
+        exiting = Registration::tryRegister(server, client);
     return exiting;
 }
 
