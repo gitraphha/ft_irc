@@ -3,6 +3,8 @@
 #include "Errors.hpp"
 #include "Utils.hpp"
 
+#include <set>
+
 ChannelManager::ChannelManager() {}
 
 std::map<std::string, Channel>::iterator
@@ -129,4 +131,17 @@ void ChannelManager::broadcast(const std::string &name, const std::string &msg,
                                const Client *skip) const {
     const Channel &channel = at(name);
     channel.broadcast(msg, skip);
+}
+
+void ChannelManager::broadcastToPeers(Client            &client,
+                                      const std::string &msg) const {
+    std::set<Client *> peers;
+    for (std::map<std::string, Channel>::const_iterator it = channels_.begin();
+         it != channels_.end(); ++it)
+        if (it->second.hasMember(client))
+            it->second.collectMembers(peers);
+    peers.erase(&client);
+    for (std::set<Client *>::iterator it = peers.begin(); it != peers.end();
+         ++it)
+        (*it)->send(msg);
 }

@@ -5,13 +5,7 @@
 #include "Server.hpp"
 #include "Utils.hpp"
 
-bool Handlers::cap(Server &server, Client &client,
-                   const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
+// PASS, NICK, USER, CAP and tryRegister live in Registration.cpp.
 
 /*
 INVITE <nickname> <channel>
@@ -158,19 +152,42 @@ bool Handlers::mode(Server &server, Client &client,
     return false;
 }
 
+/*
+NAMES [ <channel> *( "," <channel> ) [ <target> ] ]
+
+By using the NAMES command, a user can list all nicknames that are visible to
+him. The <channel> parameter specifies which channel(s) to return information
+about. There is no error reply for bad channel names.
+
+NOTE:
+- optional [ <target> ] parameter is ignored as we do not support multiple
+server
+
+- Sends only RPL_ENDOFNAMES when no params is given although RFC 2812 says,
+"
+If no <channel> parameter is given, a list of all channels and their
+occupants is returned. At the end of this list, a list of users who
+are visible but either not on any channel or not on a visible channel
+are listed as being on `channel' "*".
+"
+*/
 bool Handlers::names(Server &server, Client &client,
                      const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
-
-bool Handlers::nick(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
+    const std::string &serverName = server.getServerName();
+    if (params.empty()) {
+        client.sendReply(serverName, Reply::reply(Reply::RPL_ENDOFNAMES, "*"));
+        return false;
+    }
+    std::vector<std::string> chans = Utils::split(params[0], ',');
+    for (size_t i = 0; i < chans.size(); i++) {
+        try {
+            Channel &ch = server.getChannelManager().at(chans[i]);
+            ch.sendNames(serverName, client);
+        } catch (const Error &) {
+            client.sendReply(serverName,
+                             Reply::reply(Reply::RPL_ENDOFNAMES, chans[i]));
+        }
+    }
     return false;
 }
 
@@ -214,14 +231,6 @@ bool Handlers::part(Server &server, Client &client,
                 client.sendReply(serverName, e.reply());
         }
     }
-    return false;
-}
-
-bool Handlers::pass(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
     return false;
 }
 
@@ -290,19 +299,23 @@ bool Handlers::topic(Server &server, Client &client,
     return false;
 }
 
-bool Handlers::user(Server &server, Client &client,
-                    const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
-    (void)params;
-    return false;
-}
+/*
+VERSION [ <target> ]
 
+The VERSION command is used to query the version of the server program.
+
+NOTE: optional [ <target> ] parameter is ignored as we do not support multiple
+server
+*/
 bool Handlers::version(Server &server, Client &client,
                        const std::vector<std::string> &params) {
-    (void)server;
-    (void)client;
     (void)params;
+    const std::string &serverName = server.getServerName();
+    // <version>.<debuglevel> <server> :<comments>
+    client.sendReply(serverName,
+                     Reply::reply(Reply::RPL_VERSION,
+                                  server.getServerVersion() + " " + serverName,
+                                  "ft_irc"));
     return false;
 }
 

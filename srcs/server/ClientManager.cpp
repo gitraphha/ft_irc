@@ -4,76 +4,77 @@
 #include "Errors.hpp"
 #include "Utils.hpp"
 
+ClientManager::ClientManager() {}
+
 ClientManager::~ClientManager() {
-    std::map<std::string, Client *>::iterator it = clients_.begin();
-    for (; it != clients_.end(); it++)
+    std::map<int, Client *>::iterator it = byFd_.begin();
+    for (; it != byFd_.end(); it++)
         delete it->second;
 }
 
-ClientManager::ClientManager() {}
-
-std::map<std::string, Client *>::iterator
-ClientManager::findClient_(const std::string &name) {
-    return clients_.find(Utils::foldCase(name));
-}
-
-std::map<std::string, Client *>::const_iterator
-ClientManager::findClient_(const std::string &name) const {
-    return clients_.find(Utils::foldCase(name));
-}
-
-// 'at' returns an existing client with name equivalent to `name`,
-// or throw an error
-Client &ClientManager::at(const std::string &name) {
-    std::map<std::string, Client *>::iterator it = findClient_(name);
-    if (it == clients_.end())
-        throw Error::reply(Reply::ERR_NOSUCHNICK, name);
+Client &ClientManager::at(int fd) {
+    std::map<int, Client *>::iterator it = byFd_.find(fd);
+    if (it == byFd_.end())
+        throw Error("ClientManager: no client for fd");
     return *it->second;
 }
 
-std::map<int, std::string>::iterator ClientManager::findClient_(int fd) {
-    return fdNick_.find(fd);
-}
-
-std::map<int, std::string>::const_iterator
-ClientManager::findClient_(int fd) const {
-    return fdNick_.find(fd);
-}
-
-// 'at' returns an existing client with fd given
-// or throw an error (internal error message)
-Client &ClientManager::at(int fd) {
-    std::map<int, std::string>::iterator it = findClient_(fd);
-    if (it == fdNick_.end())
-        throw Error("can't find fd");
+Client &ClientManager::at(const std::string &name) {
+    std::map<std::string, int>::iterator it =
+        byNick_.find(Utils::foldCase(name));
+    if (it == byNick_.end())
+        throw Error::reply(Reply::ERR_NOSUCHNICK, name);
     return at(it->second);
 }
 
-bool ClientManager::hasClient(const std::string &name) const {
-    return findClient_(name) != clients_.end();
+Client *ClientManager::find(int fd) {
+    std::map<int, Client *>::iterator it = byFd_.find(fd);
+    if (it == byFd_.end())
+        return 0;
+    return it->second;
 }
 
-// add should receive `new Client()` and add should take ownership of the pointer
-bool ClientManager::add(Client &client, int fd) {
-    if (hasClient(client.getNickCaseFolded()))
+bool ClientManager::hasClient(int fd) const {
+    return byFd_.find(fd) != byFd_.end();
+}
+
+bool ClientManager::hasNick(const std::string &name) const {
+    return byNick_.find(Utils::foldCase(name)) != byNick_.end();
+}
+
+std::size_t ClientManager::size() const {
+    return byFd_.size();
+}
+
+bool ClientManager::add(int fd, std::string const &serverName) {
+    if (hasClient(fd))
         return false;
-    clients_.insert(std::make_pair(client.getNickCaseFolded(), &client));
-    fdNick_.insert(std::make_pair(fd, client.getNickCaseFolded()));
+    Client *client = new Client(fd, serverName);
+    byFd_.insert(std::make_pair(fd, client));
+    if (!client->getNick().empty())
+        byNick_.insert(std::make_pair(client->getNickCaseFolded(), fd));
     return true;
 }
 
-// kicks client out of every channel before freeing it, so Channel::MemberSet
-// is not left pointing to freed memory
+void ClientManager::setNick(Client &client, const std::string &nick) {
+    if (!client.getNick().empty())
+        byNick_.erase(client.getNickCaseFolded());
+    client.setNick(nick);
+    if (!nick.empty())
+        byNick_.insert(
+            std::make_pair(client.getNickCaseFolded(), client.getFd()));
+}
+
+// parts the client from every channel before freeing it, so no MemberSet is
+// left pointing to freed memory
 void ClientManager::remove(int fd, ChannelManager &cm) {
-    std::map<int, std::string>::iterator it = findClient_(fd);
-    if (it == fdNick_.end())
+    std::map<int, Client *>::iterator it = byFd_.find(fd);
+    if (it == byFd_.end())
         return;
-    std::string nick = it->second;
-    fdNick_.erase(it);
-    std::map<std::string, Client *>::iterator it_cl = findClient_(nick);
-    if (it_cl == clients_.end())
-        return;
-    cm.leaveAll(*it_cl->second);
-    delete it_cl->second;
-    clients_.erase(it_cl);
+    Client *client = it->second;
+    cm.leaveAll(*client);
+    if (!client->getNick().empty())
+        byNick_.erase(client->getNickCaseFolded());
+    byFd_.erase(it);
+    delete client;
 }

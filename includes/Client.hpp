@@ -12,6 +12,7 @@
 #include <string>
 
 class Client {
+    int                   fd_;
     std::string           nick_;
     std::string           nickCaseFolded_;
     std::string           username_;
@@ -25,8 +26,14 @@ class Client {
     std::set<std::string> invitedTo_;
 
   public:
-    Client() : registered_(false), passAccepted_(false), oper_(false) {}
+    Client()
+        : fd_(-1), registered_(false), passAccepted_(false), oper_(false) {}
 
+    explicit Client(int fd, std::string const &serverName)
+        : fd_(fd), hostname_(serverName), registered_(false),
+          passAccepted_(false), oper_(false) {}
+
+    int         getFd() const;
     std::string getNick() const;
     std::string getNickCaseFolded() const;
     std::string getUsername() const;
@@ -38,6 +45,8 @@ class Client {
     bool hasPassAccepted() const;
 
     std::string getPrefix() const;
+    // Nick the numerics are addressed to: "*" until the client has one.
+    std::string getReplyTarget() const;
     bool        hasIdentity() const;
     void        setNick(const std::string &name);
     void        setUser(const std::string &user, const std::string &real);

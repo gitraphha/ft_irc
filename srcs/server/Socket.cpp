@@ -13,7 +13,10 @@ void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
 }
 
-bool Socket::checkSocket(struct pollfd &pfd) {
+bool Socket::checkSocket4Recv(struct pollfd &pfd) {
+    if (socketClosed(pfd.fd))
+        return false;
+
     SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
     if ((pfd.revents & POLLERR)) {
         if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
@@ -40,53 +43,54 @@ bool Socket::updateBuffer_(int const fd) {
 }
 
 std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
-    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
-    std::string           cmdLine;
-
-    if (!buffHasMoreCmds)
+    if (!buffHasMoreCmds) {
         if (!updateBuffer_(fd))
-            return cmdLine;
-
-    size_t lfcrPos = bufferLengthAndSanityCheck_(fd);
-    if (lfcrPos != std::string::npos) {
-#if NETCATDBG
-        {
-            std::ostringstream oss;
-            oss << "You are client fd " << fd << ": \n"
-                << "Srv received: " << std::string(sIOD.readBuffer)
-                << std::endl;
-            sendMsg(fd, oss.str());
-        }
-#endif
-        sIOD.recvErrorCount = 0;
-        cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
-        sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
-        buffHasMoreCmds = (sIOD.readBuffer.find("\r\n") != std::string::npos);
+            return "";
     }
+
+    bool   msgTooLong = false;
+    size_t lfcrPos = bufferLengthAndSanityCheck_(fd, msgTooLong);
+    if (msgTooLong)
+        return std::string(MAXMSGLEN + 1, '\0');
+    if (lfcrPos == std::string::npos)
+        return "";
+
+    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+#if NETCATDBG
+    {
+        std::ostringstream oss;
+        oss << "You are client fd " << fd << ": \n"
+            << "Srv received: " << std::string(sIOD.readBuffer) << std::endl;
+        sendMsg(fd, oss.str());
+    }
+#endif
+    std::string cmdLine;
+    cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+    sIOD.recvErrorCount = 0;
+    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+    buffHasMoreCmds = (sIOD.readBuffer.find("\r\n") != std::string::npos);
     return cmdLine;
 }
 
-size_t Socket::bufferLengthAndSanityCheck_(
-    int const fd /* , bool const isRegistered */) {
+size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
     Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
     std::string          &rdBuffer = sIOD.readBuffer;
     size_t                lfcrPos = rdBuffer.find("\r\n");
-    bool                  msgTooLong = false;
 
-    if ((rdBuffer.length() >= MAXMSGLEN) &&
+    if ((!sIOD.discardMode) && (rdBuffer.length() >= MAXMSGLEN) &&
         (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
         sIOD.discardMode = true;
-        ++sIOD.recvErrorCount;
         msgTooLong = true;
     }
     if (sIOD.discardMode) {
-        if (/* !isRegistered || */ sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+        if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
             closeSocket(fd);
             return std::string::npos;
         }
         if (lfcrPos != std::string::npos) {
             rdBuffer.erase(0, lfcrPos + 2);
             sIOD.discardMode = false;
+            sIOD.recvErrorCount = 0;
             lfcrPos = rdBuffer.find("\r\n");
         } else /* lfcrPos == std::string::npos */ {
             if ('\r' == *rdBuffer.rbegin())
@@ -95,9 +99,6 @@ size_t Socket::bufferLengthAndSanityCheck_(
                 rdBuffer.clear();
         }
     }
-    if (msgTooLong)
-        throw Error(Reply::reply(Reply::ERR_INPUTTOOLONG, ""));
-
     return lfcrPos;
 }
 
@@ -108,6 +109,9 @@ size_t Socket::bufferLengthAndSanityCheck_(
 	* closes the socket (== disconnects the client) in case of too many errors
 */
 bool Socket::sendMsg(int const fd, std::string const &msg) {
+    if (socketClosed(fd))
+        return false;
+
     SocketIOData &sIOD = sockIODataStore_.at(fd);
     ssize_t       bytesSent = -1;
     bool          success = true;
@@ -126,23 +130,20 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         success = false;
     }
 
-#if NETCATDBG
-    std::ostringstream oss;
-    oss << "SendMsg event:\n"
-        << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
-    if (!success) {
-        oss << " send to FD " << fd << " failed.";
-        logger_.logMsg(oss.str(), Logger::lmError);
-    } else {
-        if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
+    {
+        std::ostringstream oss;
+        oss << "SendMsg event:\n"
+            << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
+        if (!success) {
+            oss << " send to FD " << fd << " failed.";
+            logger_.logMsg(oss.str(), Logger::lmError);
+        } else if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
             oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-                << ") " << sIOD.writeBuffer.substr(0, bytesSent);
-        else
-            oss << " successfully";
-        oss << " sent to FD: " << fd;
-        logger_.logMsg(oss.str(), Logger::lmInfo);
+                << ") " << sIOD.writeBuffer.substr(0, bytesSent)
+                << " sent to FD: " << fd;
+            logger_.logMsg(oss.str(), Logger::lmInfo);
+        }
     }
-#endif
 
     if (!success)
         return false;
