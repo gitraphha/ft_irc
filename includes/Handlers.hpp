@@ -21,12 +21,6 @@ class Server;
  */
 
 namespace Handlers {
-// tryRegister is called by CommandProcessor::run after every command of an
-// unregistered client. Once NICK and USER are both known it either completes
-// the registration (001-005 + 422) or, if PASS did not match, sends 464 and
-// asks for the connection to be closed (returns true).
-bool tryRegister(Server &server, Client &client);
-
 bool cap(Server &server, Client &client,
          const std::vector<std::string> &params);
 bool invite(Server &server, Client &client,
@@ -43,8 +37,8 @@ bool names(Server &server, Client &client,
            const std::vector<std::string> &params);
 bool nick(Server &server, Client &client,
           const std::vector<std::string> &params);
-bool message(Server &server, Client &client,
-             const std::vector<std::string> &params);
+bool notice(Server &server, Client &client,
+            const std::vector<std::string> &params);
 bool oper(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool part(Server &server, Client &client,
@@ -55,6 +49,8 @@ bool ping(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool pong(Server &server, Client &client,
           const std::vector<std::string> &params);
+bool privmsg(Server &server, Client &client,
+             const std::vector<std::string> &params);
 bool quit(Server &server, Client &client,
           const std::vector<std::string> &params);
 bool rehash(Server &server, Client &client,

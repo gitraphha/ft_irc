@@ -29,6 +29,8 @@
  * event loop is responsible for flushing it to the socket.
  */
 
+#include "Registration.hpp"
+
 #include "Client.hpp"
 #include "Errors.hpp"
 #include "Handlers.hpp"
@@ -167,14 +169,13 @@ bool Handlers::user(Server &server, Client &client,
     return false;
 }
 
-bool Handlers::tryRegister(Server &server, Client &client) {
+bool Registration::tryRegister(Server &server, Client &client) {
     if (client.isRegistered() || !client.hasIdentity())
         return false;
     if (!client.hasPassAccepted()) {
         client.sendReply(server.getServerName(),
                          Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
-        client.send("ERROR :Closing link: (" + client.getPrefix() +
-                    ") [Password incorrect]\r\n");
+        client.sendClosingMsg("Password incorrect");
         return true; // event loop: flush, then close the connection
     }
     client.setRegistered(true);

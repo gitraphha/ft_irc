@@ -43,7 +43,7 @@ insensitive.
 
 Note: * and ? added for mask safety
 */
-bool ChannelManager::isChannelName_(const std::string &name) {
+bool ChannelManager::isChannelName(const std::string &name) {
     if (name.empty() || name.size() > 50 || name.find_first_of("&#+!") != 0)
         return false;
     return name.find_first_of(" \a,:*?") == std::string::npos;
@@ -76,7 +76,7 @@ bool ChannelManager::isMember(Client &client, const std::string &name) const {
 // Join causes `client` to join the channel named `name`, creating it if needed.
 void ChannelManager::join(Client &client, const std::string &name,
                           const std::string &key) {
-    if (!isChannelName_(name))
+    if (!isChannelName(name))
         throw Error::reply(Reply::ERR_NOSUCHCHANNEL, name);
     std::string                              folded = Utils::foldCase(name);
     std::map<std::string, Channel>::iterator it = channels_.find(folded);

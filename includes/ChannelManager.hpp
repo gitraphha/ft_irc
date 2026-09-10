@@ -14,12 +14,13 @@ class ChannelManager {
     std::map<std::string, Channel>::iterator
     findChannelOrThrow_(const std::string &name);
     std::map<std::string, Channel>::const_iterator
-                findChannelOrThrow_(const std::string &name) const;
-    static bool isChannelName_(const std::string &name);
-    void        cleanup_(std::map<std::string, Channel>::iterator it);
+         findChannelOrThrow_(const std::string &name) const;
+    void cleanup_(std::map<std::string, Channel>::iterator it);
 
   public:
     ChannelManager();
+
+    static bool isChannelName(const std::string &name);
 
     Channel       &at(const std::string &name);
     const Channel &at(const std::string &name) const;
