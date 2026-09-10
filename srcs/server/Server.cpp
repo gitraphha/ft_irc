@@ -28,6 +28,7 @@ Server::Server(int const port, std::string const &password)
     std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
                   std::localtime(&now));
     createdAt_ = buf;
+    cmds_.registerCommands();
 }
 
 /*
@@ -182,6 +183,12 @@ void Server::processClientSockets_() {
                     }
                 }
             } while (buffHasMoreCmds);
+
+            if (client && !client->getSendBuffer().empty()) {
+                const std::string &out = client->getSendBuffer();
+                sockets_.sendMsg(pfd.fd, out);
+                client->consumeSendBuffer(out.size());
+            }
         }
 
         if (sockets_.socketClosed(pfd.fd)) {

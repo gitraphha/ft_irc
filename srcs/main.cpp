@@ -71,23 +71,22 @@ int main(int argc, char **argv) {
 
 static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
                                   std::string &password) {
-    std::istringstream iss;
-    std::string        remainder;
     if (argc != 3) {
         std::cerr << CYellow << "Usage: ./ircserv <int:port> <string:password>"
                   << CReset << std::endl;
         return false;
     }
 
-    iss.str(argv[1]); // NOLINT
+    std::istringstream iss(argv[1]); // NOLINT
+    std::string        remainder;
     if (!((iss >> port) && (iss >> remainder).eof()))
         throw std::runtime_error(
             "Error while extracting port number from commandline parameter.");
     if (port < 1 || port > 65535)
         throw std::runtime_error("Error: port must be in the range 1-65535.");
 
-    iss.str(argv[2]); // NOLINT
-    if (!(iss >> password).eof())
+    std::istringstream pass(argv[2]); // NOLINT
+    if (!(pass >> password).eof())
         throw std::runtime_error(
             "Error while extracting password from commandline parameter.");
 
