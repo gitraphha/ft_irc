@@ -8,14 +8,14 @@
 ChannelManager::ChannelManager() {}
 
 ChannelMap::iterator ChannelManager::findChannel_(const std::string &name) {
-    if (!isChannelName_(name))
+    if (!isChannelName(name))
         return channels_.end();
     return channels_.find(Utils::foldCase(name));
 }
 
 ChannelMap::const_iterator
 ChannelManager::findChannel_(const std::string &name) const {
-    if (!isChannelName_(name))
+    if (!isChannelName(name))
         return channels_.end();
     return channels_.find(Utils::foldCase(name));
 }

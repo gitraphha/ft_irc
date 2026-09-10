@@ -3,19 +3,18 @@
 #include "Channel.hpp"
 
 #include <map>
-#include <string>
 
 typedef std::map<std::string, Channel> ChannelMap;
 
-    std::map<std::string, Channel>::iterator
-    findChannel_(const std::string &name);
-    std::map<std::string, Channel>::const_iterator
-    findChannel_(const std::string &name) const;
-    std::map<std::string, Channel>::iterator
-    findChannelOrThrow_(const std::string &name);
-    std::map<std::string, Channel>::const_iterator
+class ChannelManager {
+    ChannelMap channels_;
+
+    ChannelMap::iterator       findChannel_(const std::string &name);
+    ChannelMap::const_iterator findChannel_(const std::string &name) const;
+    ChannelMap::iterator       findChannelOrThrow_(const std::string &name);
+    ChannelMap::const_iterator
          findChannelOrThrow_(const std::string &name) const;
-    void cleanup_(std::map<std::string, Channel>::iterator it);
+    void cleanup_(ChannelMap::iterator it);
 
   public:
     ChannelManager();
