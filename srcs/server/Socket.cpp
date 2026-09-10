@@ -81,7 +81,6 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
             return lfcrPos;
         sIOD.discardMode = true;
         msgTooLong = true;
-        // ++sIOD.recvErrorCount;
     }
     // discard mode
     if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
