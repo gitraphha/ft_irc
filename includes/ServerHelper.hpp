@@ -100,8 +100,8 @@ inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
             addrStr = "[" + addrStr + "]";
     }
     std::ostringstream oss;
-    oss << " AF: " << getAdressFamilyStr(saFamily)
-        << "\n addr:port: " << addrStr << ":" << std::dec << portNumber;
+    oss << " AF:" << getAdressFamilyStr(saFamily)
+        << "addr:port: " << addrStr << ":" << std::dec << portNumber;
 
     return oss.str();
 }
