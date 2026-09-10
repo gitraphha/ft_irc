@@ -2,8 +2,6 @@
 
 #include "Utils.hpp"
 
-#include <algorithm>
-
 int Client::getFd() const {
     return fd_;
 }
@@ -43,8 +41,8 @@ bool Client::hasPassAccepted() const {
 // "nick!user@host", or "*" until NICK and USER are both known. The host is
 // set by the server from the accepted socket address; until then (or if it
 // never is) "localhost" keeps the prefix well-formed for clients.
-std::string Client::closingLink(const std::string &reason) const {
-    return "ERROR :Closing link: (" + getPrefix() + ") [" + reason + "]\r\n";
+void Client::sendClosingMsg(const std::string &reason) {
+    send("ERROR :Closing link: (" + getPrefix() + ") [" + reason + "]\r\n");
 }
 
 std::string Client::getPrefix() const {

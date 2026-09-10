@@ -173,7 +173,7 @@ bool Handlers::tryRegister(Server &server, Client &client) {
     if (!client.hasPassAccepted()) {
         client.sendReply(server.getServerName(),
                          Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
-        client.send(client.closingLink("Password incorrect"));
+        client.sendClosingMsg("Password incorrect");
         return true; // event loop: flush, then close the connection
     }
     client.setRegistered(true);

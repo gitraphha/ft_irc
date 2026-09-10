@@ -36,7 +36,7 @@ bool Handlers::quit(Server &server, Client &client,
     if (client.isRegistered())
         server.getChannelManager().broadcastToPeers(
             client, Reply::fromClient(client.getPrefix(), "QUIT", "", reason));
-    client.send(client.closingLink("Quit: " + reason));
+    client.sendClosingMsg("Quit: " + reason);
     return true;
 }
 
