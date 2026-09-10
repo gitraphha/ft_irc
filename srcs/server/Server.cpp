@@ -21,15 +21,9 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
-      password_(password), logger_(serverName_ + ": "), sockets_(logger_),
-      numServerSockets_(0) {
-    std::time_t now = std::time(0);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
-                  std::localtime(&now));
-    createdAt_ = buf;
-}
+    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION),
+      createdAt_(Logger::nowStr()), port_(port), password_(password),
+      logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
 
 /*
 	Cleanup
@@ -189,6 +183,13 @@ void Server::processClientSockets_() {
                 }
 #endif
             } while (buffHasMoreCmds);
+
+            Client *client = clients_.find(pfd.fd);
+            if (client && !client->getSendBuffer().empty()) {
+                const std::string &out = client->getSendBuffer();
+                sockets_.sendMsg(pfd.fd, out);
+                client->consumeSendBuffer(out.size());
+            }
         }
     }
     removeClosedSockets_();
