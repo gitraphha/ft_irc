@@ -34,8 +34,16 @@ bool Socket::updateBuffer_(int const fd) {
     sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
     if (sIOD.bytesRead <= 0) {
         ++sIOD.recvErrorCount;
-        if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+        if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+            std::ostringstream oss;
+            oss << "Client sockFd:" << fd;
+            if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+                oss << " exceeded error limit (" << SOCKETERRORLIMIT << ")";
+            else if (sIOD.bytesRead == 0)
+                oss << " closed connection on their side";
+            logger_.logMsg(oss.str(), Logger::lmInfo);
             closeSocket(fd);
+        }
         return false;
     }
     sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
@@ -164,7 +172,7 @@ void Socket::closeSocket(int const fd) {
         oss << "Closing server socket ("
             << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
     } else {
-        oss << "Closing client with sockFd " << fd;
+        oss << "Closing client sockFd:" << fd;
     }
     logger_.logMsg(oss.str(), Logger::lmInfo);
 
