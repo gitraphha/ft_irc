@@ -34,7 +34,7 @@ class Server {
     size_t                     numServerSockets_;
     std::vector<struct pollfd> pollFds_;
 
-    void setupServerSockets_();
+    bool setupServerSockets_();
     int  createServerSocket_(int const domain);
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
