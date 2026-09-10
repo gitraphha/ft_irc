@@ -9,7 +9,7 @@
 
 /*
  * Tests for connection registration (RFC 2812 section 3.1): PASS, NICK, USER,
- * CAP and Handlers::tryRegister, driven through CommandProcessor::run exactly
+ * CAP and Registration::tryRegister, driven through CommandProcessor::run exactly
  * as the event loop does, without any socket.
  *
  * Links against the real Server.cpp, so this test breaks loudly if the Server
