@@ -3,14 +3,7 @@
 #include "Errors.hpp"       // for Error
 #include "Reply.hpp"        // for reply, Code
 #include "ServerHelper.hpp" // for getAdressFamilyStr, sockAddrFamily
-#include "Errors.hpp"       // for Error
-#include "Reply.hpp"        // for reply, Code
-#include "ServerHelper.hpp" // for getAdressFamilyStr, sockAddrFamily
 
-#include <poll.h>       // for pollfd, POLLERR
-#include <sstream>      // for basic_ostringstream, basic_ostream, oper...
-#include <sys/socket.h> // for recv, send, MSG_NOSIGNAL
-#include <unistd.h>     // for close
 #include <poll.h>       // for pollfd, POLLERR
 #include <sstream>      // for basic_ostringstream, basic_ostream, oper...
 #include <sys/socket.h> // for recv, send, MSG_NOSIGNAL
@@ -151,7 +144,6 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
             logger_.logMsg(oss.str(), Logger::lmInfo);
         }
     }
-#endif
 
     if (!success)
         return false;

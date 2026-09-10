@@ -5,11 +5,6 @@
 #include "Reply.hpp"         // for build
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
-#include "Client.hpp"        // for Client
-#include "Errors.hpp"        // for Error
-#include "Reply.hpp"         // for build
-#include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
-#include "SignalHandler.hpp" // for SignalHandler
 
 #include <exception>    // for exception
 #include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
