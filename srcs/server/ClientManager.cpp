@@ -46,9 +46,10 @@ std::size_t ClientManager::size() const {
     return byFd_.size();
 }
 
-bool ClientManager::add(int fd, Client *client) {
-    if (!client || hasClient(fd))
+bool ClientManager::add(int fd) {
+    if (hasClient(fd))
         return false;
+	Client *client = new Client(fd);
     byFd_.insert(std::make_pair(fd, client));
     if (!client->getNick().empty())
         byNick_.insert(std::make_pair(client->getNickCaseFolded(), fd));

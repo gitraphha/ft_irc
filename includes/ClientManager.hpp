@@ -49,9 +49,9 @@ class ClientManager {
     bool        hasNick(const std::string &name) const;
     std::size_t size() const;
 
-    // add takes ownership of `client`; returns false (and does not take
-    // ownership) if `client` is NULL or `fd` is already present.
-    bool add(int fd, Client *client);
+    // add takes a file descriptor of a newly created socket
+	// returns false if `fd` is already present.
+    bool add(int fd);
     // setNick changes `client`'s nick and keeps the nick index in sync.
     // The caller validates the nick and checks hasNick() first.
     void setNick(Client &client, const std::string &nick);
