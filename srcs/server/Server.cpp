@@ -236,7 +236,7 @@ void Server::acceptClient_(int const serverFd) {
     std::ostringstream oss;
     oss << "Client connected:"
         << " fd:" << clientFd
-        << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
+        << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46);
     log_(oss.str(), Logger::lmInfo);
 }
 
