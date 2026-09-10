@@ -40,6 +40,10 @@ class CommandProcessor {
     Command                       &at_(const std::string &name);
 
   public:
+    CommandProcessor() {
+        registerCommands();
+    }
+
     void registerCommands();
     // parser TODO blnunez-
     bool parse(const std::string &line, std::string &name,
