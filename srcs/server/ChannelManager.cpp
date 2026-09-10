@@ -139,7 +139,7 @@ void ChannelManager::broadcast(const std::string &name, const std::string &msg,
 void ChannelManager::broadcastToPeers(Client            &client,
                                       const std::string &msg) const {
     std::set<Client *> peers;
-    for (std::map<std::string, Channel>::const_iterator it = channels_.begin();
+    for (ChannelMap::const_iterator it = channels_.begin();
          it != channels_.end(); ++it)
         if (it->second.hasMember(client))
             it->second.collectMembers(peers);
