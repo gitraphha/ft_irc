@@ -27,7 +27,7 @@ void CommandProcessor::registerCommands() {
     add("KILL", Command(Handlers::kill, false, 1, true));
     add("MODE", Command(Handlers::mode, false, 1));
     add("NAMES", Command(Handlers::names, false, 0));
-    add("NICK", Command(Handlers::nick, true, 1));
+    add("NICK", Command(Handlers::nick, true, 0)); // 431, not 461
     add("NOTICE", Command(Handlers::message, false, 2));
     add("OPER", Command(Handlers::oper, false, 1));
     add("PART", Command(Handlers::part, false, 1));
@@ -63,9 +63,8 @@ bool CommandProcessor::run(Server &server, Client &client,
 
     bool exiting = cmd.handler(server, client, params);
     // after each command, see if we can send registration to the client
-    if (!exiting && !client.isRegistered()) {
-        exiting = server.tryRegister(client);
-    }
+    if (!exiting && !client.isRegistered())
+        exiting = Handlers::tryRegister(server, client);
     return exiting;
 }
 

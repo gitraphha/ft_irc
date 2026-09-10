@@ -97,3 +97,9 @@ std::string MemberSet::namesList() const {
     }
     return out;
 }
+
+void MemberSet::collect(std::set<Client *> &out) const {
+    for (std::map<Client *, ModeSet>::const_iterator it = members_.begin();
+         it != members_.end(); ++it)
+        out.insert(it->first);
+}

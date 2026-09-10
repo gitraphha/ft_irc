@@ -154,7 +154,8 @@ int main() {
         c.setNick("bob");
         report(c.getPrefix() == "*", "prefix is * with only a nickname");
         c.setUser("b", "Bob Example");
-        report(c.getPrefix() == "*", "prefix is * without a hostname");
+        report(c.getPrefix() == "bob!b@localhost",
+               "prefix falls back to localhost without a hostname");
         c.setHostname("127.0.0.1");
         report(c.getPrefix() == "bob!b@127.0.0.1", "prefix is nick!user@host");
     }

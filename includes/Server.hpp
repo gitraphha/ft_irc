@@ -11,13 +11,27 @@
 #include <string>   // for string, basic_string
 #include <vector>   // for vector
 class Client;
+#include "ChannelManager.hpp"   // for ChannelManager
+#include "ClientManager.hpp"    // for ClientManager
+#include "CommandProcessor.hpp" // for CommandProcessor
+#include "Logger.hpp"           // for Logger
+#include "Socket.hpp"           // for Socket
+
+#include <poll.h>   // for pollfd
+#include <stddef.h> // for size_t
+#include <string>   // for string, basic_string
+#include <vector>   // for vector
+class Client;
 
 #define SERVER_NAME "irc.local"
+#define SERVER_VERSION "1.0"
 #define MAX_CONNECTIONS 512
 
 class Server {
   private:
     std::string serverName_;
+    std::string serverVersion_;
+    std::string createdAt_;
     int         port_;
     std::string password_;
 
@@ -54,12 +68,9 @@ class Server {
     void sendMsg(int const fd, std::string const &msg);
 
     const std::string &getServerName() const;
+    const std::string &getServerVersion() const;
+    const std::string &getCreatedAt() const;
+    const std::string &getPassword() const;
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
-
-    // Pass-through interfaces
-    bool tryRegister(Client &client) {
-        (void)client;
-        return true;
-    };
 };

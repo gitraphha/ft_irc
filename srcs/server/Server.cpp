@@ -5,6 +5,11 @@
 #include "Reply.hpp"         // for build
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
+#include "Client.hpp"        // for Client
+#include "Errors.hpp"        // for Error
+#include "Reply.hpp"         // for build
+#include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
+#include "SignalHandler.hpp" // for SignalHandler
 
 #include <exception>    // for exception
 #include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
@@ -21,8 +26,15 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), port_(port), password_(password),
-      logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
+    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
+      password_(password), logger_(serverName_ + ": "), sockets_(logger_),
+      numServerSockets_(0) {
+    std::time_t now = std::time(0);
+    char        buf[64];
+    std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
+                  std::localtime(&now));
+    createdAt_ = buf;
+}
 
 /*
 	Cleanup
@@ -235,7 +247,7 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(*(new Client()), clientFd);
+    clients_.add(clientFd, new Client(clientFd));
 
 #if NETCATDBG
     std::cout << "Client connected:\n"
@@ -266,6 +278,18 @@ void Server::log_(std::string const &msg, Logger::logMode const lm) {
 
 const std::string &Server::getServerName() const {
     return serverName_;
+}
+
+const std::string &Server::getServerVersion() const {
+    return serverVersion_;
+}
+
+const std::string &Server::getCreatedAt() const {
+    return createdAt_;
+}
+
+const std::string &Server::getPassword() const {
+    return password_;
 }
 
 ChannelManager &Server::getChannelManager() {
