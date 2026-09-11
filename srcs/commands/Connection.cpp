@@ -21,7 +21,6 @@
  */
 
 #include "Client.hpp"
-#include "Errors.hpp"
 #include "Handlers.hpp"
 #include "Reply.hpp"
 #include "Server.hpp"

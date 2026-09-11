@@ -126,35 +126,15 @@ void Server::processClientSockets_() {
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
-#define ERRMSG2CLIENTBYEXCEPT
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                try {
-#endif
-                    cmdLine =
-                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                    if (!cmdLine.empty()) {
-                        // returns true if connection is to be closed
-                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
-                            sockets_.closeSocket(pfd.fd);
-                            break;
-                        }
-                    }
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        Client     *client = clients_.find(pfd.fd);
-                        std::string nickName =
-                            (client ? client->getNick() : "dbgDummyNick");
-                        sendMsg(pfd.fd,
-                                Reply::build(serverName_, nickName, e.reply()));
-                    } else {
-                        std::string tmp(
-                            "Error while trying to get/execute cmd:\n");
-                        tmp.append("'" + cmdLine + "'\n" + e.what());
-                        log_(tmp, Logger::lmExcept);
+                cmdLine =
+                    sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+                if (!cmdLine.empty()) {
+                    // returns true if connection is to be closed
+                    if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
+                        sockets_.closeSocket(pfd.fd);
+                        break;
                     }
                 }
-#endif
             } while (buffHasMoreCmds);
         }
     }

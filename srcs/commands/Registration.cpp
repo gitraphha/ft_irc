@@ -32,7 +32,6 @@
 #include "Registration.hpp"
 
 #include "Client.hpp"
-#include "Errors.hpp"
 #include "Handlers.hpp"
 #include "Parser.hpp"
 #include "Reply.hpp"
