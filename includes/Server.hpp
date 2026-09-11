@@ -61,6 +61,9 @@ class Server {
 
     // Pass-through interfaces
     void sendMsg(int const fd, std::string const &msg) {
-        sockets_.sendMsg(fd, msg);
+        if (sockets_.socketClosed(fd))
+            return;
+        if (!sockets_.sendMsg(fd, msg))
+            sockets_.closeSocket(fd);
     }
 };
