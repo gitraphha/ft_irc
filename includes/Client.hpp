@@ -65,7 +65,7 @@ class Client {
 
     // all send routed to `Server::sendMsg()`
     void send(const std::string &msg);
-    void sendReply(const std::string &serverName, const Reply::Message &msg);
+    void sendReply(const Reply::Message &msg);
     // "ERROR :Closing link: (nick!user@host) [reason]", the line a client gets
     // right before its connection is closed (QUIT, wrong PASS, shutdown).
     void sendClosingMsg(const std::string &reason);

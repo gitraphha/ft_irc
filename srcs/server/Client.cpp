@@ -105,11 +105,12 @@ void Client::send(const std::string &msg) {
         server_->sendMsg(fd_, msg);
 }
 
-void Client::sendReply(const std::string    &serverName,
-                       const Reply::Message &msg) {
-    const std::string &text = Reply::build(serverName, getReplyTarget(), msg);
-    if (server_)
-        server_->sendMsg(fd_, text);
+void Client::sendReply(const Reply::Message &msg) {
+    if (!server_)
+        return;
+    const std::string &text =
+        Reply::build(server_->getServerName(), getReplyTarget(), msg);
+    server_->sendMsg(fd_, text);
 }
 
 // "nick!user@host", or "*" until NICK and USER are both known. The host is

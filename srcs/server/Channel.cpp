@@ -142,7 +142,6 @@ Note: ERR_INVALIDMODEPARAM is IRCv3 extension
 Mode::ModeChanges Channel::applyChannelModeChanges(Server           &server,
                                                    Client           &client,
                                                    Mode::ModeChanges changes) {
-    const std::string                &serverName = server.getServerName();
     Mode::ModeChanges                 applied;
     Mode::ModeChanges::const_iterator it = changes.begin();
     for (; it != changes.end(); it++) {
@@ -150,16 +149,15 @@ Mode::ModeChanges Channel::applyChannelModeChanges(Server           &server,
             continue;
         if (!Mode::hasPrivs(client.getNickCaseFolded(),
                             members_.highestUserMode(client), *it)) {
-            client.sendReply(serverName,
-                             Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
+            client.sendReply(Reply::reply(Reply::ERR_CHANOPRIVSNEEDED, name_));
             continue;
         }
         switch (it->mode) {
             case Mode::Key:
-                applyKeyMode_(serverName, client, *it, applied);
+                applyKeyMode_(client, *it, applied);
                 break;
             case Mode::UserLimit:
-                applyUserLimitMode_(serverName, client, *it, applied);
+                applyUserLimitMode_(client, *it, applied);
                 break;
             case Mode::ChannelFounder:
             case Mode::ChannelAdmin:
@@ -168,7 +166,6 @@ Mode::ModeChanges Channel::applyChannelModeChanges(Server           &server,
             case Mode::Voice:
                 if (it->arg.empty()) {
                     client.sendReply(
-                        serverName,
                         Reply::reply(Reply::ERR_NEEDMOREPARAMS, "MODE"));
                     continue;
                 }
@@ -183,32 +180,29 @@ Mode::ModeChanges Channel::applyChannelModeChanges(Server           &server,
     return applied;
 }
 
-void Channel::applyKeyMode_(const std::string &serverName, Client &client,
-                            const Mode::ModeChange &change,
-                            Mode::ModeChanges      &applied) {
+void Channel::applyKeyMode_(Client &client, const Mode::ModeChange &change,
+                            Mode::ModeChanges &applied) {
     if (change.op == Mode::Remove) {
         setKey("");
         applied.push_back(change);
         return;
     }
     if (!key_.empty()) {
-        client.sendReply(serverName, Reply::reply(Reply::ERR_KEYSET, name_));
+        client.sendReply(Reply::reply(Reply::ERR_KEYSET, name_));
         return;
     }
     if (!validateChannelKey_(change.arg)) {
-        client.sendReply(
-            serverName,
-            Reply::reply(
-                Reply::ERR_INVALIDMODEPARAM,
-                Utils::join3(name_, Mode::toString(change.mode), change.arg),
-                "Invalid mode parameter"));
+        client.sendReply(Reply::reply(
+            Reply::ERR_INVALIDMODEPARAM,
+            Utils::join3(name_, Mode::toString(change.mode), change.arg),
+            "Invalid mode parameter"));
         return;
     }
     setKey(change.arg);
     applied.push_back(change);
 }
 
-void Channel::applyUserLimitMode_(const std::string &serverName, Client &client,
+void Channel::applyUserLimitMode_(Client                 &client,
                                   const Mode::ModeChange &change,
                                   Mode::ModeChanges      &applied) {
     static const std::string &userLimitError =
@@ -221,12 +215,10 @@ void Channel::applyUserLimitMode_(const std::string &serverName, Client &client,
     }
     int val = Utils::toPosInt(change.arg);
     if (val <= 0) {
-        client.sendReply(
-            serverName,
-            Reply::reply(
-                Reply::ERR_INVALIDMODEPARAM,
-                Utils::join3(name_, Mode::toString(change.mode), change.arg),
-                userLimitError));
+        client.sendReply(Reply::reply(
+            Reply::ERR_INVALIDMODEPARAM,
+            Utils::join3(name_, Mode::toString(change.mode), change.arg),
+            userLimitError));
         return;
     }
     setUserLimit(val);
@@ -260,11 +252,10 @@ bool Channel::applyModeToMember_(Server &server, Client &client,
         Client &target = server.getClientManager().at(change.arg);
         if (members_.setMode(target, change.mode, change.op == Mode::Add))
             return true;
-        client.sendReply(server.getServerName(),
-                         Reply::reply(Reply::ERR_USERNOTINCHANNEL,
+        client.sendReply(Reply::reply(Reply::ERR_USERNOTINCHANNEL,
                                       change.arg + " " + name_));
     } catch (Error &e) {
-        client.sendReply(server.getServerName(), e.reply());
+        client.sendReply(e.reply());
     }
     return false;
 }
@@ -307,18 +298,17 @@ topic is set.
 
 Note: RPL_TOPICWHOTIME is IRCv3 extension
 */
-void Channel::sendTopic(const std::string &serverName, Client &client) const {
+void Channel::sendTopic(Client &client) const {
     if (!hasMember(client))
         throw Error::reply(Reply::ERR_NOTONCHANNEL, name_);
     if (topic_.empty()) {
-        client.sendReply(serverName, Reply::reply(Reply::RPL_NOTOPIC, name_));
+        client.sendReply(Reply::reply(Reply::RPL_NOTOPIC, name_));
         return;
     }
-    client.sendReply(serverName, Reply::reply(Reply::RPL_TOPIC, name_, topic_));
+    client.sendReply(Reply::reply(Reply::RPL_TOPIC, name_, topic_));
     std::ostringstream oss;
     oss << static_cast<long>(topicSetTime_); // convert to unix epoch in seconds
-    client.sendReply(serverName,
-                     Reply::reply(Reply::RPL_TOPICWHOTIME,
+    client.sendReply(Reply::reply(Reply::RPL_TOPICWHOTIME,
                                   name_ + " " + topicSetBy_ + " " + oss.str()));
 }
 
@@ -327,10 +317,10 @@ void Channel::sendTopic(const std::string &serverName, Client &client) const {
 // send list of users in the channel to the given client
 // Note: If MODE `s` secret channel flag is implemented: check is required so
 // non-members receive non-existent channel instead of a leak in client names
-void Channel::sendNames(const std::string &serverName, Client &client) const {
-    client.sendReply(serverName, Reply::reply(Reply::RPL_NAMREPLY, "= " + name_,
-                                              members_.namesList()));
-    client.sendReply(serverName, Reply::reply(Reply::RPL_ENDOFNAMES, name_));
+void Channel::sendNames(Client &client) const {
+    client.sendReply(
+        Reply::reply(Reply::RPL_NAMREPLY, "= " + name_, members_.namesList()));
+    client.sendReply(Reply::reply(Reply::RPL_ENDOFNAMES, name_));
 }
 
 // throws error when client cannot invite target to the channel
