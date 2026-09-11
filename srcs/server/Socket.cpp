@@ -105,11 +105,13 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
     sendMsg
     * send string msg to a network socket
     * uses i/o buffers and error counters in SocketIOData
-	* closes the socket (== disconnects the client) in case of too many errors
+	* returns false in case of too many errors - caller must close socket
 
-	NOTE: MUST be called ony through Socket::sendMsg
+	NOTE: caller MUST close socket when sendMsg returns false
 */
 bool Socket::sendMsg(int const fd, std::string const &msg) {
+	if (socketClosed(fd))
+        return true;
     SocketIOData &sIOD = sockIODataStore_.at(fd);
 
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
@@ -124,27 +126,19 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         return true;
     }
 
+    sIOD.sendErrorCount = 0;
+    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
 #if NETCATDBG
-    {
         std::ostringstream oss;
         oss << "SendMsg event:\n"
             << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
-        if (!success) {
-            oss << " send to FD " << fd << " failed.";
-            logger_.logMsg(oss.str(), Logger::lmError);
-        } else if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
-            oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-                << ") " << sIOD.writeBuffer.substr(0, bytesSent)
-                << " sent to FD: " << fd;
-            logger_.logMsg(oss.str(), Logger::lmInfo);
-        }
-    }
+        oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
+            << ") " << sIOD.writeBuffer.substr(0, bytesSent)
+            << " sent to FD: " << fd;
+        logger_.logMsg(oss.str(), Logger::lmInfo);
 #endif
-
-    sIOD.sendErrorCount = 0;
-    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
-    else
+    } else
         sIOD.writeBuffer.clear();
     return true;
 }

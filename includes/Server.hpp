@@ -59,11 +59,5 @@ class Server {
     ChannelManager    &getChannelManager();
     ClientManager     &getClientManager();
 
-    // Pass-through interfaces
-    void sendMsg(int const fd, std::string const &msg) {
-        if (sockets_.socketClosed(fd))
-            return;
-        if (!sockets_.sendMsg(fd, msg))
-            sockets_.closeSocket(fd);
-    }
+    void sendMsg(int const fd, std::string const &msg);
 };

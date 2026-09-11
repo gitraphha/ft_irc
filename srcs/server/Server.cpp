@@ -145,9 +145,8 @@ void Server::processClientSockets_() {
                         Client     *client = clients_.find(pfd.fd);
                         std::string nickName =
                             (client ? client->getNick() : "dbgDummyNick");
-                        sockets_.sendMsg(
-                            pfd.fd,
-                            Reply::build(serverName_, nickName, e.reply()));
+                        sendMsg(pfd.fd,
+                                Reply::build(serverName_, nickName, e.reply()));
                     } else {
                         std::string tmp(
                             "Error while trying to get/execute cmd:\n");
@@ -273,5 +272,19 @@ void Server::run() {
 
         processServerSocketData_();
         processClientSockets_();
+    }
+}
+
+/*
+NOTE: all send should go though server::sendMsg
+*/
+void Server::sendMsg(int const fd, std::string const &msg) {
+    if (!sockets_.sendMsg(fd, msg)) {
+        sockets_.closeSocket(fd);
+#if NETCATDBG
+        std::ostringstream oss;
+        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
+        logger_.logMsg(oss.str(), Logger::lmError);
+#endif
     }
 }
