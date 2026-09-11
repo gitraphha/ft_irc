@@ -49,7 +49,7 @@ class Error : public std::exception {
         return reply_;
     }
 
-    static Error reply(Reply::Code code, const std::string &params) {
+    static Error reply(Reply::Code code, const std::string &params = "") {
         return Error(Reply::reply(code, params));
     }
 

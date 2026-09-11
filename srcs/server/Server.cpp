@@ -1,8 +1,6 @@
 #include "Server.hpp"
 
 #include "Client.hpp"        // for Client
-#include "Errors.hpp"        // for Error
-#include "Reply.hpp"         // for build
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
