@@ -9,11 +9,8 @@
 
 #include <utility>
 
-Command &CommandProcessor::at_(const std::string &name) {
-    std::map<std::string, Command>::iterator it = commands_.find(name);
-    if (it == commands_.end())
-        throw Error::reply(Reply::ERR_UNKNOWNCOMMAND, name);
-    return it->second;
+CommandProcessor::CommandProcessor() {
+    registerCommands();
 }
 
 bool CommandProcessor::parse(const std::string &line, std::string &cmd,
@@ -48,6 +45,12 @@ void CommandProcessor::registerCommands() {
     add("WHOIS", Command(Handlers::whois, false, 1));
 }
 
+bool CommandProcessor::sendError_(Client &client, Reply::Code code,
+                                  const std::string &params) {
+    client.sendReply(Reply::reply(code, params));
+    return false;
+}
+
 // Run runs this command with the given client/message.
 bool CommandProcessor::run(Server &server, Client &client,
                            const std::string &line) {
@@ -56,16 +59,19 @@ bool CommandProcessor::run(Server &server, Client &client,
     if (!parse(line, name, params))
         return false;
 
-    Command &cmd = at_(name);
+    std::map<std::string, Command>::iterator it = commands_.find(name);
+    if (it == commands_.end())
+        return sendError_(client, Reply::ERR_UNKNOWNCOMMAND, name);
+    Command &cmd = it->second;
     if (!client.isRegistered() && !cmd.isUsablePreReg())
-        throw Error::reply(Reply::ERR_NOTREGISTERED, "");
+        return sendError_(client, Reply::ERR_NOTREGISTERED);
     if (client.isRegistered() &&
         (cmd.handler == Handlers::pass || cmd.handler == Handlers::user))
-        throw Error::reply(Reply::ERR_ALREADYREGISTRED, "");
+        return sendError_(client, Reply::ERR_ALREADYREGISTRED);
     if (cmd.getRequiresOp() && !client.isOperator())
-        throw Error::reply(Reply::ERR_NOPRIVILEGES, "");
+        return sendError_(client, Reply::ERR_NOPRIVILEGES);
     if (params.size() < cmd.getMinParams())
-        throw Error::reply(Reply::ERR_NEEDMOREPARAMS, name);
+        return sendError_(client, Reply::ERR_NEEDMOREPARAMS, name);
 
     bool exiting = cmd.handler(server, client, params);
     // after each command, see if we can send registration to the client

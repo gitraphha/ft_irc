@@ -91,7 +91,7 @@ void sendWelcome(Server &server, Client &client) {
                                   "are supported by this server"));
     // No MOTD: irssi (and most clients) consider registration finished only
     // after RPL_ENDOFMOTD (376) or ERR_NOMOTD (422).
-    client.sendReply(Reply::reply(Reply::ERR_NOMOTD, ""));
+    client.sendReply(Reply::reply(Reply::ERR_NOMOTD));
 }
 
 } // namespace
@@ -117,10 +117,10 @@ bool Handlers::cap(Server &server, Client &client,
 // PASS <password>
 bool Handlers::pass(Server &server, Client &client,
                     const std::vector<std::string> &params) {
-    if (client.isRegistered())
-        throw Error::reply(Reply::ERR_ALREADYREGISTRED, "");
-    if (params[0].empty())
-        throw Error::reply(Reply::ERR_NEEDMOREPARAMS, "PASS");
+    if (params[0].empty()) {
+        client.sendReply(Reply::reply(Reply::ERR_NEEDMOREPARAMS, "PASS"));
+        return false;
+    }
     // A wrong password is not reported here: it is reported (464) and the
     // link closed when NICK+USER complete, see tryRegister().
     client.setPassAccepted(params[0] == server.getPassword());
@@ -130,16 +130,22 @@ bool Handlers::pass(Server &server, Client &client,
 // NICK <nickname>
 bool Handlers::nick(Server &server, Client &client,
                     const std::vector<std::string> &params) {
-    if (params.empty() || params[0].empty())
-        throw Error::reply(Reply::ERR_NONICKNAMEGIVEN, "");
+    if (params.empty() || params[0].empty()) {
+        client.sendReply(Reply::reply(Reply::ERR_NONICKNAMEGIVEN));
+        return false;
+    }
     const std::string &nick = params[0];
-    if (!isValidNick(nick))
-        throw Error::reply(Reply::ERR_ERRONEUSNICKNAME, nick);
+    if (!isValidNick(nick)) {
+        client.sendReply(Reply::reply(Reply::ERR_ERRONEUSNICKNAME, nick));
+        return false;
+    }
 
     ClientManager &clients = server.getClientManager();
     const bool sameClient = Utils::foldCase(nick) == client.getNickCaseFolded();
-    if (!sameClient && clients.hasNick(nick))
-        throw Error::reply(Reply::ERR_NICKNAMEINUSE, nick);
+    if (!sameClient && clients.hasNick(nick)) {
+        client.sendReply(Reply::reply(Reply::ERR_NICKNAMEINUSE, nick));
+        return false;
+    }
 
     if (client.isRegistered()) {
         // Registered client renaming itself: everyone who can see it - itself
@@ -158,10 +164,10 @@ bool Handlers::nick(Server &server, Client &client,
 bool Handlers::user(Server &server, Client &client,
                     const std::vector<std::string> &params) {
     (void)server;
-    if (client.isRegistered())
-        throw Error::reply(Reply::ERR_ALREADYREGISTRED, "");
-    if (params[0].empty() || params[3].empty())
-        throw Error::reply(Reply::ERR_NEEDMOREPARAMS, "USER");
+    if (params[0].empty() || params[3].empty()) {
+        client.sendReply(Reply::reply(Reply::ERR_NEEDMOREPARAMS, "USER"));
+        return false;
+    }
     client.setUser(params[0], params[3]);
     return false;
 }
@@ -170,7 +176,7 @@ bool Registration::tryRegister(Server &server, Client &client) {
     if (client.isRegistered() || !client.hasIdentity())
         return false;
     if (!client.hasPassAccepted()) {
-        client.sendReply(Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
+        client.sendReply(Reply::reply(Reply::ERR_PASSWDMISMATCH));
         client.sendClosingMsg("Password incorrect");
         return true; // event loop: flush, then close the connection
     }

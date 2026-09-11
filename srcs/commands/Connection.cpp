@@ -42,8 +42,10 @@ bool Handlers::quit(Server &server, Client &client,
 
 bool Handlers::ping(Server &server, Client &client,
                     const std::vector<std::string> &params) {
-    if (params.empty() || params[0].empty())
-        throw Error::reply(Reply::ERR_NOORIGIN, "");
+    if (params.empty() || params[0].empty()) {
+        client.sendReply(Reply::reply(Reply::ERR_NOORIGIN));
+        return false;
+    }
     client.send(Reply::fromClient(server.getServerName(), "PONG",
                                   server.getServerName(), params[0]));
     return false;
