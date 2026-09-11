@@ -110,7 +110,7 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
 	NOTE: caller MUST close socket when sendMsg returns false
 */
 bool Socket::sendMsg(int const fd, std::string const &msg) {
-	if (socketClosed(fd))
+    if (socketClosed(fd))
         return true;
     SocketIOData &sIOD = sockIODataStore_.at(fd);
 
