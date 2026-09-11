@@ -78,11 +78,11 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
             (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2))
-			return lfcrPos;
-		sIOD.discardMode = true;
-		msgTooLong = true;
+            return lfcrPos;
+        sIOD.discardMode = true;
+        msgTooLong = true;
     }
-	// discard mode
+    // discard mode
     if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
         closeSocket(fd);
         return std::string::npos;
@@ -110,7 +110,7 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
 	NOTE: MUST be called ony through Socket::sendMsg
 */
 bool Socket::sendMsg(int const fd, std::string const &msg) {
-	SocketIOData &sIOD = sockIODataStore_.at(fd);
+    SocketIOData &sIOD = sockIODataStore_.at(fd);
 
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
         return false;
@@ -149,8 +149,15 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     return true;
 }
 
+/*
+Performance note: 2 searches of sockIODataStore.
+Wrap in try catch to remove this redundancy
+or make socketClosed return a pointer instead
+*/
 void Socket::closeSocket(int const fd) {
-    SocketIOData &sIOD = sockIODataStore_.at(fd);
+    if (socketClosed(fd))
+        return;
+    SocketIOData &sIOD = sockIODataStore_.at(fd); // throws
 
     std::ostringstream oss;
     if (sIOD.isSrvSocket) {

@@ -11,7 +11,10 @@
 #include <set>
 #include <string>
 
+class Server;
+
 class Client {
+    Server               *server_;
     int                   fd_;
     std::string           nick_;
     std::string           nickCaseFolded_;
@@ -19,18 +22,17 @@ class Client {
     std::string           hostname_;
     std::string           realname_;
     bool                  registered_;
-    std::string           recvBuffer_;
-    std::string           sendBuffer_;
     bool                  passAccepted_;
     bool                  oper_;
     std::set<std::string> invitedTo_;
 
   public:
     Client()
-        : fd_(-1), registered_(false), passAccepted_(false), oper_(false) {}
+        : server_(0), fd_(-1), registered_(false), passAccepted_(false),
+          oper_(false) {}
 
-    explicit Client(int fd, std::string const &clientHost)
-        : fd_(fd), hostname_(clientHost), registered_(false),
+    explicit Client(int fd, std::string const &hostname, Server *server)
+        : server_(server), fd_(fd), hostname_(hostname), registered_(false),
           passAccepted_(false), oper_(false) {}
 
     int         getFd() const;
@@ -47,13 +49,11 @@ class Client {
     std::string getPrefix() const;
     // Nick the numerics are addressed to: "*" until the client has one.
     std::string getReplyTarget() const;
-    // "ERROR :Closing link: (nick!user@host) [reason]", the line a client gets
-    // right before its connection is closed (QUIT, wrong PASS, shutdown).
-    void sendClosingMsg(const std::string &reason);
-    bool hasIdentity() const;
-    void setNick(const std::string &name);
-    void setUser(const std::string &user, const std::string &real);
-    void setHostname(const std::string &host);
+    bool        hasIdentity() const;
+    void        setNick(const std::string &name);
+    void        setUser(const std::string &user, const std::string &real);
+    void        setHostname(const std::string &host);
+    void        setServer(Server *server);
 
     void setRegistered(bool value);
     void setPassAccepted(bool value);
@@ -63,14 +63,10 @@ class Client {
     void addInvite(const std::string &name);
     void removeInvite(const std::string &name);
 
+    // all send routed to `Server::sendMsg()`
     void send(const std::string &msg);
     void sendReply(const std::string &serverName, const Reply::Message &msg);
-    void appendToRecvBuffer(const std::string &bytes);
-    bool extractLine(std::string &line);
-    std::size_t        recvBufferSize() const;
-    const std::string &getSendBuffer() const;
-    void               consumeSendBuffer(std::size_t count);
-    void               clearSendBuffer();
-
-    bool hasPendingOutput() const;
+    // "ERROR :Closing link: (nick!user@host) [reason]", the line a client gets
+    // right before its connection is closed (QUIT, wrong PASS, shutdown).
+    void sendClosingMsg(const std::string &reason);
 };

@@ -35,13 +35,6 @@ Server::~Server() {
         if (!sockets_.isServerSocket(fd)) {
             Client &client = clients_.at(fd);
             client.sendClosingMsg("Server shutdown - goodbye");
-
-            // REMOVE ME --->
-            const std::string &out = client.getSendBuffer();
-            sockets_.sendMsg(fd, out);
-            client.consumeSendBuffer(out.size());
-            // <--- REMOVE ME
-
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
@@ -164,15 +157,6 @@ void Server::processClientSockets_() {
                 }
 #endif
             } while (buffHasMoreCmds);
-
-            // REMOVE ME --->
-            Client *client = clients_.find(pfd.fd);
-            if (client && !client->getSendBuffer().empty()) {
-                const std::string &out = client->getSendBuffer();
-                sockets_.sendMsg(pfd.fd, out);
-                client->consumeSendBuffer(out.size());
-            }
-            // <--- REMOVE ME
         }
     }
     removeClosedSockets_();
@@ -214,7 +198,7 @@ void Server::acceptClient_(int const serverFd) {
     uint16_t    port = 0;
     srvHelp::getIPandPort(sockAddrIn46, srvHelp::getSaFamily(sockAddrIn46),
                           port, clientIP);
-    clients_.add(clientFd, clientIP);
+    clients_.add(clientFd, clientIP, *this);
 
     std::ostringstream oss;
     oss << "Client connected:"
