@@ -33,13 +33,14 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            Client &client = clients_.at(fd);
-            client.sendClosingMsg("Server shutdown - goodbye");
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg("Server shutdown - goodbye");
 
             // REMOVE ME --->
-            const std::string &out = client.getSendBuffer();
+            const std::string &out = client->getSendBuffer();
             sockets_.sendMsg(fd, out);
-            client.consumeSendBuffer(out.size());
+            client->consumeSendBuffer(out.size());
             // <--- REMOVE ME
 
             clients_.remove(fd, channels_);
