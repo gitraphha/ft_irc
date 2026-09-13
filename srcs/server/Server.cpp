@@ -131,11 +131,25 @@ void Server::processClientSockets_() {
 #ifdef ERRMSG2CLIENTBYEXCEPT
                 try {
 #endif
-                    cmdLine =
-                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                    if (!cmdLine.empty()) {
+                    bool msgTooLong = false;
+                    cmdLine = sockets_.getCRLFLineFromBuffer(
+                        pfd.fd, buffHasMoreCmds, msgTooLong);
+                    if (msgTooLong)
+                        cmds_.inputTooLong(*this, pfd.fd);
+                    else if (!cmdLine.empty()) {
                         // returns true if connection is to be closed
-                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
+						Client *client = clients_.find(pfd.fd);
+						if (!client) {
+							std::ostringstream oss("Internal error: No client data found for fd:");
+							oss << pfd.fd;
+							log_(oss.str(), Logger::lmError);
+							// close socket alltogether here?"No client data for fd"
+							// There's not much chance the client data will reappear later...
+							// Can't even send Closing message without client ptr
+							// sockets_.closeSocket(pfd.fd);
+							break;
+						}
+                        if (cmds_.run(*this, *client, cmdLine)) {
                             sockets_.closeSocket(pfd.fd);
                             break;
                         }
@@ -165,7 +179,7 @@ void Server::processClientSockets_() {
 void Server::removeClosedSockets_() {
     for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
         pollfd &pfd = pollFds_.at(idx);
-        if (sockets_.socketClosed(pfd.fd)) {
+        if (sockets_.getSockIOData(pfd.fd) == NULL) {
             clients_.remove(pfd.fd, channels_);
             removePollFd_(pfd.fd);
             --idx;
