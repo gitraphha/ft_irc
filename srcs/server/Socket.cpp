@@ -136,11 +136,22 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         std::ostringstream oss;
         oss << "SendMsg event:\n"
             << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
-        oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-            << ") " << sIOD.writeBuffer.substr(0, bytesSent)
-            << " sent to FD: " << fd;
-        logger_.logMsg(oss.str(), Logger::lmInfo);
-#endif
+        if (!success || bytesSent < 0) {
+            oss << " send to FD " << fd << " failed.";
+            logger_.logMsg(oss.str(), Logger::lmError);
+        } else if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
+            oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
+                << ") " << sIOD.writeBuffer.substr(0, bytesSent)
+                << " sent to FD: " << fd;
+            logger_.logMsg(oss.str(), Logger::lmInfo);
+        }
+    }
+
+    if (!success)
+        return false;
+
+    sIOD.sendErrorCount = 0;
+    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
     } else
         sIOD.writeBuffer.clear();
