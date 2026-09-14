@@ -6,15 +6,15 @@
 class Logger {
     std::string prefix_;
 
-    static std::string nowStr_() {
+  public:
+    static std::string nowStr() {
         time_t     now = time(0);
         struct tm *timeinfo = localtime(&now);
-        char       buffer[32];
+        char       buffer[32]; // NOLINT
         strftime(&buffer[0], sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
         return std::string(&buffer[0]);
     }
 
-  public:
     enum logMode { lmInfo, lmWarn, lmError, lmExcept };
 
     Logger(std::string const &prefix) : prefix_(prefix) {}

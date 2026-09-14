@@ -73,16 +73,10 @@ inline void bindServerSocket(int const socketFd, int const domain, // NOLINT
                                  getAdressFamilyStr(domain) + " !");
 }
 
-inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
-    char            addrBuffer[128];
-    socklen_t const addrBuffLen = sizeof(addrBuffer) / sizeof(char);
-
-    sa_family_t const saFamily =
-        // NOLINTNEXTLINE
-        reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4).sa_family;
+inline void getIPandPort(socketAddrX const &sockAddrIn46,
+                         sa_family_t const saFamily, uint16_t &portNumber,
+                         std::string &addrStr) {
     void const *addrPtr = 0;
-    uint16_t    portNumber = 0;
-
     if (saFamily == AF_INET) {
         addrPtr = &sockAddrIn46.sai4.sin_addr;
         portNumber = ntohs(sockAddrIn46.sai4.sin_port);
@@ -90,20 +84,54 @@ inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
         addrPtr = &sockAddrIn46.sai6.sin6_addr;
         portNumber = ntohs(sockAddrIn46.sai6.sin6_port);
     }
-    char const *addrStrPtr =
+
+    char            addrBuffer[128]; // NOLINT
+    socklen_t const addrBuffLen = sizeof(addrBuffer) / sizeof(char);
+    char const     *addrStrPtr =
         inet_ntop(saFamily, addrPtr, &addrBuffer[0], addrBuffLen);
 
-    std::string addrStr("No addr:port information.");
     if (addrStrPtr) {
         addrStr.assign(addrStrPtr);
         if (saFamily == AF_INET6)
             addrStr = "[" + addrStr + "]";
-    }
+    } else
+        addrStr.assign("No addr:port information.");
+}
+
+inline sa_family_t getSaFamily(socketAddrX const &sockAddrIn46) {
+    // NOLINTNEXTLINE
+    return reinterpret_cast<struct sockaddr const &>(sockAddrIn46.sai4)
+        .sa_family;
+}
+
+inline std::string composeAddrfamAddrPortStr(socketAddrX const &sockAddrIn46) {
+    sa_family_t const saFamily = getSaFamily(sockAddrIn46);
+
+    uint16_t    portNumber = 0;
+    std::string addrStr;
+    getIPandPort(sockAddrIn46, saFamily, portNumber, addrStr);
+
     std::ostringstream oss;
-    oss << " AF: " << getAdressFamilyStr(saFamily)
-        << "\n addr:port: " << addrStr << ":" << std::dec << portNumber;
+    oss << " AF:" << getAdressFamilyStr(saFamily) << " addr:port: " << addrStr
+        << ":" << std::dec << portNumber;
 
     return oss.str();
 }
+
+/*
+ * Functor that can be used in std::find_if
+ * workaround since we are stuck with c++98 without lambdas
+ */
+class PfdHasFd {
+  private:
+    int const fd_;
+
+  public:
+    PfdHasFd(int fd) : fd_(fd) {}
+
+    bool operator()(pollfd const pfd) const {
+        return (pfd.fd == fd_);
+    }
+};
 
 } // namespace srvHelp

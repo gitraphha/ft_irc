@@ -6,12 +6,13 @@
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
+#include <algorithm>    // for find_if
 #include <exception>    // for exception
-#include <iostream>     // for basic_ostream, operator<<, basic_ostrea...
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
-#include <sstream>      // for basic_ostringstream
+#include <sstream>      // for basic_ostringstream, basic_ostream, ope...
 #include <stdexcept>    // for runtime_error, invalid_argument
-#include <string>       // for allocator, char_traits, basic_string
+#include <stdint.h>     // for uint16_t
+#include <string>       // for allocator, basic_string, char_traits
 #include <sys/socket.h> // for setsockopt, AF_INET6, AF_INET, accept
 
 /*
@@ -20,15 +21,9 @@
     * init the logger prefix (server name)
 */
 Server::Server(int const port, std::string const &password)
-    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION), port_(port),
-      password_(password), logger_(serverName_ + ": "), sockets_(logger_),
-      numServerSockets_(0) {
-    std::time_t now = std::time(0);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%a %b %d %H:%M:%S %Y",
-                  std::localtime(&now));
-    createdAt_ = buf;
-}
+    : serverName_(SERVER_NAME), serverVersion_(SERVER_VERSION),
+      createdAt_(Logger::nowStr()), port_(port), password_(password),
+      logger_(serverName_ + ": "), sockets_(logger_), numServerSockets_(0) {}
 
 /*
 	Cleanup
@@ -38,31 +33,24 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            std::string nickName;
-            try {
-                nickName = clients_.at(fd).getNick();
-            } catch (std::exception const &e) {
-                logger_.logMsg("\n Cannot get client object:"
-                               "\n starting from a second client, the object "
-                               "isn't correctly created"
-                               "\n in function bool ClientManager::add(Client "
-                               "&client, int fd)"
-                               "\n Exception: " +
-                                   std::string(e.what()),
-                               Logger::lmError);
-            }
-            std::ostringstream oss;
-            oss << "ERROR :" << serverName_ << " " << nickName
-                << " :Server shutdown - goodbye.";
-            sockets_.sendMsg(fd, oss.str());
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg("Server shutdown - goodbye");
+
+            // REMOVE ME --->
+            const std::string &out = client->getSendBuffer();
+            sockets_.sendMsg(fd, out);
+            client->consumeSendBuffer(out.size());
+            // <--- REMOVE ME
+
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
-        pollFds_.erase(--pollFds_.end());
+        this->removePollFd_(fd);
     }
 }
 
-void Server::setupServerSockets_() {
+bool Server::setupServerSockets_() {
     static int const              domArr[] = {AF_INET, AF_INET6};
     static std::vector<int> const domains(
         // NOLINTNEXTLINE
@@ -74,8 +62,11 @@ void Server::setupServerSockets_() {
             log_(e.what(), Logger::lmExcept);
         }
     }
-    if (numServerSockets_ == 0)
-        throw std::runtime_error("No server socket could be setup correctly.");
+    if (numServerSockets_ == 0) {
+        log_("No server socket could be setup correctly.", Logger::lmError);
+        return false;
+    }
+    return true;
 }
 
 /*
@@ -133,44 +124,35 @@ void Server::processServerSocketData_() {
     }
 }
 
-void Server::setClientInfo_(int fd, Client **clntPtr, std::string &nick,
-                            bool &isReg) {
-    try {
-        *clntPtr = &clients_.at(fd);
-        if (*clntPtr && (*clntPtr)->isRegistered()) {
-            isReg = true;
-            nick = (*clntPtr)->getNick();
-        }
-    } catch (std::exception const &e) {
-        log_(e.what(), Logger::lmWarn);
-    }
-}
-
 void Server::processClientSockets_() {
     for (size_t idx = numServerSockets_;
          !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (sockets_.checkSocket(pfd) && (pfd.revents & POLLIN)) {
-
-            // to be replaced by a request to some sort of manager
-            Client     *client = 0;
-            std::string nickName = "*";
-            bool        clntIsReg = false;
-            setClientInfo_(pfd.fd, &client, nickName, clntIsReg);
-            // end: to be replaced by a request to some sort of manager
-
+        if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
             std::string cmdLine;
             bool        buffHasMoreCmds = false;
             do {
+#define ERRMSG2CLIENTBYEXCEPT
+#ifdef ERRMSG2CLIENTBYEXCEPT
                 try {
+#endif
                     cmdLine =
                         sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                    if (!cmdLine.empty())
-                        cmds_.run(*this, *client, cmdLine);
+                    if (!cmdLine.empty()) {
+                        // returns true if connection is to be closed
+                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
+                            sockets_.closeSocket(pfd.fd);
+                            break;
+                        }
+                    }
+#ifdef ERRMSG2CLIENTBYEXCEPT
                 } catch (Error const &e) {
                     if (e.hasReply()) {
+                        Client     *client = clients_.find(pfd.fd);
+                        std::string nickName =
+                            (client ? client->getNick() : "dbgDummyNick");
                         sockets_.sendMsg(
                             pfd.fd,
                             Reply::build(serverName_, nickName, e.reply()));
@@ -181,12 +163,28 @@ void Server::processClientSockets_() {
                         log_(tmp, Logger::lmExcept);
                     }
                 }
+#endif
             } while (buffHasMoreCmds);
-        }
 
+            // REMOVE ME --->
+            Client *client = clients_.find(pfd.fd);
+            if (client && !client->getSendBuffer().empty()) {
+                const std::string &out = client->getSendBuffer();
+                sockets_.sendMsg(pfd.fd, out);
+                client->consumeSendBuffer(out.size());
+            }
+            // <--- REMOVE ME
+        }
+    }
+    removeClosedSockets_();
+}
+
+void Server::removeClosedSockets_() {
+    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+        pollfd &pfd = pollFds_.at(idx);
         if (sockets_.socketClosed(pfd.fd)) {
             clients_.remove(pfd.fd, channels_);
-            removePollFd_(idx);
+            removePollFd_(pfd.fd);
             --idx;
         }
     }
@@ -212,11 +210,18 @@ void Server::acceptClient_(int const serverFd) {
     srvHelp::setSocketNonBlock(clientFd);
 
     storePollFd_(clientFd, false);
-    clients_.add(clientFd, new Client(clientFd));
 
-    std::cout << "Client connected:\n"
-              << " fd: " << clientFd << "\n"
-              << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46) << std::endl;
+    std::string clientIP;
+    uint16_t    port = 0;
+    srvHelp::getIPandPort(sockAddrIn46, srvHelp::getSaFamily(sockAddrIn46),
+                          port, clientIP);
+    clients_.add(clientFd, clientIP);
+
+    std::ostringstream oss;
+    oss << "Client connected:"
+        << " fd:" << clientFd
+        << srvHelp::composeAddrfamAddrPortStr(sockAddrIn46);
+    log_(oss.str(), Logger::lmInfo);
 }
 
 void Server::storePollFd_(int const socketFd, bool srvSocket) {
@@ -228,10 +233,11 @@ void Server::storePollFd_(int const socketFd, bool srvSocket) {
     sockets_.addSocket(socketFd, srvSocket);
 }
 
-void Server::removePollFd_(int const idx) {
-    std::vector<struct pollfd>::difference_type dist =
-        static_cast<std::vector<struct pollfd>::difference_type>(idx);
-    pollFds_.erase(pollFds_.begin() + dist);
+void Server::removePollFd_(int const fd) {
+    std::vector<pollfd>::iterator it =
+        std::find_if(pollFds_.begin(), pollFds_.end(), srvHelp::PfdHasFd(fd));
+    if (it != pollFds_.end())
+        pollFds_.erase(it);
 }
 
 void Server::log_(std::string const &msg, Logger::logMode const lm) {
@@ -270,7 +276,8 @@ ClientManager &Server::getClientManager() {
 	* handles client connect and disconnect scenarios
 */
 void Server::run() {
-    setupServerSockets_();
+    if (!setupServerSockets_())
+        return;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);

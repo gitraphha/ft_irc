@@ -10,7 +10,6 @@
 #include <stddef.h> // for size_t
 #include <string>   // for string, basic_string
 #include <vector>   // for vector
-class Client;
 
 #define SERVER_NAME "irc.local"
 #define SERVER_VERSION "1.0"
@@ -34,15 +33,14 @@ class Server {
     size_t                     numServerSockets_;
     std::vector<struct pollfd> pollFds_;
 
-    void setupServerSockets_();
+    bool setupServerSockets_();
     int  createServerSocket_(int const domain);
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
     void processClientSockets_();
+    void removeClosedSockets_();
     void storePollFd_(int const socketFd, bool srvSocket);
-    void removePollFd_(int const idx);
-    void setClientInfo_(int fd, Client **clntPtr, std::string &nick,
-                        bool &isReg);
+    void removePollFd_(int const fd);
     void log_(std::string const &msg, Logger::logMode const lm);
 
     Server(Server const &other);
@@ -62,7 +60,7 @@ class Server {
     ClientManager     &getClientManager();
 
     // Pass-through interfaces
-    // void sendMsg(int const fd, std::string const &msg) {
-    //     sockets_.sendMsg(fd, msg);
-    // }
+    void sendMsg(int const fd, std::string const &msg) {
+        sockets_.sendMsg(fd, msg);
+    }
 };

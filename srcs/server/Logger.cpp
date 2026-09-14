@@ -31,5 +31,5 @@ void Logger::logMsg(std::string msg, logMode const lm) const {
             *os << CMgnta;
             break;
     }
-    *os << nowStr_() << " " << prefix_ << msg << CReset << std::endl;
+    *os << nowStr() << " " << prefix_ << msg << CReset << std::endl;
 }
