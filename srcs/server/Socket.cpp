@@ -71,9 +71,13 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
 }
 
 size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
-    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
-    std::string          &rdBuffer = sIOD.readBuffer;
-    size_t                lfcrPos = rdBuffer.find("\r\n");
+    SocketIOData *sIODptr = getSockIOData(fd);
+    if (!sIODptr)
+        return std::string::npos;
+
+    SocketIOData &sIOD = *sIODptr;
+    std::string  &rdBuffer = sIOD.readBuffer;
+    size_t        lfcrPos = rdBuffer.find("\r\n");
 
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
@@ -164,10 +168,11 @@ Wrap in try catch to remove this redundancy
 or make socketClosed return a pointer instead
 */
 void Socket::closeSocket(int const fd) {
-    if (socketClosed(fd))
+    SocketIOData *sIODptr = getSockIOData(fd);
+    if (!sIODptr)
         return;
-    SocketIOData &sIOD = sockIODataStore_.at(fd); // throws
 
+    SocketIOData      &sIOD = *sIODptr;
     std::ostringstream oss;
     if (sIOD.isSrvSocket) {
         oss << "Closing server socket ("

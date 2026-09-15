@@ -30,6 +30,14 @@ void Logger::logMsg(std::string msg, logMode const lm) const {
             msg.insert(0, " [EXCEPT]: ");
             *os << CMgnta;
             break;
+        case Logger::lmIn:
+            msg.insert(0, " [INPUT ]: ");
+            *os << CWhite;
+            break;
+        case Logger::lmOut:
+            msg.insert(0, " [OUTPUT]: ");
+            *os << CBlue;
+            break;
     }
     *os << nowStr() << " " << prefix_ << msg << CReset << std::endl;
 }

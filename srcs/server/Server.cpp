@@ -134,6 +134,13 @@ void Server::processClientSockets_() {
                     bool msgTooLong = false;
                     cmdLine = sockets_.getCRLFLineFromBuffer(
                         pfd.fd, buffHasMoreCmds, msgTooLong);
+
+                    {
+                        std::ostringstream oss;
+                        oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": "
+                            << cmdLine;
+                        logger_.logMsg(oss.str(), Logger::lmIn);
+                    }
                     if (msgTooLong)
                         cmds_.inputTooLong(*this, pfd.fd);
                     else if (!cmdLine.empty()) {
@@ -295,12 +302,13 @@ void Server::run() {
 NOTE: all send should go though server::sendMsg
 */
 void Server::sendMsg(int const fd, std::string const &msg) {
+    {
+        std::ostringstream oss;
+        oss << "SendMsg event:\nSendto FD " << fd << ": "
+            << msg.substr(0, msg.length() - 2);
+        logger_.logMsg(oss.str(), Logger::lmOut);
+    }
     if (!sockets_.sendMsg(fd, msg)) {
         sockets_.closeSocket(fd);
-#if NETCATDBG
-        std::ostringstream oss;
-        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
-        logger_.logMsg(oss.str(), Logger::lmError);
-#endif
     }
 }

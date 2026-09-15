@@ -15,7 +15,7 @@ class Logger {
         return std::string(&buffer[0]);
     }
 
-    enum logMode { lmInfo, lmWarn, lmError, lmExcept };
+    enum logMode { lmInfo, lmWarn, lmError, lmExcept, lmIn, lmOut };
 
     Logger(std::string const &prefix) : prefix_(prefix) {}
 
