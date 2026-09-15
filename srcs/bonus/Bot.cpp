@@ -1,17 +1,18 @@
-// #ifdef BONUS
+#ifdef BONUS
+
 #include "Bot.hpp"
 
 #include "CTCP.hpp"
 #include "Client.hpp"
+#include "Errors.hpp"
 #include "Reply.hpp"
 #include "Server.hpp"
+#include "TransferManager.hpp"
 #include "Utils.hpp"
-#include "Errors.hpp"
+
+#include <sstream>
 
 Bot::Bot() : name_("DCCBot") {}
-
-// not needed?
-Bot::Bot(const std::string &name) : name_(name) {}
 
 std::string Bot::getPrefix(const std::string &serverName) const {
     return name_ + "!bot@" + serverName;
@@ -69,53 +70,56 @@ std::string Bot::help() const {
     return "Commands: !help, !version, !whoami, !send, !accept, !reject";
 }
 
-bool Bot::handleSend(Server &server, Client &client, std::vector<std::string> words){
-	if (words.size() < 3 || words[2].empty()){
-			client.sendReply(Reply::reply(Reply::ERR_NORECIPIENT, "",
-                                          "No recipient given (PRIVMSG)\nSYNTAX: bot !send <nick> <file>")); // TODO: check msg to send
-				return false;
-			}
-	try{
-	Client &sendTo = server.getClientManager().at(words[2]);
-	} catch(Error &e){
-		if (e.hasReply())
-			client.sendReply(e.reply());
-		return false;
-	}
-	msg = CTCP::buildCTCP("DCC SEND <file> <ip> <port> <size>");
-}
-
 /*
-1. bot !send <nick> <file>
+bot !send <nick> <file>
 	bot is initiator, opens a listener,
 	replies buildCTCP("DCC SEND ...") in PRIVMSG to requester
-2. \x01DCC SEND <file> <ip> <port> <size>\x01
-	someone offering a file to the bot, !accept or !reject.
 */
-bool Bot::handleCTCP(Server &server, Client &client,
+void Bot::handleSend(Server &server, Client &client, const std::string &nick,
+                     const std::string &filename) const {
+    try {
+        Client          &target = server.getClientManager().at(nick);
+        TransferManager &tm = server.getTransferManager();
+        if (!tm.openOffer(&client, &target, filename)) {
+            client.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                      "PRIVMSG", target.getNick(),
+                "bot busy or no such file under 'files/' or socket failed");
+            // TODO make error specific with enum
+            return;
+        }
+        Transfer          *t = tm.current();
+        std::ostringstream dcc;
+        dcc << "DCC SEND " << t->filename << " " << tm.getIP() << " " << t->port
+            << " " << t->filesize;
+        std::string msg = CTCP::buildCTCP(dcc.str());
+        target.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                      "PRIVMSG", target.getNick(), msg));
+        client.send("offer sent to " + nick);
+    } catch (Error &e) {
+        if (e.hasReply())
+            client.sendReply(e.reply());
+    }
+}
+
+void Bot::handleCTCP(const std::string &serverName, Client &client,
                      const std::string &body) const {
     std::string              ctcp = CTCP::extractCTCP(body);
     std::vector<std::string> words = Utils::split(ctcp, ' ');
     const std::string &text = Utils::foldCase(words.empty() ? "" : words[0]);
     std::string        msg;
     if (text == "version")
-        msg = getVersion(server.getServerName());
+        msg = getVersion(serverName);
     else if (text.compare(0, 4, "ping") == 0)
         msg = ctcp;
-    else if (text == "dcc" && words.size() > 2 &&
-             Utils::foldCase(words[1]) == "send"){
-		return handleSend(server, client, words);
-	}
     else
         msg = unknown();
-    client.send(Reply::fromClient(getPrefix(server.getServerName()), "NOTICE",
-                                  client.getNick(), msg));
-    return false;
+    client.send(Reply::fromClient(getPrefix(serverName), "NOTICE",
+                                  client.getNick(), CTCP::buildCTCP(msg)));
 }
 
 // bot <bot_cmd>
 // #chan <bot_cmd>
-bool Bot::handleMessage(const std::string &serverName, Client &client,
+void Bot::handleMessage(Server &server, Client &client,
                         const std::string &body) const {
     std::vector<std::string> words = Utils::split(body, ' ');
     std::string cmd = Utils::foldCase(words.empty() ? "" : words[0]);
@@ -124,13 +128,25 @@ bool Bot::handleMessage(const std::string &serverName, Client &client,
     if (cmd.empty() || cmd == "help")
         msg = help();
     else if (cmd == "version")
-        msg = getVersion(serverName);
+        msg = getVersion(server.getServerName());
     else if (cmd == "whoami")
         msg = "You are " + client.getNick();
-    else
+    else if (cmd == "send") {
+        if (words.size() < 3 || words[1].empty() || words[2].empty())
+            client.sendReply(Reply::reply(Reply::ERR_NEEDMOREPARAMS, "SEND"));
+        else
+            handleSend(server, client, words[1], words[2]);
+        return;
+    } else if (cmd == "accept" || cmd == "reject") {
+        bool ok = server.getTransferManager().setOfferStatus(&client,
+                                                             cmd == "accept");
+        msg = ok ? (cmd == "accept" ? "transfer accepted - connect to receive"
+                                    : "transfer rejected")
+                 : "no pending transfers for you";
+    } else
         msg = unknown();
-    client.send(Reply::fromClient(getPrefix(serverName), "PRIVMSG",
+    client.send(Reply::fromClient(getPrefix(server.getServerName()), "PRIVMSG",
                                   client.getNick(), msg));
-    return false;
 }
+
 #endif

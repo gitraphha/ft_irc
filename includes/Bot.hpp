@@ -1,4 +1,4 @@
-// #ifdef BONUS
+#ifdef BONUS
 
 #pragma once
 
@@ -14,7 +14,6 @@ class Bot {
 
   public:
     Bot();
-    Bot(const std::string &name);
 
     std::string getPrefix(const std::string &serverName) const;
     std::string getVersion(const std::string &serverName) const;
@@ -23,10 +22,11 @@ class Bot {
     std::string unknown() const;
     std::string help() const;
 
-	bool handleSend(Server &server, Client &client, std::vector<std::string> words);
-    bool handleCTCP(Server &server, Client &client,
+    void handleSend(Server &server, Client &client, const std::string &nick,
+                    const std::string &filename) const;
+    void handleCTCP(const std::string &serverName, Client &client,
                     const std::string &body) const;
-    bool handleMessage(const std::string &serverName, Client &client,
+    void handleMessage(Server &server, Client &client,
                        const std::string &body) const;
 };
 

@@ -8,6 +8,7 @@
 
 #ifdef BONUS
 #include "Bot.hpp" // for Bot
+#include "TransferManager.hpp"
 #endif
 
 #include <poll.h>   // for pollfd
@@ -35,7 +36,8 @@ class Server {
     CommandProcessor cmds_;
 
 #ifdef BONUS
-    Bot bot_;
+    TransferManager tm_;
+    Bot             bot_;
 #endif
 
     size_t                     numServerSockets_;
@@ -70,6 +72,7 @@ class Server {
     void sendMsg(int const fd, std::string const &msg);
 
 #ifdef BONUS
-    Bot &getBot();
+    TransferManager &getTransferManager();
+    Bot             &getBot();
 #endif
 };

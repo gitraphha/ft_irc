@@ -1,4 +1,4 @@
-// #ifdef BONUS
+#ifdef BONUS
 
 #pragma once
 

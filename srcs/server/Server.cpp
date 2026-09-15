@@ -331,6 +331,10 @@ void Server::sendMsg(int const fd, std::string const &msg) {
 }
 
 #ifdef BONUS
+TransferManager &Server::getTransferManager() {
+    return tm_;
+}
+
 Bot &Server::getBot() {
     return bot_;
 }

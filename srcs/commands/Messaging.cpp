@@ -71,8 +71,8 @@ bool deliver(Server &server, Client &client,
 }
 
 // Checks min parameters. Sends error message and returns false on error.
-bool checkMinParam(Client &client,
-                   const std::vector<std::string> &params, bool silent) {
+bool checkMinParam(Client &client, const std::vector<std::string> &params,
+                   bool silent) {
     if (params.empty() || params[0].empty()) {
         if (!silent)
             client.sendReply(Reply::reply(Reply::ERR_NORECIPIENT, "",
@@ -97,9 +97,9 @@ bool Handlers::privmsg(Server &server, Client &client,
     Bot &bot = server.getBot();
     if (bot.isForBot(server, params)) {
         if (CTCP::isCTCP(params[1]))
-            bot.handleCTCP(server, client, params[1]);
+            bot.handleCTCP(server.getServerName(), client, params[1]);
         else
-            bot.handleMessage(server.getServerName(), client, params[1]);
+            bot.handleMessage(server, client, params[1]);
         return false;
     }
 #endif

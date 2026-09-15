@@ -31,7 +31,8 @@ SRCS_UTILS		= MemberSet \
 				  ModeSet
 
 SRCS_BONUS		= DCC \
-				  Bot
+				  Bot \
+				  TransferManager
 
 SRCS			= $(SRCS_ROOT) \
 				  $(addprefix server/, $(SRCS_SERVER)) \
