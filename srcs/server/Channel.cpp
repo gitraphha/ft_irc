@@ -263,7 +263,8 @@ bool Channel::applyModeToMember_(Server &server, Client &client,
         client.sendReply(Reply::reply(Reply::ERR_USERNOTINCHANNEL,
                                       change.arg + " " + name_));
     } catch (Error &e) {
-        client.sendReply(e.reply());
+		if (e.hasReply())
+        	client.sendReply(e.reply());
     }
     return false;
 }

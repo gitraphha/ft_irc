@@ -5,6 +5,10 @@
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
+#ifdef BONUS
+#include "Bot.hpp" // for Bot
+#endif
+
 #include <algorithm>    // for find_if
 #include <exception>    // for exception
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
@@ -325,3 +329,9 @@ void Server::sendMsg(int const fd, std::string const &msg) {
     }
     sockets_.sendMsg(fd, msg);
 }
+
+#ifdef BONUS
+Bot &Server::getBot() {
+    return bot_;
+}
+#endif

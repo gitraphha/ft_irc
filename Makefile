@@ -1,8 +1,8 @@
 # ---- Library and Project names -----------------------------------------------
 NAME			= ircserv
 DEBUG_NAME		= ircserv_debug
-# BONUS			= ircserv_bonus
-# DEBUG_BONUS	= ircserv_bonus_debug
+BONUS			= ircserv_bonus
+DEBUG_BONUS		= ircserv_bonus_debug
 
 # ---- Sources & Objects -------------------------------------------------------
 SRC_DIR			= srcs
@@ -29,26 +29,27 @@ SRCS_COMMANDS	= CommandProcessor \
 
 SRCS_UTILS		= MemberSet \
 				  ModeSet
-# 				  Parser \
-# 				  Reply
 
-# SRCS_BONUS		= DCC \
-# 				  Bot
+SRCS_BONUS		= DCC \
+				  Bot
 
 SRCS			= $(SRCS_ROOT) \
 				  $(addprefix server/, $(SRCS_SERVER)) \
 				  $(addprefix commands/, $(SRCS_COMMANDS)) \
 				  $(addprefix utils/, $(SRCS_UTILS))
 
+SRCS_ALL_BONUS	= $(SRCS) \
+				  $(addprefix bonus/, $(SRCS_BONUS))
+
 OBJS			= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
 DEBUG_OBJS		= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .o, $(SRCS)))
-# BONUS_OBJS		= $(OBJS:.o=.bonus.o)
-# DEBUG_BONUS_OBJS	= $(DEBUG_OBJS:.o=.bonus.o)
+BONUS_OBJS		= $(addprefix $(BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .bonus.o, $(SRCS_ALL_BONUS)))
+DEBUG_BONUS_OBJS= $(addprefix $(DEBUG_BUILD_DIR)/$(SRC_DIR)/, $(addsuffix .bonus.o, $(SRCS_ALL_BONUS)))
 
 # ---- Auto-generated header deps ----------------------------------------------
 
 DEPS			= $(OBJS:.o=.d) $(DEBUG_OBJS:.o=.d)
-# BONUS_DEPS	= $(BONUS_OBJS:.o=.d) $(DEBUG_BONUS_OBJS:.o=.d)
+BONUS_DEPS		= $(BONUS_OBJS:.o=.d) $(DEBUG_BONUS_OBJS:.o=.d)
 
 # ---- Compiler and Flags ------------------------------------------------------
 
@@ -62,11 +63,11 @@ DEBUG_CXXFLAGS	= $(CXXFLAGS) $(DFLAGS)
 
 all: $(NAME)
 
-# bonus: $(BONUS)
+bonus: $(BONUS)
 
 debug: $(DEBUG_NAME)
 
-# debug_bonus: $(DEBUG_BONUS)
+debug_bonus: $(DEBUG_BONUS)
 
 # clang-format
 format:
@@ -91,11 +92,11 @@ $(NAME): $(OBJS)
 $(DEBUG_NAME): $(DEBUG_OBJS)
 	$(CXX) $(DEBUG_CXXFLAGS) $(DEBUG_OBJS) -o $@
 
-# $(BONUS): $(BONUS_OBJS)
-# 	$(CXX) $(CXXFLAGS) $(BONUS_OBJS) -o $@
+$(BONUS): $(BONUS_OBJS)
+	$(CXX) $(CXXFLAGS) $(BONUS_OBJS) -o $@
 
-# $(DEBUG_BONUS): $(DEBUG_BONUS_OBJS)
-# 	$(CXX) $(DEBUG_CXXFLAGS) $(DEBUG_BONUS_OBJS) -o $@
+$(DEBUG_BONUS): $(DEBUG_BONUS_OBJS)
+	$(CXX) $(DEBUG_CXXFLAGS) $(DEBUG_BONUS_OBJS) -o $@
 
 $(BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
@@ -105,13 +106,13 @@ $(DEBUG_BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(DEBUG_CXXFLAGS) $(IFLAGS) -MMD -MP -c $< -o $@
 
-# $(BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
-# 	@mkdir -p $(@D)
-# 	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
+$(BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
 
-# $(DEBUG_BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
-# 	@mkdir -p $(@D)
-# 	$(CXX) $(DEBUG_CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
+$(DEBUG_BUILD_DIR)/$(SRC_DIR)/%.bonus.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(DEBUG_CXXFLAGS) $(IFLAGS) -MMD -MP -c -DBONUS $< -o $@
 
 # ---- Cleanup -----------------------------------------------------------------
 clean:
@@ -122,7 +123,6 @@ fclean: clean
 
 re: fclean all
 
--include $(DEPS)
-# -include $(DEPS) $(BONUS_DEPS)
+-include $(DEPS) $(BONUS_DEPS)
 
 .PHONY: all bonus clean fclean re debug debug_bonus format tidy tidy-all
