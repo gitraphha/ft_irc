@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Reply.hpp"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -37,15 +39,14 @@ class Command {
 
 class CommandProcessor {
     std::map<std::string, Command> commands_;
-    Command                       &at_(const std::string &name);
+
+    bool sendError_(Client &client, Reply::Code code,
+                    const std::string &params = "");
 
   public:
-    CommandProcessor() {
-        registerCommands();
-    }
+    CommandProcessor();
 
     void registerCommands();
-    // parser TODO blnunez-
     bool parse(const std::string &line, std::string &name,
                std::vector<std::string> &params);
     bool run(Server &server, Client &client, const std::string &line);

@@ -191,11 +191,11 @@ parseChannelModeChanges(const std::vector<std::string> &params,
                 changes.push_back(ModeChange(*it, op, ""));
                 break;
             case UserLimit:
-            case ChannelOperator:
                 if (op == Remove) {
                     changes.push_back(ModeChange(*it, op, ""));
                     continue;
                 }
+            case ChannelOperator:
             case Key:
                 if (idx >= params.size())
                     changes.push_back(ModeChange(*it, op, ""));

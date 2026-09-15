@@ -1,8 +1,6 @@
 #include "Server.hpp"
 
 #include "Client.hpp"        // for Client
-#include "Errors.hpp"        // for Error
-#include "Reply.hpp"         // for build
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
@@ -123,41 +121,23 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
-            std::string cmdLine;
-            bool        buffHasMoreCmds = false;
-            do {
-#define ERRMSG2CLIENTBYEXCEPT
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                try {
-#endif
-                    cmdLine =
-                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-                    if (!cmdLine.empty()) {
-                        // returns true if connection is to be closed
-                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
-                            sockets_.closeSocket(pfd.fd);
-                            break;
-                        }
-                    }
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        Client     *client = clients_.find(pfd.fd);
-                        std::string nickName =
-                            (client ? client->getNick() : "dbgDummyNick");
-                        sendMsg(pfd.fd,
-                                Reply::build(serverName_, nickName, e.reply()));
-                    } else {
-                        std::string tmp(
-                            "Error while trying to get/execute cmd:\n");
-                        tmp.append("'" + cmdLine + "'\n" + e.what());
-                        log_(tmp, Logger::lmExcept);
-                    }
-                }
-#endif
-            } while (buffHasMoreCmds);
-        }
+        if (!(sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)))
+            continue;
+        bool buffHasMoreCmds = false;
+        do {
+            std::string cmdLine =
+                sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+            if (cmdLine.empty())
+                continue;
+            Client *client = clients_.find(pfd.fd);
+            if (!client)
+                break;
+            // returns true if connection is to be closed
+            if (cmds_.run(*this, *client, cmdLine)) {
+                sockets_.closeSocket(pfd.fd);
+                break;
+            }
+        } while (buffHasMoreCmds);
     }
     removeClosedSockets_();
 }
