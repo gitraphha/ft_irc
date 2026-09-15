@@ -39,12 +39,10 @@ class Channel {
     // Modes (MODE command)
     bool applyModeToMember_(Server &server, Client &client,
                             const Mode::ModeChange &change);
-    void applyKeyMode_(const std::string &serverName, Client &client,
-                       const Mode::ModeChange &change,
-                       Mode::ModeChanges      &applied);
-    void applyUserLimitMode_(const std::string &serverName, Client &client,
-                             const Mode::ModeChange &change,
-                             Mode::ModeChanges      &applied);
+    void applyKeyMode_(Client &client, const Mode::ModeChange &change,
+                       Mode::ModeChanges &applied);
+    void applyUserLimitMode_(Client &client, const Mode::ModeChange &change,
+                             Mode::ModeChanges &applied);
     static bool validateChannelKey_(std::string key);
 
   public:
@@ -77,10 +75,10 @@ class Channel {
 
     // Topic (TOPIC command)
     void setTopic(Client &client, const std::string &topic);
-    void sendTopic(const std::string &serverName, Client &client) const;
+    void sendTopic(Client &client) const;
 
     // Names / Invite (NAMES, INVITE)
-    void sendNames(const std::string &serverName, Client &client) const;
+    void sendNames(Client &client) const;
     void checkInvite(Client &client, Client &target) const;
 
     // Privilege checks

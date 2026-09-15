@@ -49,18 +49,15 @@ void deliverTo(Server &server, Client &from, const std::string &target,
 bool deliver(Server &server, Client &client,
              const std::vector<std::string> &params, const std::string &cmd,
              bool silent) {
-    const std::string &serverName = server.getServerName();
     if (params.empty() || params[0].empty()) {
         if (!silent)
-            client.sendReply(serverName,
-                             Reply::reply(Reply::ERR_NORECIPIENT, "",
+            client.sendReply(Reply::reply(Reply::ERR_NORECIPIENT, "",
                                           "No recipient given (" + cmd + ")"));
         return false;
     }
     if (params.size() < 2 || params[1].empty()) {
         if (!silent)
-            client.sendReply(serverName,
-                             Reply::reply(Reply::ERR_NOTEXTTOSEND, ""));
+            client.sendReply(Reply::reply(Reply::ERR_NOTEXTTOSEND, ""));
         return false;
     }
     const std::vector<std::string> targets = Utils::split(params[0], ',');
@@ -73,7 +70,7 @@ bool deliver(Server &server, Client &client,
             deliverTo(server, client, targets[i], line);
         } catch (const Error &e) {
             if (!silent && e.hasReply())
-                client.sendReply(serverName, e.reply());
+                client.sendReply(e.reply());
         }
     }
     return false;

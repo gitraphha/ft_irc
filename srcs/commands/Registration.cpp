@@ -72,29 +72,26 @@ bool isValidNick(const std::string &nick) {
 
 void sendWelcome(Server &server, Client &client) {
     const std::string name = server.getServerName();
-    client.sendReply(name,
-                     Reply::reply(Reply::RPL_WELCOME, "",
+    const std::string version = server.getServerVersion();
+    client.sendReply(Reply::reply(Reply::RPL_WELCOME, "",
                                   "Welcome to the Internet Relay Network " +
                                       client.getPrefix()));
-    client.sendReply(name, Reply::reply(Reply::RPL_YOURHOST, "",
-                                        "Your host is " + name +
-                                            ", running version " +
-                                            server.getServerVersion()));
     client.sendReply(
-        name, Reply::reply(Reply::RPL_CREATED, "",
-                           "This server was created " + server.getCreatedAt()));
+        Reply::reply(Reply::RPL_YOURHOST, "",
+                     "Your host is " + name + ", running version " + version));
+    client.sendReply(
+        Reply::reply(Reply::RPL_CREATED, "",
+                     "This server was created " + server.getCreatedAt()));
     // <servername> <version> <available user modes> <available channel modes>
     client.sendReply(
-        name, Reply::reply(Reply::RPL_MYINFO,
-                           name + " " + server.getServerVersion() + "  itkol"));
-    client.sendReply(name,
-                     Reply::reply(Reply::RPL_ISUPPORT,
+        Reply::reply(Reply::RPL_MYINFO, name + " " + version + "  itkol"));
+    client.sendReply(Reply::reply(Reply::RPL_ISUPPORT,
                                   "CHANTYPES=&#+! NICKLEN=30 CHANMODES=,k,l,it "
                                   "PREFIX=(o)@ CASEMAPPING=rfc1459",
                                   "are supported by this server"));
     // No MOTD: irssi (and most clients) consider registration finished only
     // after RPL_ENDOFMOTD (376) or ERR_NOMOTD (422).
-    client.sendReply(name, Reply::reply(Reply::ERR_NOMOTD, ""));
+    client.sendReply(Reply::reply(Reply::ERR_NOMOTD, ""));
 }
 
 } // namespace
@@ -173,8 +170,7 @@ bool Registration::tryRegister(Server &server, Client &client) {
     if (client.isRegistered() || !client.hasIdentity())
         return false;
     if (!client.hasPassAccepted()) {
-        client.sendReply(server.getServerName(),
-                         Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
+        client.sendReply(Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
         client.sendClosingMsg("Password incorrect");
         return true; // event loop: flush, then close the connection
     }

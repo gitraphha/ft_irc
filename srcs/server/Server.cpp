@@ -36,13 +36,6 @@ Server::~Server() {
             Client *client = clients_.find(fd);
             if (client)
                 client->sendClosingMsg("Server shutdown - goodbye");
-
-            // REMOVE ME --->
-            const std::string &out = client->getSendBuffer();
-            sockets_.sendMsg(fd, out);
-            client->consumeSendBuffer(out.size());
-            // <--- REMOVE ME
-
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
@@ -153,9 +146,8 @@ void Server::processClientSockets_() {
                         Client     *client = clients_.find(pfd.fd);
                         std::string nickName =
                             (client ? client->getNick() : "dbgDummyNick");
-                        sockets_.sendMsg(
-                            pfd.fd,
-                            Reply::build(serverName_, nickName, e.reply()));
+                        sendMsg(pfd.fd,
+                                Reply::build(serverName_, nickName, e.reply()));
                     } else {
                         std::string tmp(
                             "Error while trying to get/execute cmd:\n");
@@ -165,15 +157,6 @@ void Server::processClientSockets_() {
                 }
 #endif
             } while (buffHasMoreCmds);
-
-            // REMOVE ME --->
-            Client *client = clients_.find(pfd.fd);
-            if (client && !client->getSendBuffer().empty()) {
-                const std::string &out = client->getSendBuffer();
-                sockets_.sendMsg(pfd.fd, out);
-                client->consumeSendBuffer(out.size());
-            }
-            // <--- REMOVE ME
         }
     }
     removeClosedSockets_();
@@ -215,7 +198,7 @@ void Server::acceptClient_(int const serverFd) {
     uint16_t    port = 0;
     srvHelp::getIPandPort(sockAddrIn46, srvHelp::getSaFamily(sockAddrIn46),
                           port, clientIP);
-    clients_.add(clientFd, clientIP);
+    clients_.add(clientFd, clientIP, *this);
 
     std::ostringstream oss;
     oss << "Client connected:"
@@ -290,5 +273,19 @@ void Server::run() {
 
         processServerSocketData_();
         processClientSockets_();
+    }
+}
+
+/*
+NOTE: all send should go though server::sendMsg
+*/
+void Server::sendMsg(int const fd, std::string const &msg) {
+    if (!sockets_.sendMsg(fd, msg)) {
+        sockets_.closeSocket(fd);
+#if NETCATDBG
+        std::ostringstream oss;
+        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
+        logger_.logMsg(oss.str(), Logger::lmError);
+#endif
     }
 }
