@@ -31,8 +31,9 @@ Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         if (!sockets_.isServerSocket(fd)) {
-            Client &client = clients_.at(fd);
-            client.sendClosingMsg("Server shutdown - goodbye");
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg("Server shutdown - goodbye");
             clients_.remove(fd, channels_);
         }
         sockets_.closeSocket(fd);
