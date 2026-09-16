@@ -45,18 +45,6 @@ class Socket {
     bool        sendMsg(int const fd, std::string const &msg);
     void        closeSocket(int const fd);
 
-    SocketIOData *getSockIOData(int const fd) {
-        std::map<int, SocketIOData>::iterator it = sockIODataStore_.find(fd);
-        if (it == sockIODataStore_.end())
-            return NULL;
-        return &(it->second);
-    }
-
-    bool isServerSocket(int const fd) const {
-        SocketIOData const *const sIODptr =
-            const_cast<Socket *>(this)->getSockIOData(fd);
-        if (sIODptr)
-            return sIODptr->isSrvSocket;
-        return false;
-    };
+    SocketIOData *getSockIOData(int const fd);
+    bool          isServerSocket(int const fd);
 };

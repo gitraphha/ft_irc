@@ -144,20 +144,21 @@ void Server::processClientSockets_() {
                     if (msgTooLong)
                         cmds_.inputTooLong(*this, pfd.fd);
                     else if (!cmdLine.empty()) {
-                        // returns true if connection is to be closed
+                        bool    closeConnection = false;
                         Client *client = clients_.find(pfd.fd);
                         if (!client) {
-                            std::ostringstream oss(
-                                "Internal error: No client data found for fd:");
-                            oss << pfd.fd;
+                            std::ostringstream oss;
+                            oss << "Internal error: No client data found for "
+                                   "fd:"
+                                << pfd.fd;
                             log_(oss.str(), Logger::lmError);
-                            // close socket alltogether here?"No client data for fd"
-                            // There's not much chance the client data will reappear later...
-                            // Can't even send Closing message without client ptr
-                            // sockets_.closeSocket(pfd.fd);
-                            break;
+                            closeConnection = true;
+                        } else {
+                            // returns true if connection is to be closed
+                            closeConnection =
+                                cmds_.run(*this, *client, cmdLine);
                         }
-                        if (cmds_.run(*this, *client, cmdLine)) {
+                        if (closeConnection) {
                             sockets_.closeSocket(pfd.fd);
                             break;
                         }

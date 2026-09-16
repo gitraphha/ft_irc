@@ -62,8 +62,7 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     if (msgTooLong || lfcrPos == std::string::npos)
         return "";
 
-    std::string cmdLine;
-    cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
     sIOD.recvErrorCount = 0;
     sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
     buffHasMoreCmds = (sIOD.readBuffer.find("\r\n") != std::string::npos);
@@ -184,4 +183,18 @@ void Socket::closeSocket(int const fd) {
 
     close(fd);
     sockIODataStore_.erase(fd);
+}
+
+Socket::SocketIOData *Socket::getSockIOData(int const fd) {
+    std::map<int, SocketIOData>::iterator it = sockIODataStore_.find(fd);
+    if (it == sockIODataStore_.end())
+        return NULL;
+    return &(it->second);
+}
+
+bool Socket::isServerSocket(int const fd) {
+    SocketIOData const *const sIODptr = getSockIOData(fd);
+    if (sIODptr)
+        return sIODptr->isSrvSocket;
+    return false;
 }
