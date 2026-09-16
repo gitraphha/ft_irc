@@ -3,6 +3,8 @@
 #include <ctime>  // for localtime, strftime, time, time_t
 #include <string> // for basic_string, string
 
+#define DBGLOG
+
 class Logger {
     std::string prefix_;
 
