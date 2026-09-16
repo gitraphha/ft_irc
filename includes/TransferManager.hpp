@@ -11,8 +11,8 @@ class Client;
 enum Status { Pending, Accepted, Rejected };
 
 struct Transfer {
-    Client     *client;
-    Client     *target;
+    int         clientFd;
+    int         targetFd;
     std::string filename;
     std::string filepath; // "files/" + filename
     off_t       filesize;
@@ -21,17 +21,17 @@ struct Transfer {
     int         port;
     off_t       offset;
     Status      status;
-    time_t      createdAt;
+    time_t      lastActivity;
 
     Transfer()
-        : client(0), target(0), filesize(0), listenerFd(-1), dataFd(-1),
-          port(0), offset(0), status(Pending), createdAt(std::time(0)) {};
+        : clientFd(-1), targetFd(-1), filesize(0), listenerFd(-1), dataFd(-1),
+          port(0), offset(0), status(Pending), lastActivity(std::time(0)) {};
 
-    Transfer(Client *req, Client *targ, std::string name, std::string path,
+    Transfer(int client, int target, std::string name, std::string path,
              off_t size)
-        : client(req), target(targ), filename(name), filepath(path),
+        : clientFd(client), targetFd(target), filename(name), filepath(path),
           filesize(size), listenerFd(-1), dataFd(-1), port(0), offset(0),
-          status(Pending), createdAt(std::time(0)) {}
+          status(Pending), lastActivity(std::time(0)) {}
 };
 
 class TransferManager {
@@ -50,9 +50,8 @@ class TransferManager {
     TransferManager();
     ~TransferManager();
 
-    bool openOffer(Client *requester, Client *target,
-                   const std::string &filename);
-    bool setOfferStatus(Client *target, bool accept);
+    bool openOffer(int clientFd, int targetFd, const std::string &filename);
+    bool setOfferStatus(int targetFd, bool accept);
     void closeOffer();
     bool expired() const;
 
@@ -64,6 +63,7 @@ class TransferManager {
     bool      isActive() const;
     Transfer *current();
     bool      ownsFd(int fd) const;
+    bool      transferDone() const;
 };
 
 #endif

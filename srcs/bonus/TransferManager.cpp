@@ -13,9 +13,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+static const int    CHUNK_SIZE = 1024;
 static const time_t STALE_TIMEOUT = 60;
 static const int    LISTENER_BACKLOG = 8;
-static const int    CHUNK_SIZE = 1024;
 static const char  *FILES_DIR = "files/";
 
 TransferManager::TransferManager() : active_(false) {}
@@ -27,18 +27,21 @@ TransferManager::~TransferManager() {
 // ---- Offer lifecycle --------------------------------------------------------
 
 // true if offered, false if busy / file missing / socket failed
-bool TransferManager::openOffer(Client *requester, Client *target,
+bool TransferManager::openOffer(int clientFd, int targetFd,
                                 const std::string &filename) {
     if (active_) {
         if (!expired())
             return false;
         closeOffer();
     }
+    if (filename.find('/') != std::string::npos ||
+        filename.find("..") != std::sring::npos)
+        return false;
     std::string filepath = std::string(FILES_DIR) + filename;
     off_t       size = 0;
     if (!fileSize_(filepath, size))
         return false;
-    current_ = Transfer(requester, target, filename, filepath, size);
+    current_ = Transfer(clientFd, targetFd, filename, filepath, size);
     if (!openListener_()) {
         closeFds_();
         return false;
@@ -47,8 +50,8 @@ bool TransferManager::openOffer(Client *requester, Client *target,
     return true;
 }
 
-bool TransferManager::setOfferStatus(Client *target, bool accept) {
-    if (!active_ || current_.status != Pending || current_.target != target)
+bool TransferManager::setOfferStatus(int targetFd, bool accept) {
+    if (!active_ || current_.status != Pending || current_.targetFd != targetFd)
         return false;
     current_.status = accept ? Accepted : Rejected;
     if (!accept)
@@ -62,8 +65,7 @@ void TransferManager::closeOffer() {
 }
 
 bool TransferManager::expired() const {
-    return active_ && current_.dataFd == -1 &&
-           std::time(0) - current_.createdAt > STALE_TIMEOUT;
+    return active_ && std::time(0) - current_.lastActivity > STALE_TIMEOUT;
 }
 
 // ---- Listener & connection --------------------------------------------------
@@ -142,10 +144,11 @@ ssize_t TransferManager::sendChunk() {
     std::streamsize n = f.gcount();
     if (n <= 0)
         return 0; // EOF
-    ssize_t sent =
-        ::send(current_.dataFd, buf, static_cast<size_t>(n), MSG_NOSIGNAL);
-    if (sent > 0)
-        current_.offset += sent;
+    ssize_t sent = ::send(current_.dataFd, buf, n, MSG_NOSIGNAL);
+    if (sent <= 0)
+        return sent;
+    current_.lastActivity = std::time(0); // TODO: or move before sent<=0?
+    current_.offset += sent;
     return sent;
 }
 
@@ -165,6 +168,11 @@ Transfer *TransferManager::current() {
 
 bool TransferManager::ownsFd(int fd) const {
     return active_ && (fd == current_.listenerFd || fd == current_.dataFd);
+}
+
+bool TransferManager::transferDone() const {
+    return active_ && (current_.status == Accepted &&
+                       current_.offset >= current_.filesize);
 }
 
 // ---- Helpers ----------------------------------------------------------------
