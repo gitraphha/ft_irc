@@ -33,14 +33,13 @@ bool Handlers::invite(Server &server, Client &client,
             chan.checkInvite(client, target);
         }
         target.addInvite(params[1]);
-        client.sendReply(server.getServerName(),
-                         Reply::reply(Reply::RPL_INVITING,
+        client.sendReply(Reply::reply(Reply::RPL_INVITING,
                                       params[1] + " " + target.getNick()));
         target.send(Reply::fromClient(client.getPrefix(), "INVITE",
                                       target.getNick() + " " + params[1]));
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.getServerName(), e.reply());
+            client.sendReply(e.reply());
     }
     return false;
 }
@@ -75,7 +74,6 @@ bool Handlers::join(Server &server, Client &client,
     std::vector<std::string> keys = params.size() > 1
                                         ? Utils::split(params[1], ',')
                                         : std::vector<std::string>();
-    const std::string       &serverName = server.getServerName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -85,11 +83,11 @@ bool Handlers::join(Server &server, Client &client,
             Channel &ch = cm.at(channels[i]);
             ch.broadcast(
                 Reply::fromClient(client.getPrefix(), "JOIN", channels[i]));
-            ch.sendTopic(serverName, client);
-            ch.sendNames(serverName, client);
+            ch.sendTopic(client);
+            ch.sendNames(client);
         } catch (const Error &e) {
             if (e.hasReply())
-                client.sendReply(serverName, e.reply());
+                client.sendReply(e.reply());
         }
     }
     return false;
@@ -110,8 +108,7 @@ bool Handlers::kick(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::vector<std::string> users = Utils::split(params[1], ',');
     if (channels.size() != users.size() && channels.size() != 1) {
-        client.sendReply(server.getServerName(),
-                         Reply::reply(Reply::ERR_NEEDMOREPARAMS, "KICK"));
+        client.sendReply(Reply::reply(Reply::ERR_NEEDMOREPARAMS, "KICK"));
         return false;
     }
     ChannelManager    &cm = server.getChannelManager();
@@ -131,7 +128,7 @@ bool Handlers::kick(Server &server, Client &client,
             cm.kick(client, chan, user, comment);
         } catch (const Error &e) {
             if (e.hasReply())
-                client.sendReply(server.getServerName(), e.reply());
+                client.sendReply(e.reply());
         }
     }
     return false;
@@ -164,13 +161,11 @@ client (userhost) modes.
 */
 bool Handlers::mode(Server &server, Client &client,
                     const std::vector<std::string> &params) {
-    const std::string &serverName = server.getServerName();
     try {
         Channel &chan = server.getChannelManager().at(params[0]);
         if (params.size() < 2) {
             const std::string modes = chan.modeString(client);
-            client.sendReply(serverName,
-                             Reply::reply(Reply::RPL_CHANNELMODEIS,
+            client.sendReply(Reply::reply(Reply::RPL_CHANNELMODEIS,
                                           chan.getName() + " " + modes));
             return false;
         }
@@ -180,11 +175,9 @@ bool Handlers::mode(Server &server, Client &client,
             Mode::parseChannelModeChanges(modeParams, unknown);
         std::string::const_iterator it = unknown.begin();
         for (; it != unknown.end(); it++) {
-            client.sendReply(serverName,
-                             Reply::reply(Reply::ERR_UNKNOWNMODE,
-                                          Mode::toString(*it),
-                                          "is unknown mode char to me for " +
-                                              chan.getName()));
+            client.sendReply(Reply::reply(
+                Reply::ERR_UNKNOWNMODE, Mode::toString(*it),
+                "is unknown mode char to me for " + chan.getName()));
         }
         if (!changes.size())
             return false;
@@ -193,7 +186,7 @@ bool Handlers::mode(Server &server, Client &client,
         chan.broadcastCmodeChanges(client, applied);
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(serverName, e.reply());
+            client.sendReply(e.reply());
     }
     return false;
 }
@@ -219,19 +212,17 @@ are listed as being on `channel' "*".
 */
 bool Handlers::names(Server &server, Client &client,
                      const std::vector<std::string> &params) {
-    const std::string &serverName = server.getServerName();
     if (params.empty()) {
-        client.sendReply(serverName, Reply::reply(Reply::RPL_ENDOFNAMES, "*"));
+        client.sendReply(Reply::reply(Reply::RPL_ENDOFNAMES, "*"));
         return false;
     }
     std::vector<std::string> chans = Utils::split(params[0], ',');
     for (size_t i = 0; i < chans.size(); i++) {
         try {
             Channel &ch = server.getChannelManager().at(chans[i]);
-            ch.sendNames(serverName, client);
+            ch.sendNames(client);
         } catch (const Error &) {
-            client.sendReply(serverName,
-                             Reply::reply(Reply::RPL_ENDOFNAMES, chans[i]));
+            client.sendReply(Reply::reply(Reply::RPL_ENDOFNAMES, chans[i]));
         }
     }
     return false;
@@ -258,7 +249,6 @@ bool Handlers::part(Server &server, Client &client,
     std::vector<std::string> channels = Utils::split(params[0], ',');
     std::string     reason = (params.size() > 1) ? params[1] : client.getNick();
     ChannelManager &cm = server.getChannelManager();
-    const std::string &serverName = server.getServerName();
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
@@ -266,7 +256,7 @@ bool Handlers::part(Server &server, Client &client,
             cm.part(client, channels[i], reason);
         } catch (const Error &e) {
             if (e.hasReply())
-                client.sendReply(serverName, e.reply());
+                client.sendReply(e.reply());
         }
     }
     return false;
@@ -305,10 +295,10 @@ bool Handlers::topic(Server &server, Client &client,
         if (params.size() > 1)
             ch.setTopic(client, params[1]);
         else
-            ch.sendTopic(server.getServerName(), client);
+            ch.sendTopic(client);
     } catch (const Error &e) {
         if (e.hasReply())
-            client.sendReply(server.getServerName(), e.reply());
+            client.sendReply(e.reply());
     }
     return false;
 }
@@ -326,8 +316,7 @@ bool Handlers::version(Server &server, Client &client,
     (void)params;
     const std::string &serverName = server.getServerName();
     // <version>.<debuglevel> <server> :<comments>
-    client.sendReply(serverName,
-                     Reply::reply(Reply::RPL_VERSION,
+    client.sendReply(Reply::reply(Reply::RPL_VERSION,
                                   server.getServerVersion() + " " + serverName,
                                   "ft_irc"));
     return false;

@@ -75,28 +75,29 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
     std::string          &rdBuffer = sIOD.readBuffer;
     size_t                lfcrPos = rdBuffer.find("\r\n");
 
-    if ((!sIOD.discardMode) && (rdBuffer.length() >= MAXMSGLEN) &&
-        (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2)) {
+    if (!sIOD.discardMode) {
+        if ((rdBuffer.length() < MAXMSGLEN) ||
+            (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2))
+            return lfcrPos;
         sIOD.discardMode = true;
         msgTooLong = true;
     }
-    if (sIOD.discardMode) {
-        if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-            closeSocket(fd);
-            return std::string::npos;
-        }
-        if (lfcrPos != std::string::npos) {
-            rdBuffer.erase(0, lfcrPos + 2);
-            sIOD.discardMode = false;
-            sIOD.recvErrorCount = 0;
-            lfcrPos = rdBuffer.find("\r\n");
-        } else /* lfcrPos == std::string::npos */ {
-            if ('\r' == *rdBuffer.rbegin())
-                rdBuffer = "\r";
-            else
-                rdBuffer.clear();
-        }
+    // discard mode
+    if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+        closeSocket(fd);
+        return std::string::npos;
     }
+    if (lfcrPos != std::string::npos) {
+        rdBuffer.erase(0, lfcrPos + 2);
+        sIOD.discardMode = false;
+        sIOD.recvErrorCount = 0;
+        return rdBuffer.find("\r\n");
+    }
+    // lfcrPos == std::string::npos
+    if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+        rdBuffer = "\r";
+    else
+        rdBuffer.clear();
     return lfcrPos;
 }
 
@@ -104,58 +105,53 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
     sendMsg
     * send string msg to a network socket
     * uses i/o buffers and error counters in SocketIOData
-	* closes the socket (== disconnects the client) in case of too many errors
+	* returns false in case of too many errors - caller must close socket
+
+	NOTE: caller MUST close socket when sendMsg returns false
 */
 bool Socket::sendMsg(int const fd, std::string const &msg) {
     if (socketClosed(fd))
-        return false;
-
+        return true;
     SocketIOData &sIOD = sockIODataStore_.at(fd);
-    ssize_t       bytesSent = -1;
-    bool          success = true;
 
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
-        sIOD.sendErrorCount = SOCKETERRORLIMIT;
-    else {
-        sIOD.writeBuffer += msg;
-        bytesSent = send(fd, sIOD.writeBuffer.c_str(),
-                         sIOD.writeBuffer.length(), MSG_NOSIGNAL);
-        if (bytesSent <= 0)
-            ++sIOD.sendErrorCount;
-    }
-    if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
-        closeSocket(fd);
-        success = false;
+        return false;
+    sIOD.writeBuffer += msg;
+    ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
+                             sIOD.writeBuffer.length(), MSG_NOSIGNAL);
+    if (bytesSent == -1) {
+        ++sIOD.sendErrorCount;
+        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
+            return false;
+        return true;
     }
 
-    {
+    sIOD.sendErrorCount = 0;
+    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
+#if NETCATDBG
         std::ostringstream oss;
         oss << "SendMsg event:\n"
             << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
-        if (!success) {
-            oss << " send to FD " << fd << " failed.";
-            logger_.logMsg(oss.str(), Logger::lmError);
-        } else if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
-            oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-                << ") " << sIOD.writeBuffer.substr(0, bytesSent)
-                << " sent to FD: " << fd;
-            logger_.logMsg(oss.str(), Logger::lmInfo);
-        }
-    }
-
-    if (!success)
-        return false;
-
-    sIOD.sendErrorCount = 0;
-    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
+        oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
+            << ") " << sIOD.writeBuffer.substr(0, bytesSent)
+            << " sent to FD: " << fd;
+        logger_.logMsg(oss.str(), Logger::lmInfo);
+#endif
         sIOD.writeBuffer.erase(0, bytesSent);
-    else
+    } else
         sIOD.writeBuffer.clear();
     return true;
 }
 
+/*
+Performance note: 2 searches of sockIODataStore.
+Wrap in try catch to remove this redundancy
+or make socketClosed return a pointer instead
+*/
 void Socket::closeSocket(int const fd) {
-    SocketIOData &sIOD = sockIODataStore_.at(fd);
+    if (socketClosed(fd))
+        return;
+    SocketIOData &sIOD = sockIODataStore_.at(fd); // throws
 
     std::ostringstream oss;
     if (sIOD.isSrvSocket) {
