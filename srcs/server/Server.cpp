@@ -95,7 +95,7 @@ int Server::createServerSocket_(int const domain) {
 
     srvHelp::bindServerSocket(socketFd, domain, port_);
 
-    if (listen(socketFd, MAX_CONNECTIONS) < 0)
+    if (listen(socketFd, MAX_CONNECTIONQUEUE) < 0)
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
@@ -300,7 +300,7 @@ void Server::run() {
 }
 
 /*
-NOTE: all send should go though server::sendMsg
+   NOTE: all send should go though server::sendMsg
 */
 void Server::sendMsg(int const fd, std::string const &msg) {
     {
@@ -309,7 +309,6 @@ void Server::sendMsg(int const fd, std::string const &msg) {
             << msg.substr(0, msg.length() - 2);
         logger_.logMsg(oss.str(), Logger::lmOut);
     }
-    if (!sockets_.sendMsg(fd, msg)) {
+    if (!sockets_.sendMsg(fd, msg))
         sockets_.closeSocket(fd);
-    }
 }

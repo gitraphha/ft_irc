@@ -13,7 +13,7 @@
 
 #define SERVER_NAME "irc.local"
 #define SERVER_VERSION "1.0"
-#define MAX_CONNECTIONS 512
+#define MAX_CONNECTIONQUEUE 512
 
 class Server {
   private:
