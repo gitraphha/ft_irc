@@ -118,7 +118,6 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         return false;
 
     SocketIOData &sIOD = *sIODptr;
-    ssize_t       bytesSent = -1;
     bool          success = true;
 
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
@@ -135,7 +134,6 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
 
     sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
-#if NETCATDBG
         std::ostringstream oss;
         oss << "SendMsg event:\n"
             << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
@@ -156,9 +154,9 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
-    } else
-        sIOD.writeBuffer.clear();
-    return true;
+
+else sIOD.writeBuffer.clear();
+return true;
 }
 
 /*
