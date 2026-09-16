@@ -118,14 +118,12 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
         return false;
 
     SocketIOData &sIOD = *sIODptr;
-    bool          success = true;
-
     if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
         return false;
     sIOD.writeBuffer += msg;
     ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
                              sIOD.writeBuffer.length(), MSG_NOSIGNAL);
-    if (bytesSent == -1) {
+    if (bytesSent <= 0) {
         ++sIOD.sendErrorCount;
         if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
             return false;
@@ -133,37 +131,13 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     }
 
     sIOD.sendErrorCount = 0;
-    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
-        std::ostringstream oss;
-        oss << "SendMsg event:\n"
-            << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
-        if (!success || bytesSent < 0) {
-            oss << " send to FD " << fd << " failed.";
-            logger_.logMsg(oss.str(), Logger::lmError);
-        } else if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
-            oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
-                << ") " << sIOD.writeBuffer.substr(0, bytesSent)
-                << " sent to FD: " << fd;
-            logger_.logMsg(oss.str(), Logger::lmInfo);
-        }
-    }
-
-    if (!success)
-        return false;
-
-    sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
-
-else sIOD.writeBuffer.clear();
-return true;
+    else
+        sIOD.writeBuffer.clear();
+    return true;
 }
 
-/*
-Performance note: 2 searches of sockIODataStore.
-Wrap in try catch to remove this redundancy
-or make socketClosed return a pointer instead
-*/
 void Socket::closeSocket(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
     if (!sIODptr)
