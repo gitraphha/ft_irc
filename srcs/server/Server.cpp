@@ -124,61 +124,42 @@ void Server::processClientSockets_() {
         pollfd &pfd = pollFds_.at(idx);
 
         if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
-            std::string cmdLine;
-            bool        buffHasMoreCmds = false;
+            bool buffHasMoreCmds = false;
             do {
-#define ERRMSG2CLIENTBYEXCEPT
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                try {
-#endif
-                    bool msgTooLong = false;
-                    cmdLine = sockets_.getCRLFLineFromBuffer(
-                        pfd.fd, buffHasMoreCmds, msgTooLong);
-
-                    {
-                        std::ostringstream oss;
-                        oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": "
-                            << cmdLine;
-                        logger_.logMsg(oss.str(), Logger::lmIn);
-                    }
-                    if (msgTooLong)
-                        cmds_.inputTooLong(*this, pfd.fd);
-                    else if (!cmdLine.empty()) {
-                        bool    closeConnection = false;
-                        Client *client = clients_.find(pfd.fd);
-                        if (!client) {
-                            std::ostringstream oss;
-                            oss << "Internal error: No client data found for "
-                                   "fd:"
-                                << pfd.fd;
-                            log_(oss.str(), Logger::lmError);
-                            closeConnection = true;
-                        } else {
-                            // returns true if connection is to be closed
-                            closeConnection =
-                                cmds_.run(*this, *client, cmdLine);
-                        }
-                        if (closeConnection) {
-                            sockets_.closeSocket(pfd.fd);
-                            break;
-                        }
-                    }
-#ifdef ERRMSG2CLIENTBYEXCEPT
-                } catch (Error const &e) {
-                    if (e.hasReply()) {
-                        Client     *client = clients_.find(pfd.fd);
-                        std::string nickName =
-                            (client ? client->getNick() : "dbgDummyNick");
-                        sendMsg(pfd.fd,
-                                Reply::build(serverName_, nickName, e.reply()));
-                    } else {
-                        std::string tmp(
-                            "Error while trying to get/execute cmd:\n");
-                        tmp.append("'" + cmdLine + "'\n" + e.what());
-                        log_(tmp, Logger::lmExcept);
-                    }
+                bool        msgTooLong = false;
+                std::string cmdLine = sockets_.getCRLFLineFromBuffer(
+                    pfd.fd, buffHasMoreCmds, msgTooLong);
+                {
+                    std::ostringstream oss;
+                    oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": "
+                        << cmdLine;
+                    logger_.logMsg(oss.str(), Logger::lmIn);
                 }
-#endif
+
+                if (msgTooLong) {
+                    cmds_.inputTooLong(*this, pfd.fd);
+                    continue;
+                }
+                if (cmdLine.empty())
+                    continue;
+
+                bool    closeConnection = false;
+                Client *client = clients_.find(pfd.fd);
+                if (!client) {
+                    std::ostringstream oss;
+                    oss << "Internal error: No client data found for "
+                           "fd:"
+                        << pfd.fd;
+                    log_(oss.str(), Logger::lmError);
+                    closeConnection = true;
+                } else {
+                    // returns true if connection is to be closed
+                    closeConnection = cmds_.run(*this, *client, cmdLine);
+                }
+                if (closeConnection) {
+                    sockets_.closeSocket(pfd.fd);
+                    break;
+                }
             } while (buffHasMoreCmds);
         }
     }
