@@ -9,7 +9,7 @@
    to stdout/stderr respectively.
 */
 void Logger::logMsg(std::string msg, logMode const lm) const {
-#ifdef DBGLOG
+#ifndef DBGLOG
     if (lm == Logger::lmIn || lm == Logger::lmOut)
         return;
 #endif
