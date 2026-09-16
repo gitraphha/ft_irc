@@ -3,6 +3,8 @@
 #include <ctime>  // for localtime, strftime, time, time_t
 #include <string> // for basic_string, string
 
+#define DBGLOG
+
 class Logger {
     std::string prefix_;
 
@@ -15,7 +17,7 @@ class Logger {
         return std::string(&buffer[0]);
     }
 
-    enum logMode { lmInfo, lmWarn, lmError, lmExcept };
+    enum logMode { lmInfo, lmWarn, lmError, lmExcept, lmIn, lmOut };
 
     Logger(std::string const &prefix) : prefix_(prefix) {}
 

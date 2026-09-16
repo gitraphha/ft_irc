@@ -9,6 +9,11 @@
    to stdout/stderr respectively.
 */
 void Logger::logMsg(std::string msg, logMode const lm) const {
+#ifdef DBGLOG
+    if (lm == Logger::lmIn || lm == Logger::lmOut)
+        return;
+#endif
+
     std::ostream *os = &std::cout;
     if (lm == Logger::lmError || lm == Logger::lmExcept)
         os = &std::cerr;
@@ -29,6 +34,14 @@ void Logger::logMsg(std::string msg, logMode const lm) const {
         case Logger::lmExcept:
             msg.insert(0, " [EXCEPT]: ");
             *os << CMgnta;
+            break;
+        case Logger::lmIn:
+            msg.insert(0, " [INPUT ]: ");
+            *os << CWhite;
+            break;
+        case Logger::lmOut:
+            msg.insert(0, " [OUTPUT]: ");
+            *os << CBlue;
             break;
     }
     *os << nowStr() << " " << prefix_ << msg << CReset << std::endl;

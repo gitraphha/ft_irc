@@ -93,7 +93,7 @@ int Server::createServerSocket_(int const domain) {
 
     srvHelp::bindServerSocket(socketFd, domain, port_);
 
-    if (listen(socketFd, MAX_CONNECTIONS) < 0)
+    if (listen(socketFd, MAX_CONNECTIONQUEUE) < 0)
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
@@ -145,7 +145,7 @@ void Server::processClientSockets_() {
 void Server::removeClosedSockets_() {
     for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
         pollfd &pfd = pollFds_.at(idx);
-        if (sockets_.socketClosed(pfd.fd)) {
+        if (sockets_.getSockIOData(pfd.fd) == NULL) {
             clients_.remove(pfd.fd, channels_);
             removePollFd_(pfd.fd);
             --idx;
@@ -257,15 +257,15 @@ void Server::run() {
 }
 
 /*
-NOTE: all send should go though server::sendMsg
+   NOTE: all send should go though server::sendMsg
 */
 void Server::sendMsg(int const fd, std::string const &msg) {
-    if (!sockets_.sendMsg(fd, msg)) {
-        sockets_.closeSocket(fd);
-#if NETCATDBG
+    {
         std::ostringstream oss;
-        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
-        logger_.logMsg(oss.str(), Logger::lmError);
-#endif
+        oss << "SendMsg event:\nSendto FD " << fd << ": "
+            << msg.substr(0, msg.length() - 2);
+        logger_.logMsg(oss.str(), Logger::lmOut);
     }
+    if (!sockets_.sendMsg(fd, msg))
+        sockets_.closeSocket(fd);
 }

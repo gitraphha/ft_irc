@@ -32,7 +32,7 @@ class Socket {
     std::map<int, SocketIOData> sockIODataStore_;
     Logger const               &logger_;
 
-    bool   updateBuffer_(int const fd);
+    bool   updateBuffer_(int const fd, SocketIOData &sIOD);
     size_t bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong);
 
   public:
@@ -40,19 +40,11 @@ class Socket {
 
     void        addSocket(int const fd, bool srvSocket);
     bool        checkSocket4Recv(struct pollfd &pfd); // NOLINT
-    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds);
+    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
+                                      bool &msgTooLong);
     bool        sendMsg(int const fd, std::string const &msg);
     void        closeSocket(int const fd);
 
-    bool socketClosed(int const fd) const {
-        return (sockIODataStore_.find(fd) == sockIODataStore_.end());
-    }
-
-    bool isServerSocket(int const fd) const {
-        std::map<int, SocketIOData>::const_iterator it =
-            sockIODataStore_.find(fd);
-        if (it != sockIODataStore_.end())
-            return it->second.isSrvSocket;
-        return false;
-    };
+    SocketIOData *getSockIOData(int const fd);
+    bool          isServerSocket(int const fd);
 };

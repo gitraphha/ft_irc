@@ -90,7 +90,7 @@ void sendWelcome(Server &server, Client &client) {
                                   "are supported by this server"));
     // No MOTD: irssi (and most clients) consider registration finished only
     // after RPL_ENDOFMOTD (376) or ERR_NOMOTD (422).
-    client.sendReply(Reply::reply(Reply::ERR_NOMOTD));
+    client.sendReply(Reply::reply(Reply::ERR_NOMOTD, ""));
 }
 
 } // namespace
@@ -175,7 +175,7 @@ bool Registration::tryRegister(Server &server, Client &client) {
     if (client.isRegistered() || !client.hasIdentity())
         return false;
     if (!client.hasPassAccepted()) {
-        client.sendReply(Reply::reply(Reply::ERR_PASSWDMISMATCH));
+        client.sendReply(Reply::reply(Reply::ERR_PASSWDMISMATCH, ""));
         client.sendClosingMsg("Password incorrect");
         return true; // event loop: flush, then close the connection
     }
