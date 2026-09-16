@@ -6,6 +6,7 @@
 
 #include <arpa/inet.h>
 #include <cstring>
+#include <ctime>
 #include <fcntl.h>
 #include <fstream>
 #include <netinet/in.h>
@@ -23,11 +24,49 @@ TransferManager::~TransferManager() {
     closeFds_();
 }
 
-void TransferManager::setNonBlocking_(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags != -1)
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+// ---- Offer lifecycle --------------------------------------------------------
+
+// true if offered, false if busy / file missing / socket failed
+bool TransferManager::openOffer(Client *requester, Client *target,
+                                const std::string &filename) {
+    if (active_) {
+        if (!expired())
+            return false;
+        closeOffer();
+    }
+    std::string filepath = std::string(FILES_DIR) + filename;
+    off_t       size = 0;
+    if (!fileSize_(filepath, size))
+        return false;
+    current_ = Transfer(requester, target, filename, filepath, size);
+    if (!openListener_()) {
+        closeFds_();
+        return false;
+    }
+    active_ = true;
+    return true;
 }
+
+bool TransferManager::setOfferStatus(Client *target, bool accept) {
+    if (!active_ || current_.status != Pending || current_.target != target)
+        return false;
+    current_.status = accept ? Accepted : Rejected;
+    if (!accept)
+        closeOffer();
+    return true;
+}
+
+void TransferManager::closeOffer() {
+    closeFds_();
+    active_ = false;
+}
+
+bool TransferManager::expired() const {
+    return active_ && current_.dataFd == -1 &&
+           std::time(0) - current_.createdAt > STALE_TIMEOUT;
+}
+
+// ---- Listener & connection --------------------------------------------------
 
 bool TransferManager::openListener_() {
     struct sockaddr_in addr;
@@ -41,9 +80,13 @@ bool TransferManager::openListener_() {
         return false;
 
     int opt = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        ::close(fd);
+        return false;
+    }
 
-    if (::bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (::bind(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) <
+        0) {
         ::close(fd);
         return false;
     }
@@ -54,7 +97,8 @@ bool TransferManager::openListener_() {
     setNonBlocking_(fd);
 
     socklen_t len = sizeof(addr);
-    if (::getsockname(fd, (struct sockaddr *)&addr, &len) < 0) {
+    if (::getsockname(fd, reinterpret_cast<struct sockaddr *>(&addr), &len) <
+        0) {
         ::close(fd);
         return false;
     }
@@ -63,6 +107,67 @@ bool TransferManager::openListener_() {
     current_.port = ntohs(addr.sin_port);
     return true;
 }
+
+// accept() receiver's connection
+int TransferManager::getDataFd() {
+    if (!active_ || current_.status != Accepted || current_.listenerFd == -1)
+        return -1;
+    if (current_.dataFd != -1)
+        return current_.dataFd;
+
+    struct sockaddr_in addr;
+    socklen_t          len = sizeof(addr);
+    int                fd = ::accept(current_.listenerFd,
+                                     reinterpret_cast<struct sockaddr *>(&addr), &len);
+    if (fd < 0)
+        return -1;
+    setNonBlocking_(fd);
+    current_.dataFd = fd;
+    return fd;
+}
+
+// ---- Transfer IO ------------------------------------------------------------
+
+// send 1KB
+ssize_t TransferManager::sendChunk() {
+    if (!active_ || current_.status != Accepted || current_.dataFd == -1)
+        return -1;
+
+    std::ifstream f(current_.filepath.c_str(), std::ios::in | std::ios::binary);
+    if (!f.is_open())
+        return -1;
+    f.seekg(current_.offset);
+    char buf[CHUNK_SIZE];
+    f.read(buf, CHUNK_SIZE);
+    std::streamsize n = f.gcount();
+    if (n <= 0)
+        return 0; // EOF
+    ssize_t sent =
+        ::send(current_.dataFd, buf, static_cast<size_t>(n), MSG_NOSIGNAL);
+    if (sent > 0)
+        current_.offset += sent;
+    return sent;
+}
+
+// ---- State ------------------------------------------------------------------
+
+int TransferManager::getListenerFd() const {
+    return active_ ? current_.listenerFd : -1;
+}
+
+bool TransferManager::isActive() const {
+    return active_;
+}
+
+Transfer *TransferManager::current() {
+    return active_ ? &current_ : 0;
+}
+
+bool TransferManager::ownsFd(int fd) const {
+    return active_ && (fd == current_.listenerFd || fd == current_.dataFd);
+}
+
+// ---- Helpers ----------------------------------------------------------------
 
 void TransferManager::closeFds_() {
     if (current_.listenerFd != -1) {
@@ -87,98 +192,10 @@ bool TransferManager::fileSize_(const std::string &path, off_t &size) const {
     return true;
 }
 
-// true if offered, false if busy / file missing / socket failed
-bool TransferManager::openOffer(Client *requester, Client *target,
-                                const std::string &filename) {
-    if (active_) {
-        if (!stalePending_())
-            return false;
-        closeOffer();
-    }
-    std::string filepath = std::string(FILES_DIR) + filename;
-    off_t       size = 0;
-    if (!fileSize_(filepath, size))
-        return false;
-    current_ = Transfer(requester, target, filename, filepath, size);
-    if (!openListener_()) {
-        closeFds_();
-        return false;
-    }
-    active_ = true;
-    return true;
-}
-
-Transfer *TransferManager::current() {
-    return active_ ? &current_ : 0;
-}
-
-bool TransferManager::setOfferStatus(Client *target, bool accept) {
-    if (!active_ || current_.status != Pending || current_.target != target)
-        return false;
-    current_.status = accept ? Accepted : Rejected;
-    if (!accept)
-        closeOffer();
-    return true;
-}
-
-void TransferManager::closeOffer() {
-    closeFds_();
-    active_ = false;
-}
-
-int TransferManager::getListenerFd() const {
-    return active_ ? current_.listenerFd : -1;
-}
-
-// accept() receiver's connection
-int TransferManager::getDataFd() {
-    if (!active_ || current_.status != Accepted || current_.listenerFd == -1)
-        return -1;
-    if (current_.dataFd != -1)
-        return current_.dataFd;
-
-    struct sockaddr_in addr;
-    socklen_t          len = sizeof(addr);
-    int fd = ::accept(current_.listenerFd, (struct sockaddr *)&addr, &len);
-    if (fd < 0)
-        return -1;
-    char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
-    setNonBlocking_(fd);
-    current_.dataFd = fd;
-    return fd;
-}
-
-// send 1KB bytes
-ssize_t TransferManager::sendChunk() {
-    if (!active_ || current_.status != Accepted || current_.dataFd == -1)
-        return -1;
-
-    std::ifstream f(current_.filepath.c_str(), std::ios::in | std::ios::binary);
-    if (!f.is_open())
-        return -1;
-    f.seekg(current_.offset);
-    char buf[CHUNK_SIZE];
-    f.read(buf, CHUNK_SIZE);
-    std::streamsize n = f.gcount();
-    if (n <= 0)
-        return 0; // EOF
-    ssize_t sent = ::send(current_.dataFd, buf, static_cast<size_t>(n), 0);
-    if (sent > 0)
-        current_.offset += sent;
-    return sent;
-}
-
-bool TransferManager::isActive() const {
-    return active_;
-}
-
-bool TransferManager::stalePending_() const {
-    return active_ && std::time(0) - current_.createdAt > STALE_TIMEOUT;
-}
-
-bool TransferManager::ownsFd(int fd) const {
-    return active_ && (fd == current_.listenerFd || fd == current_.dataFd);
+void TransferManager::setNonBlocking_(int fd) {
+    int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags != -1)
+        ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
 #endif

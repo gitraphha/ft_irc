@@ -19,15 +19,16 @@ class Bot {
     std::string getVersion(const std::string &serverName) const;
 
     bool isForBot(Server &server, const std::vector<std::string> &params) const;
-    std::string unknown() const;
-    std::string help() const;
 
+    void handleMessage(Server &server, Client &client,
+                       const std::string &body) const;
     void handleSend(Server &server, Client &client, const std::string &nick,
                     const std::string &filename) const;
     void handleCTCP(const std::string &serverName, Client &client,
                     const std::string &body) const;
-    void handleMessage(Server &server, Client &client,
-                       const std::string &body) const;
+
+    std::string unknown() const;
+    std::string help() const;
 };
 
 #endif

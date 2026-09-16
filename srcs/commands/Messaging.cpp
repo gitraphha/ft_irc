@@ -51,6 +51,7 @@ void deliverTo(Server &server, Client &from, const std::string &target,
     server.getClientManager().at(target).send(line); // throws 401
 }
 
+// call checkMinParam() before calling deliver()
 bool deliver(Server &server, Client &client,
              const std::vector<std::string> &params, const std::string &cmd,
              bool silent) {

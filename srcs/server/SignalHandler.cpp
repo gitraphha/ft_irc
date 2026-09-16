@@ -51,8 +51,6 @@ SignalHandler::SignalHandler() {
     stopSignals_.push_back(SIGQUIT);
     stopSignals_.push_back(SIGTERM);
 
-    signal(SIGPIPE, SIG_IGN);
-
     if (!setStopSignals_(handleStopSignals_))
         throw std::runtime_error("Setting stop signals failed");
 }

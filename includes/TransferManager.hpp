@@ -41,7 +41,6 @@ class TransferManager {
     bool        openListener_();
     void        closeFds_();
     bool        fileSize_(const std::string &path, off_t &size) const;
-    bool        stalePending_() const;
     static void setNonBlocking_(int fd);
 
     TransferManager(const TransferManager &);
@@ -51,17 +50,20 @@ class TransferManager {
     TransferManager();
     ~TransferManager();
 
-    bool      openOffer(Client *requester, Client *target,
-                        const std::string &filename);
-    Transfer *current();
-    bool      setOfferStatus(Client *target, bool accept);
-    void      closeOffer();
+    bool openOffer(Client *requester, Client *target,
+                   const std::string &filename);
+    bool setOfferStatus(Client *target, bool accept);
+    void closeOffer();
+    bool expired() const;
 
-    int     getListenerFd() const;
-    int     getDataFd();
+    int getDataFd();
+
     ssize_t sendChunk();
-    bool    isActive() const;
-    bool    ownsFd(int fd) const;
+
+    int       getListenerFd() const;
+    bool      isActive() const;
+    Transfer *current();
+    bool      ownsFd(int fd) const;
 };
 
 #endif

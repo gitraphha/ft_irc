@@ -349,6 +349,10 @@ Bot &Server::getBot() {
 void Server::processTransferSocket_() {
     if (!tm_.isActive())
         return;
+    if (tm_.expired()) {
+        tm_.closeOffer();
+        return;
+    }
     int listener = tm_.getListenerFd();
     if (listener == -1)
         return;
@@ -382,10 +386,19 @@ void Server::processTransferSocket_() {
         return;
     }
     if (pfds[1].revents & (POLLOUT | POLLHUP)) {
-        ssize_t sent = tm_.sendChunk();
-        if (sent == 0 || tm_.current()->offset >= tm_.current()->filesize ||
-            (sent < 0 && errno != EAGAIN))
+        Transfer *t = tm_.current();
+        ssize_t   sent = tm_.sendChunk();
+        if (sent == 0 || tm_.current()->offset >= tm_.current()->filesize) {
             tm_.closeOffer();
+            if (t->client)
+                t->client->send(Reply::fromClient(
+                    bot_.getPrefix(serverName_), "PRIVMSG",
+                    t->client->getNick(), "transfer complete"));
+        } else if (sent < 0)
+            if (t->client)
+                t->client->send(
+                    Reply::fromClient(bot_.getPrefix(serverName_), "PRIVMSG",
+                                      t->client->getNick(), "transfer failed"));
     }
 }
 

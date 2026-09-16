@@ -14,6 +14,8 @@
 
 Bot::Bot() : name_("DCCBot") {}
 
+// ---- Identifiers ------------------------------------------------------------
+
 std::string Bot::getPrefix(const std::string &serverName) const {
     return name_ + "!bot@" + serverName;
 }
@@ -21,6 +23,8 @@ std::string Bot::getPrefix(const std::string &serverName) const {
 std::string Bot::getVersion(const std::string &serverName) const {
     return "I am " + name_ + " on " + serverName;
 }
+
+// ---- Command recognition ----------------------------------------------------
 
 /*
 PRIVMSG <target> <cmd>
@@ -60,69 +64,7 @@ bool Bot::isBotCommand_(const std::string &body) const {
     return false;
 }
 
-// should reply "Do you mean xxx" -> like a compiler.
-// make this a bit smarter?
-std::string Bot::unknown() const {
-    return "Unknown command. Try !help";
-}
-
-std::string Bot::help() const {
-    return "Commands: !help, !version, !whoami, !send, !accept, !reject";
-}
-
-/*
-bot !send <nick> <file>
-	bot is initiator, opens a listener,
-	replies buildCTCP("DCC SEND ...") in PRIVMSG to requester
-
-NOTE: DCC receiver connects to the offer IP.
-127.0.0.1 macOS returns broken accepted socket (SO_ERROR=9 / POLLHUP) when a
-process connects to its own LAN IP, which breaks the transfers for same-host
-receivers
-*/
-void Bot::handleSend(Server &server, Client &client, const std::string &nick,
-                     const std::string &filename) const {
-    try {
-        Client          &target = server.getClientManager().at(nick);
-        TransferManager &tm = server.getTransferManager();
-        if (!tm.openOffer(&client, &target, filename)) {
-            client.send(Reply::fromClient(
-                getPrefix(server.getServerName()), "PRIVMSG", target.getNick(),
-                "bot busy or no such file under 'files/' or socket failed"));
-            // TODO make error specific with enum
-            return;
-        }
-        Transfer          *t = tm.current();
-        std::ostringstream dcc;
-        dcc << "DCC SEND " << t->filename << " 127.0.0.1 " << t->port << " "
-            << t->filesize;
-        std::string msg = CTCP::buildCTCP(dcc.str());
-        target.send(Reply::fromClient(getPrefix(server.getServerName()),
-                                      "PRIVMSG", target.getNick(), msg));
-        client.send(Reply::fromClient(getPrefix(server.getServerName()),
-                                      "PRIVMSG", target.getNick(),
-                                      "offer sent to " + nick));
-    } catch (Error &e) {
-        if (e.hasReply())
-            client.sendReply(e.reply());
-    }
-}
-
-void Bot::handleCTCP(const std::string &serverName, Client &client,
-                     const std::string &body) const {
-    std::string              ctcp = CTCP::extractCTCP(body);
-    std::vector<std::string> words = Utils::split(ctcp, ' ');
-    const std::string &text = Utils::foldCase(words.empty() ? "" : words[0]);
-    std::string        msg;
-    if (text == "version")
-        msg = getVersion(serverName);
-    else if (text.compare(0, 4, "ping") == 0)
-        msg = ctcp;
-    else
-        msg = unknown();
-    client.send(Reply::fromClient(getPrefix(serverName), "NOTICE",
-                                  client.getNick(), CTCP::buildCTCP(msg)));
-}
+// ---- Command handlers -------------------------------------------------------
 
 // bot <bot_cmd>
 // #chan <bot_cmd>
@@ -154,6 +96,72 @@ void Bot::handleMessage(Server &server, Client &client,
         msg = unknown();
     client.send(Reply::fromClient(getPrefix(server.getServerName()), "PRIVMSG",
                                   client.getNick(), msg));
+}
+
+/*
+bot !send <nick> <file>
+	bot is initiator, opens a listener,
+	replies buildCTCP("DCC SEND ...") in PRIVMSG to requester
+
+NOTE: DCC receiver connects to the offer IP.
+127.0.0.1 macOS returns broken accepted socket (SO_ERROR=9 / POLLHUP) when a
+process connects to its own LAN IP, which breaks the transfers for same-host
+receivers
+*/
+void Bot::handleSend(Server &server, Client &client, const std::string &nick,
+                     const std::string &filename) const {
+    try {
+        Client          &target = server.getClientManager().at(nick);
+        TransferManager &tm = server.getTransferManager();
+        if (!tm.openOffer(&client, &target, filename)) {
+            client.send(Reply::fromClient(
+                getPrefix(server.getServerName()), "PRIVMSG", client.getNick(),
+                "bot busy or no such file under 'files/' or socket failed"));
+            // TODO make error specific with enum
+            return;
+        }
+        Transfer          *t = tm.current();
+        std::ostringstream dcc;
+        dcc << "DCC SEND " << t->filename << " 127.0.0.1 " << t->port << " "
+            << t->filesize;
+        std::string msg = CTCP::buildCTCP(dcc.str());
+        target.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                      "PRIVMSG", target.getNick(), msg));
+        client.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                      "PRIVMSG", client.getNick(),
+                                      "offer sent to " + target.getNick()));
+    } catch (Error &e) {
+        if (e.hasReply())
+            client.sendReply(e.reply());
+    }
+}
+
+void Bot::handleCTCP(const std::string &serverName, Client &client,
+                     const std::string &body) const {
+    std::string              ctcp = CTCP::extractCTCP(body);
+    std::vector<std::string> words = Utils::split(ctcp, ' ');
+    const std::string &text = Utils::foldCase(words.empty() ? "" : words[0]);
+    std::string        msg;
+    if (text == "version")
+        msg = getVersion(serverName);
+    else if (text.compare(0, 4, "ping") == 0)
+        msg = ctcp;
+    else
+        msg = unknown();
+    client.send(Reply::fromClient(getPrefix(serverName), "NOTICE",
+                                  client.getNick(), CTCP::buildCTCP(msg)));
+}
+
+// ---- Response text ----------------------------------------------------------
+
+// should reply "Do you mean xxx" -> like a compiler.
+// make this a bit smarter?
+std::string Bot::unknown() const {
+    return "Unknown command. Try !help";
+}
+
+std::string Bot::help() const {
+    return "Commands: !help, !version, !whoami, !send, !accept, !reject";
 }
 
 #endif
