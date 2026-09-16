@@ -74,6 +74,11 @@ std::string Bot::help() const {
 bot !send <nick> <file>
 	bot is initiator, opens a listener,
 	replies buildCTCP("DCC SEND ...") in PRIVMSG to requester
+
+NOTE: DCC receiver connects to the offer IP.
+127.0.0.1 macOS returns broken accepted socket (SO_ERROR=9 / POLLHUP) when a
+process connects to its own LAN IP, which breaks the transfers for same-host
+receivers
 */
 void Bot::handleSend(Server &server, Client &client, const std::string &nick,
                      const std::string &filename) const {
@@ -81,20 +86,22 @@ void Bot::handleSend(Server &server, Client &client, const std::string &nick,
         Client          &target = server.getClientManager().at(nick);
         TransferManager &tm = server.getTransferManager();
         if (!tm.openOffer(&client, &target, filename)) {
-            client.send(Reply::fromClient(getPrefix(server.getServerName()),
-                                      "PRIVMSG", target.getNick(),
-                "bot busy or no such file under 'files/' or socket failed");
+            client.send(Reply::fromClient(
+                getPrefix(server.getServerName()), "PRIVMSG", target.getNick(),
+                "bot busy or no such file under 'files/' or socket failed"));
             // TODO make error specific with enum
             return;
         }
         Transfer          *t = tm.current();
         std::ostringstream dcc;
-        dcc << "DCC SEND " << t->filename << " " << tm.getIP() << " " << t->port
-            << " " << t->filesize;
+        dcc << "DCC SEND " << t->filename << " 127.0.0.1 " << t->port << " "
+            << t->filesize;
         std::string msg = CTCP::buildCTCP(dcc.str());
         target.send(Reply::fromClient(getPrefix(server.getServerName()),
                                       "PRIVMSG", target.getNick(), msg));
-        client.send("offer sent to " + nick);
+        client.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                      "PRIVMSG", target.getNick(),
+                                      "offer sent to " + nick));
     } catch (Error &e) {
         if (e.hasReply())
             client.sendReply(e.reply());

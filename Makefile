@@ -30,8 +30,7 @@ SRCS_COMMANDS	= CommandProcessor \
 SRCS_UTILS		= MemberSet \
 				  ModeSet
 
-SRCS_BONUS		= DCC \
-				  Bot \
+SRCS_BONUS		= Bot \
 				  TransferManager
 
 SRCS			= $(SRCS_ROOT) \

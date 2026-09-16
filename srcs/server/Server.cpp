@@ -119,6 +119,10 @@ void Server::processClientSockets_() {
          !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
+#ifdef BONUS
+        if (tm_.ownsFd(pfd.fd))
+            continue;
+#endif
 
         if (sockets_.socketCloseMarker(pfd.fd)) {
             removeClientSocketPfd_(pfd.fd, "Socket marked for closing.");
@@ -314,6 +318,9 @@ void Server::run() {
 
         processServerSocketData_();
         processClientSockets_();
+#ifdef BONUS
+        processTransferSocket_();
+#endif
     }
 }
 
@@ -338,4 +345,48 @@ TransferManager &Server::getTransferManager() {
 Bot &Server::getBot() {
     return bot_;
 }
+
+void Server::processTransferSocket_() {
+    if (!tm_.isActive())
+        return;
+    int listener = tm_.getListenerFd();
+    if (listener == -1)
+        return;
+    int           dataFd = tm_.getDataFd();
+    struct pollfd pfds[2];
+    int           n = 1;
+    pfds[0] = PollFd(listener, POLLIN).pfd;
+    if (dataFd != -1) {
+        pfds[1] = PollFd(dataFd, POLLOUT).pfd;
+        n = 2;
+    }
+    if (poll(pfds, n, 0) <= 0)
+        return;
+    if (pfds[0].revents & (POLLERR | POLLNVAL)) {
+        tm_.closeOffer();
+        return;
+    }
+    if (pfds[0].revents & POLLIN) {
+        dataFd = tm_.getDataFd();
+        if (dataFd < 0)
+            return;
+        pfds[1] = PollFd(dataFd, POLLOUT).pfd;
+        n = 2;
+        if (poll(pfds, n, 0) <= 0)
+            return;
+    }
+    if (n != 2)
+        return;
+    if (pfds[1].revents & (POLLERR | POLLNVAL)) {
+        tm_.closeOffer();
+        return;
+    }
+    if (pfds[1].revents & (POLLOUT | POLLHUP)) {
+        ssize_t sent = tm_.sendChunk();
+        if (sent == 0 || tm_.current()->offset >= tm_.current()->filesize ||
+            (sent < 0 && errno != EAGAIN))
+            tm_.closeOffer();
+    }
+}
+
 #endif

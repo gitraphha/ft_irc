@@ -17,39 +17,10 @@ static const int    LISTENER_BACKLOG = 8;
 static const int    CHUNK_SIZE = 1024;
 static const char  *FILES_DIR = "files/";
 
-TransferManager::TransferManager() : active_(false), ip_(resolveIP_()) {}
+TransferManager::TransferManager() : active_(false) {}
 
 TransferManager::~TransferManager() {
     closeFds_();
-}
-
-/*
-UDP connect without sending a packet to figure out the IP address of bot.
-Port 9 is used for Discard protocol, which accepts incoming data and immediately
-discards it.
-8.8.8.8 any public IP routed via LAN default gateway, to get real IP.
-*/
-std::string TransferManager::resolveIP_() {
-    int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0)
-        return "127.0.0.1";
-
-    struct sockaddr_in addr;
-    std::memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(9);
-    addr.sin_addr.s_addr = inet_addr("8.8.8.8");
-    if ((::connect(fd, (struct sockaddr *)&addr, sizeof(addr))) < 0) {
-        ::close(fd);
-        return "127.0.0.1";
-    }
-
-    socklen_t   len = sizeof(addr);
-    std::string ip = "127.0.0.1";
-    if (::getsockname(fd, (struct sockaddr *)&addr, &len) == 0)
-        ip = inet_ntoa(addr.sin_addr);
-    ::close(fd);
-    return ip;
 }
 
 void TransferManager::setNonBlocking_(int fd) {
@@ -146,7 +117,7 @@ bool TransferManager::setOfferStatus(Client *target, bool accept) {
         return false;
     current_.status = accept ? Accepted : Rejected;
     if (!accept)
-        closeFds_();
+        closeOffer();
     return true;
 }
 
@@ -163,34 +134,38 @@ int TransferManager::getListenerFd() const {
 int TransferManager::getDataFd() {
     if (!active_ || current_.status != Accepted || current_.listenerFd == -1)
         return -1;
+    if (current_.dataFd != -1)
+        return current_.dataFd;
 
     struct sockaddr_in addr;
     socklen_t          len = sizeof(addr);
     int fd = ::accept(current_.listenerFd, (struct sockaddr *)&addr, &len);
     if (fd < 0)
         return -1;
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
     setNonBlocking_(fd);
     current_.dataFd = fd;
     return fd;
 }
 
 // send 1KB bytes
-ssize_t TransferManager::sendChunk(int dataFd, off_t &offset) {
-    if (!active_ || current_.status != Accepted)
+ssize_t TransferManager::sendChunk() {
+    if (!active_ || current_.status != Accepted || current_.dataFd == -1)
         return -1;
 
     std::ifstream f(current_.filepath.c_str(), std::ios::in | std::ios::binary);
     if (!f.is_open())
         return -1;
-    f.seekg(offset);
+    f.seekg(current_.offset);
     char buf[CHUNK_SIZE];
     f.read(buf, CHUNK_SIZE);
     std::streamsize n = f.gcount();
     if (n <= 0)
         return 0; // EOF
-    ssize_t sent = ::send(dataFd, buf, static_cast<size_t>(n), 0);
+    ssize_t sent = ::send(current_.dataFd, buf, static_cast<size_t>(n), 0);
     if (sent > 0)
-        offset += sent;
+        current_.offset += sent;
     return sent;
 }
 
@@ -199,12 +174,11 @@ bool TransferManager::isActive() const {
 }
 
 bool TransferManager::stalePending_() const {
-    return active_ && current_.status == Pending &&
-           std::time(0) - current_.createdAt > STALE_TIMEOUT;
+    return active_ && std::time(0) - current_.createdAt > STALE_TIMEOUT;
 }
 
-const std::string &TransferManager::getIP() const {
-    return ip_;
+bool TransferManager::ownsFd(int fd) const {
+    return active_ && (fd == current_.listenerFd || fd == current_.dataFd);
 }
 
 #endif

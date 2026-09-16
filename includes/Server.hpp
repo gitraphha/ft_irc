@@ -36,8 +36,19 @@ class Server {
     CommandProcessor cmds_;
 
 #ifdef BONUS
+    struct PollFd {
+        struct pollfd pfd;
+
+        PollFd(int fd, short events) {
+            pfd.fd = fd;
+            pfd.events = events;
+            pfd.revents = 0;
+        }
+    };
+
     TransferManager tm_;
     Bot             bot_;
+    void            processTransferSocket_();
 #endif
 
     size_t                     numServerSockets_;

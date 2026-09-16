@@ -19,31 +19,30 @@ struct Transfer {
     int         listenerFd;
     int         dataFd;
     int         port;
+    off_t       offset;
     Status      status;
     time_t      createdAt;
 
     Transfer()
         : client(0), target(0), filesize(0), listenerFd(-1), dataFd(-1),
-          port(0), status(Pending), createdAt(std::time(0)) {};
+          port(0), offset(0), status(Pending), createdAt(std::time(0)) {};
 
     Transfer(Client *req, Client *targ, std::string name, std::string path,
              off_t size)
         : client(req), target(targ), filename(name), filepath(path),
-          filesize(size), listenerFd(-1), dataFd(-1), port(0), status(Pending),
-          createdAt(std::time(0)) {}
+          filesize(size), listenerFd(-1), dataFd(-1), port(0), offset(0),
+          status(Pending), createdAt(std::time(0)) {}
 };
 
 class TransferManager {
-    bool        active_; // one transfer at a time. true = busy.
-    Transfer    current_;
-    std::string ip_;
+    bool     active_; // one transfer at a time. true = busy.
+    Transfer current_;
 
-    bool               openListener_();
-    void               closeFds_();
-    bool               fileSize_(const std::string &path, off_t &size) const;
-    bool               stalePending_() const;
-    static std::string resolveIP_();
-    static void        setNonBlocking_(int fd);
+    bool        openListener_();
+    void        closeFds_();
+    bool        fileSize_(const std::string &path, off_t &size) const;
+    bool        stalePending_() const;
+    static void setNonBlocking_(int fd);
 
     TransferManager(const TransferManager &);
     TransferManager &operator=(const TransferManager &);
@@ -56,15 +55,13 @@ class TransferManager {
                         const std::string &filename);
     Transfer *current();
     bool      setOfferStatus(Client *target, bool accept);
-    // bool      acceptOffer(Client *target);
-    // bool      rejectOffer(Client *target);
-    void closeOffer();
+    void      closeOffer();
 
-    int                getListenerFd() const;
-    int                getDataFd();
-    ssize_t            sendChunk(int dataFd, off_t &offset);
-    bool               isActive() const;
-    const std::string &getIP() const;
+    int     getListenerFd() const;
+    int     getDataFd();
+    ssize_t sendChunk();
+    bool    isActive() const;
+    bool    ownsFd(int fd) const;
 };
 
 #endif
