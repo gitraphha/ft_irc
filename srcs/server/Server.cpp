@@ -125,18 +125,41 @@ void Server::processClientSockets_() {
             continue;
         bool buffHasMoreCmds = false;
         do {
-            std::string cmdLine =
-                sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+
+            bool        msgTooLong = false;
+            std::string cmdLine = sockets_.getCRLFLineFromBuffer(
+                pfd.fd, buffHasMoreCmds, msgTooLong);
+
+            {
+                std::ostringstream oss;
+                oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
+                logger_.logMsg(oss.str(), Logger::lmIn);
+            }
+            if (msgTooLong) {
+                cmds_.inputTooLong(*this, pfd.fd);
+                continue;
+            }
             if (cmdLine.empty())
                 continue;
+
             Client *client = clients_.find(pfd.fd);
-            if (!client)
-                break;
-            // returns true if connection is to be closed
-            if (cmds_.run(*this, *client, cmdLine)) {
+            bool    closeConnection = false;
+            if (!client) {
+                std::ostringstream oss;
+                oss << "Internal error: No client data found for "
+                       "fd:"
+                    << pfd.fd;
+                log_(oss.str(), Logger::lmError);
+                closeConnection = true;
+            } else {
+                // returns true if connection is to be closed
+                closeConnection = cmds_.run(*this, *client, cmdLine);
+            }
+            if (closeConnection) {
                 sockets_.closeSocket(pfd.fd);
                 break;
             }
+
         } while (buffHasMoreCmds);
     }
     removeClosedSockets_();

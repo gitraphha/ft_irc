@@ -82,10 +82,6 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
             (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2))
             return lfcrPos;
-    if (!sIOD.discardMode) {
-        if ((rdBuffer.length() < MAXMSGLEN) ||
-            (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2))
-            return lfcrPos;
         sIOD.discardMode = true;
         msgTooLong = true;
     }
@@ -137,16 +133,11 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     sIOD.sendErrorCount = 0;
     if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
         sIOD.writeBuffer.erase(0, bytesSent);
-    } else
+    else
         sIOD.writeBuffer.clear();
     return true;
 }
 
-/*
-Performance note: 2 searches of sockIODataStore.
-Wrap in try catch to remove this redundancy
-or make socketClosed return a pointer instead
-*/
 void Socket::closeSocket(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
     if (!sIODptr)
