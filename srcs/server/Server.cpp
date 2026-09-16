@@ -308,7 +308,12 @@ void Server::run() {
         // Reaping client happens in processClientSockets_ when poll() returns.
         // With poll(-1), an idle loop would sleep forver and never reap these fds,
         // so wake it up every 1000.
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), 1000);
+		int timeout = 1000;
+		#ifdef BONUS
+		if (tm_.isActive())
+			timeout = 100;
+		#endif
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), timeout);
         if (pollResult == -1) {
             if (SignalHandler::stopLoopSignalReceived())
                 break;

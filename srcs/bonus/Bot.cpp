@@ -113,11 +113,11 @@ void Bot::handleSend(Server &server, Client &client, const std::string &nick,
     try {
         Client          &target = server.getClientManager().at(nick);
         TransferManager &tm = server.getTransferManager();
-        if (!tm.openOffer(client.getFd(), target.getFd(), filename)) {
-            client.send(Reply::fromClient(
-                getPrefix(server.getServerName()), "PRIVMSG", client.getNick(),
-                "bot busy or no such file under 'files/' or socket failed"));
-            // TODO make error specific with enum
+        std::string      err =
+            tm.openOffer(client.getFd(), target.getFd(), filename);
+        if (!err.empty()) {
+            client.send(Reply::fromClient(getPrefix(server.getServerName()),
+                                          "PRIVMSG", client.getNick(), err));
             return;
         }
         Transfer          *t = tm.current();

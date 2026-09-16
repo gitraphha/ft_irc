@@ -26,28 +26,28 @@ TransferManager::~TransferManager() {
 
 // ---- Offer lifecycle --------------------------------------------------------
 
-// true if offered, false if busy / file missing / socket failed
-bool TransferManager::openOffer(int clientFd, int targetFd,
-                                const std::string &filename) {
+// returns error msg or ""
+std::string TransferManager::openOffer(int clientFd, int targetFd,
+                                       const std::string &filename) {
     if (active_) {
         if (!expired())
-            return false;
+            return "bot busy";
         closeOffer();
     }
     if (filename.find('/') != std::string::npos ||
-        filename.find("..") != std::sring::npos)
-        return false;
+        filename.find("..") != std::string::npos)
+        return "invalid filename";
     std::string filepath = std::string(FILES_DIR) + filename;
     off_t       size = 0;
     if (!fileSize_(filepath, size))
-        return false;
+        return std::string("file not found under ") + FILES_DIR;
     current_ = Transfer(clientFd, targetFd, filename, filepath, size);
     if (!openListener_()) {
         closeFds_();
-        return false;
+        return "socket error, try again later";
     }
     active_ = true;
-    return true;
+    return "";
 }
 
 bool TransferManager::setOfferStatus(int targetFd, bool accept) {
@@ -146,8 +146,8 @@ ssize_t TransferManager::sendChunk() {
         return 0; // EOF
     ssize_t sent = ::send(current_.dataFd, buf, n, MSG_NOSIGNAL);
     if (sent <= 0)
-        return sent;
-    current_.lastActivity = std::time(0); // TODO: or move before sent<=0?
+        return 0;
+    current_.lastActivity = std::time(0);
     current_.offset += sent;
     return sent;
 }

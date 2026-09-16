@@ -50,10 +50,11 @@ class TransferManager {
     TransferManager();
     ~TransferManager();
 
-    bool openOffer(int clientFd, int targetFd, const std::string &filename);
-    bool setOfferStatus(int targetFd, bool accept);
-    void closeOffer();
-    bool expired() const;
+    std::string openOffer(int clientFd, int targetFd,
+                          const std::string &filename);
+    bool        setOfferStatus(int targetFd, bool accept);
+    void        closeOffer();
+    bool        expired() const;
 
     int getDataFd();
 
