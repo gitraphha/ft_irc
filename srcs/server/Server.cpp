@@ -123,45 +123,46 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
-            bool buffHasMoreCmds = false;
-            do {
-                bool        msgTooLong = false;
-                std::string cmdLine = sockets_.getCRLFLineFromBuffer(
-                    pfd.fd, buffHasMoreCmds, msgTooLong);
-                {
-                    std::ostringstream oss;
-                    oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": "
-                        << cmdLine;
-                    logger_.logMsg(oss.str(), Logger::lmIn);
-                }
+        if (!(sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)))
+            continue;
+        bool buffHasMoreCmds = false;
+        do {
 
-                if (msgTooLong) {
-                    cmds_.inputTooLong(*this, pfd.fd);
-                    continue;
-                }
-                if (cmdLine.empty())
-                    continue;
+            bool        msgTooLong = false;
+            std::string cmdLine = sockets_.getCRLFLineFromBuffer(
+                pfd.fd, buffHasMoreCmds, msgTooLong);
 
-                bool    closeConnection = false;
-                Client *client = clients_.find(pfd.fd);
-                if (!client) {
-                    std::ostringstream oss;
-                    oss << "Internal error: No client data found for "
-                           "fd:"
-                        << pfd.fd;
-                    log_(oss.str(), Logger::lmError);
-                    closeConnection = true;
-                } else {
-                    // returns true if connection is to be closed
-                    closeConnection = cmds_.run(*this, *client, cmdLine);
-                }
-                if (closeConnection) {
-                    sockets_.closeSocket(pfd.fd);
-                    break;
-                }
-            } while (buffHasMoreCmds);
-        }
+            {
+                std::ostringstream oss;
+                oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
+                logger_.logMsg(oss.str(), Logger::lmIn);
+            }
+
+            if (msgTooLong) {
+                cmds_.inputTooLong(*this, pfd.fd);
+                continue;
+            }
+            if (cmdLine.empty())
+                continue;
+
+            Client *client = clients_.find(pfd.fd);
+            bool    closeConnection = false;
+            if (!client) {
+                std::ostringstream oss;
+                oss << "Internal error: No client data found for "
+                       "fd:"
+                    << pfd.fd;
+                log_(oss.str(), Logger::lmError);
+                closeConnection = true;
+            } else {
+                // returns true if connection is to be closed
+                closeConnection = cmds_.run(*this, *client, cmdLine);
+            }
+            if (closeConnection) {
+                sockets_.closeSocket(pfd.fd);
+                break;
+            }
+        } while (buffHasMoreCmds);
     }
     removeClosedSockets_();
 }
