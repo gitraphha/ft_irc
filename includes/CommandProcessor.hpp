@@ -51,9 +51,9 @@ class CommandProcessor {
     bool run(Server &server, Client &client, const std::string &line);
     void add(const std::string &name, const Command &cmd);
 
-    void inputTooLong(Server &srv, int const fd) {
+    void inputTooLong(Server &srv, Client &client) {
         (void)srv;
-        (void)fd;
+        (void)client;
         // tbd.
     };
 };

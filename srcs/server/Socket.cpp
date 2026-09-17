@@ -59,7 +59,7 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
             return "";
     }
     size_t lfcrPos = bufferLengthAndSanityCheck_(fd, msgTooLong);
-    if (msgTooLong || lfcrPos == std::string::npos)
+    if (lfcrPos == std::string::npos)
         return "";
 
     std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
@@ -84,24 +84,30 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
             return lfcrPos;
         sIOD.discardMode = true;
         msgTooLong = true;
+        ++sIOD.recvErrorCount;
     }
+
     // discard mode
-    if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+    while (lfcrPos != std::string::npos && lfcrPos > MAXMSGLEN - 2) {
+        ++sIOD.recvErrorCount;
+        rdBuffer.erase(0, lfcrPos + 2);
+        lfcrPos = rdBuffer.find("\r\n");
+    }
+    if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
         closeSocket(fd);
         return std::string::npos;
     }
     if (lfcrPos != std::string::npos) {
-        rdBuffer.erase(0, lfcrPos + 2);
         sIOD.discardMode = false;
         sIOD.recvErrorCount = 0;
-        return rdBuffer.find("\r\n");
+        return lfcrPos;
     }
     // lfcrPos == std::string::npos
     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
     else
         rdBuffer.clear();
-    return lfcrPos;
+    return std::string::npos;
 }
 
 /*
