@@ -125,7 +125,6 @@ void Server::processClientSockets_() {
             continue;
         bool buffHasMoreCmds = false;
         do {
-
             bool        msgTooLong = false;
             std::string cmdLine = sockets_.getCRLFLineFromBuffer(
                 pfd.fd, buffHasMoreCmds, msgTooLong);
@@ -135,12 +134,6 @@ void Server::processClientSockets_() {
                 oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
                 logger_.logMsg(oss.str(), Logger::lmIn);
             }
-            if (msgTooLong) {
-                cmds_.inputTooLong(*this, pfd.fd);
-                continue;
-            }
-            if (cmdLine.empty())
-                continue;
 
             Client *client = clients_.find(pfd.fd);
             bool    closeConnection = false;
@@ -152,6 +145,10 @@ void Server::processClientSockets_() {
                 log_(oss.str(), Logger::lmError);
                 closeConnection = true;
             } else {
+                if (msgTooLong)
+                    cmds_.inputTooLong(*this, *client);
+                if (cmdLine.empty())
+                    continue;
                 // returns true if connection is to be closed
                 closeConnection = cmds_.run(*this, *client, cmdLine);
             }
@@ -159,7 +156,6 @@ void Server::processClientSockets_() {
                 sockets_.closeSocket(pfd.fd);
                 break;
             }
-
         } while (buffHasMoreCmds);
     }
     removeClosedSockets_();
