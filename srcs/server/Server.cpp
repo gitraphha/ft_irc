@@ -123,7 +123,7 @@ void Server::processClientSockets_() {
         struct {
 			bool closeSocket;
 			std::string closeMsg;
-		} closeData = {.closeSocket = true, .closeMsg = ""};
+		} closeData = {false, ""};
 
         if (!(sockets_.checkSocketData(pfd.fd) && sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
