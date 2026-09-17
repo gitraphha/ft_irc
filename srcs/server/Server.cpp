@@ -175,10 +175,12 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    if (!msg.empty() && !sockets_.isServerSocket(fd)) {
-        Client *client = clients_.find(fd);
-        if (client)
-            client->sendClosingMsg(msg);
+    if (!sockets_.isServerSocket(fd)) {
+        if (!msg.empty()) {
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg(msg);
+        }
         clients_.remove(fd, channels_);
     }
     sockets_.closeSocket(fd);
