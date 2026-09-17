@@ -154,7 +154,7 @@ void Server::processClientSockets_() {
         };
 
         if (closeSocket) {
-            removeClientSocketPfd_(pfd.fd, "Wrong client input.");
+            removeClientSocketPfd_(pfd.fd, "");
             --idx;
         }
     }
@@ -278,7 +278,7 @@ void Server::run() {
    NOTE: all send should go though server::sendMsg
 */
 void Server::sendMsg(int const fd, std::string const &msg) {
-    {
+    if (msg.length() > 2) {
         std::ostringstream oss;
         oss << "SendMsg event:\nSendto FD " << fd << ": "
             << msg.substr(0, msg.length() - 2);
