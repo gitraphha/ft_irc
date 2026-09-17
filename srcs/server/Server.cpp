@@ -124,8 +124,11 @@ void Server::processClientSockets_() {
             std::string closeMsg;
         } closeData = {false, ""};
 
-        if (!(sockets_.checkSocketData(pfd.fd) &&
-              sockets_.updateBuffer_(pfd))) {
+        if (pfd.revents & (POLLERR | POLLHUP)) {
+            closeData.closeSocket = true;
+            closeData.closeMsg = "Socket POLLERR / POLLHUP.";
+        } else if (!(sockets_.checkSocketData(pfd.fd) &&
+                     sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Socket error while updating buffer.";
         }
