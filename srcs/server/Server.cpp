@@ -121,14 +121,15 @@ void Server::processClientSockets_() {
             continue;
 
         struct {
-			bool closeSocket;
-			std::string closeMsg;
-		} closeData = {false, ""};
+            bool        closeSocket;
+            std::string closeMsg;
+        } closeData = {false, ""};
 
-        if (!(sockets_.checkSocketData(pfd.fd) && sockets_.updateBuffer_(pfd))) {
+        if (!(sockets_.checkSocketData(pfd.fd) &&
+              sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
-			closeData.closeMsg = "Socket error while updating buffer.";
-		}
+            closeData.closeMsg = "Socket error while updating buffer.";
+        }
 
         bool buffHasMoreCmds = true;
         while (buffHasMoreCmds && !closeData.closeSocket) {
@@ -137,8 +138,8 @@ void Server::processClientSockets_() {
                 pfd.fd, buffHasMoreCmds, msgTooLong);
             if (sockets_.socketCloseMarker(pfd.fd)) {
                 closeData.closeSocket = true;
-				closeData.closeMsg = "Socket error while composing command line from buffer.";
-                break;
+                closeData.closeMsg =
+                    "Error while composing command line from buffer.";
             }
 
             Client *client = clients_.find(pfd.fd);
@@ -147,7 +148,7 @@ void Server::processClientSockets_() {
                 oss << "Internal error: No client data for fd:" << pfd.fd;
                 log_(oss.str(), Logger::lmError);
                 closeData.closeSocket = true;
-				closeData.closeMsg = oss.str();
+                closeData.closeMsg = oss.str();
                 break;
             }
 
@@ -163,8 +164,8 @@ void Server::processClientSockets_() {
             }
 
             // returns true if connection is to be closed
-                closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
-				closeData.closeMsg = "";
+            closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
+            closeData.closeMsg = "";
         };
 
         if (closeData.closeSocket) {
