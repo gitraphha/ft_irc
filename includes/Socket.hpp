@@ -8,7 +8,7 @@
 #include <sys/types.h> // for ssize_t
 #include <utility>     // for pair
 
-#define RECVBUFFLEN 4196
+#define RECVBUFFLEN 4096
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 3
 
@@ -39,10 +39,11 @@ class Socket {
     Socket(Logger const &logger) : logger_(logger) {}
 
     void        addSocket(int const fd, bool srvSocket);
+    bool        checkSocketData(int const fd);
     std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                       bool &msgTooLong);
     bool        sendMsg(int const fd, std::string const &msg);
-    bool       &socketCloseMarker(int const fd);
+    bool        socketCloseMarker(int const fd);
     void        closeSocket(int const fd);
 
     bool          updateBuffer_(struct pollfd &pfd);
