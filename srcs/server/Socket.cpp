@@ -11,6 +11,10 @@ void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
 }
 
+bool Socket::checkSocketData(int const fd) {
+    return (getSockIOData(fd) != NULL);
+}
+
 bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
     if ((pfd.revents & POLLERR)) {
         ++sIOD.recvErrorCount;
@@ -146,30 +150,30 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
     return true;
 }
 
-bool &Socket::socketCloseMarker(int const fd) {
-    static bool   closed = true;
+bool Socket::socketCloseMarker(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
     if (!sIODptr)
-        return closed;
+        return true;
     return sIODptr->closeFd;
 }
 
 void Socket::closeSocket(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
+    int const     addrFam = srvHelp::sockAddrFamily(fd);
+    close(fd);
+
     if (!sIODptr)
         return;
-    SocketIOData &sIOD = *sIODptr;
-
+    SocketIOData      &sIOD = *sIODptr;
     std::ostringstream oss;
     if (sIOD.isSrvSocket) {
-        oss << "Closing server socket ("
-            << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
+        oss << "Closing server socket (" << srvHelp::getAdressFamilyStr(addrFam)
+            << ")";
     } else {
         oss << "Closing client sockFd:" << fd;
     }
     logger_.logMsg(oss.str(), Logger::lmInfo);
 
-    close(fd);
     sockIODataStore_.erase(fd);
 }
 

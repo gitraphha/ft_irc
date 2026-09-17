@@ -116,25 +116,37 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (!(pfd.revents & POLLIN))
+        if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
             continue;
 
-        bool &closeSocket = sockets_.socketCloseMarker(pfd.fd);
-        if (!sockets_.updateBuffer_(pfd))
-            closeSocket = true;
+        struct {
+			bool closeSocket;
+			std::string closeMsg;
+		} closeData = {false, ""};
+
+        if (!(sockets_.checkSocketData(pfd.fd) && sockets_.updateBuffer_(pfd))) {
+            closeData.closeSocket = true;
+			closeData.closeMsg = "Socket error while updating buffer.";
+		}
 
         bool buffHasMoreCmds = true;
-        while (buffHasMoreCmds && !closeSocket) {
+        while (buffHasMoreCmds && !closeData.closeSocket) {
             bool        msgTooLong = false;
             std::string cmdLine = sockets_.getCRLFLineFromBuffer(
                 pfd.fd, buffHasMoreCmds, msgTooLong);
+            if (sockets_.socketCloseMarker(pfd.fd)) {
+                closeData.closeSocket = true;
+				closeData.closeMsg = "Socket error while composing command line from buffer.";
+                break;
+            }
 
             Client *client = clients_.find(pfd.fd);
             if (!client) {
                 std::ostringstream oss;
                 oss << "Internal error: No client data for fd:" << pfd.fd;
                 log_(oss.str(), Logger::lmError);
-                closeSocket = true;
+                closeData.closeSocket = true;
+				closeData.closeMsg = oss.str();
                 break;
             }
 
@@ -150,18 +162,19 @@ void Server::processClientSockets_() {
             }
 
             // returns true if connection is to be closed
-            closeSocket = cmds_.run(*this, *client, cmdLine);
+                closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
+				closeData.closeMsg = "";
         };
 
-        if (closeSocket) {
-            removeClientSocketPfd_(pfd.fd, "");
+        if (closeData.closeSocket) {
+            removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
             --idx;
         }
     }
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    if (!sockets_.isServerSocket(fd)) {
+    if (!msg.empty() && !sockets_.isServerSocket(fd)) {
         Client *client = clients_.find(fd);
         if (client)
             client->sendClosingMsg(msg);
@@ -284,5 +297,6 @@ void Server::sendMsg(int const fd, std::string const &msg) {
             << msg.substr(0, msg.length() - 2);
         logger_.logMsg(oss.str(), Logger::lmOut);
     }
-    sockets_.sendMsg(fd, msg);
+    if (!sockets_.sendMsg(fd, msg))
+        removeClientSocketPfd_(fd, "Error while sending Msg.");
 }
