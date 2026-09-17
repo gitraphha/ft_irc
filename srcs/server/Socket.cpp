@@ -90,26 +90,28 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         }
     }
     // discard mode
-    while (lfcrPos != std::string::npos && lfcrPos > MAXMSGLEN - 2) {
+    while (sIOD.discardMode) {
         if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT)
             break;
-        rdBuffer.erase(0, lfcrPos + 2);
-        lfcrPos = rdBuffer.find("\r\n");
+        if (lfcrPos != std::string::npos) {
+            rdBuffer.erase(0, lfcrPos + 2);
+            lfcrPos = rdBuffer.find("\r\n");
+            sIOD.discardMode =
+                (lfcrPos == std::string::npos || lfcrPos > MAXMSGLEN - 2);
+        }
+        if (lfcrPos == std::string::npos) {
+            if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+                rdBuffer = "\r";
+            else
+                rdBuffer.clear();
+            return std::string::npos;
+        }
     }
     if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
         sIOD.closeFd = true;
         return std::string::npos;
     }
-    if (lfcrPos != std::string::npos) {
-        sIOD.discardMode = false;
-        return lfcrPos;
-    }
-    // lfcrPos == std::string::npos
-    if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
-        rdBuffer = "\r";
-    else
-        rdBuffer.clear();
-    return std::string::npos;
+    return lfcrPos;
 }
 
 /*
