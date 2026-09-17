@@ -38,7 +38,7 @@ class Server {
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
     void processClientSockets_();
-    void removeClosedSockets_();
+    void removeClientSocketPfd_(int const fd, std::string const &msg);
     void storePollFd_(int const socketFd, bool srvSocket);
     void removePollFd_(int const fd);
     void log_(std::string const &msg, Logger::logMode const lm);
