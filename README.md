@@ -32,9 +32,9 @@ make bonus && ./ircserv_bonus <port> <password>
 # connect with netcat and register
 nc <host> <port>
 PASS <password>
-NICK blnunez-
-USER blnunez- 0 * :Bastien
-JOIN #general
+NICK <nick>
+USER <user> 0 * :<realname>
+JOIN #channel
 ```
 
 Port must be in the range `1-65535`, a password must be supplied.
@@ -50,7 +50,7 @@ Port must be in the range `1-65535`, a password must be supplied.
 - `PING`/`PONG` — keepalive and latency check.
 
 ### Channels
-- `JOIN <#channel> [<key>]` — join (or create) a channel; optional key for `+k`.
+- `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
 - `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
 - `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
 - `INVITE <nick> <#channel>` — invite a user (subject to `+i`).
@@ -59,12 +59,8 @@ Port must be in the range `1-65535`, a password must be supplied.
 - `MODE <#channel> [modes]` — view/set channel modes and user modes.
 
 ### Messaging
-- `PRIVMSG <target> <message>` — send a message.
+- `PRIVMSG <target> <message>` — send a message. The bonus bot answers PRIVMSG addressed to it.
 - `NOTICE <target> <message>` — send a notice (no auto-reply / CTCP handling).
-
-### Server / Operations
-- `OPER <nick> <password>` — become an IRC operator.
-- `QUIT [<msg>]` — leave the network.
 
 ### Channel Modes
 | Mode | Argument | Meaning |
@@ -82,21 +78,44 @@ Modes act on the target `nick`: hosts `~` founder, `&` admin, `@` operator, `%` 
 
 ---
 
+## Bonus: DCC Bot & File Transfer
+
+Built with `make bonus` → `./ircserv_bonus <port> <password>`.
+
+### DCCBot
+
+A bot named `DCCBot` (also reached as `bot` / `BOT` / `#bot`, or by sending a bot command to any channel) that intercepts `PRIVMSG`: bot commands are answered with `PRIVMSG`, CTCP queries with `NOTICE`.
+
+| Command          | Action |
+|------------------|--------|
+| `!help`          | List the available bot commands |
+| `!version`       | Report the bot/server version |
+| `!whoami`        | Show the requester's nick |
+| `!send <nick> <file>` | Start a DCC SEND offer of `files/<file>` |
+| `!accept`        | Accept the pending transfer offer |
+| `!reject`        | Reject the pending transfer offer |
+
+CTCP queries (`\x01VERSION\x01`, `\x01PING <token>\x01`) sent to the bot via `PRIVMSG` are answered by the bot with `NOTICE`.
+
+### File transfer (DCC SEND)
+
+`!send` opens a listener on an OS-picked port and hands the target a CTCP `DCC SEND <file> 127.0.0.1 <port> <size>` line. The receiver replies with `!accept`, connects to the advertised address/port and receives the file in 1 KiB chunks. Only one transfer is active at a time (`bot busy` otherwise). Pending offers expire after 60 seconds. Offered files must live in a `files/` directory next to the server; filenames containing `/` or `..` are rejected.
+
+---
+
 ## Clang tool commands
 
 ```sh
-# Run clang-format before PR (use clang-format version 21)
+# clang-format all headers and sources
 make format
-```
 
-```sh
-# Run clang-tidy on individual file
+# clang-tidy one file
 make tidy FILE=srcs/<filename>
 
-# Run clang-tidy on multiple files (filenames without spaces)
+# clang-tidy on multiple files (filenames without spaces)
 make tidy FILE="srcs/<a.cpp> srcs/<b.cpp>"
 
-# Run clang-tidy on all .cpp/.hpp under srcs and includes
+# clang-tidy every source and header
 make tidy-all
 ```
 
@@ -119,6 +138,12 @@ TODO: add poll and client
 **Challenge:** Channels are created on join, destroyed when the last member parts, and must never hold a pointer to a freed `Client`.
 
 **Solution:** `ChannelManager` owns `Channel` objects in a case-folded map and cleans up empty channels after PART/KICK/leaveAll. `MemberSet` stores `Client*` + `ModeSet`. `ClientManager::remove` first parts the client from every channel (via `ChannelManager::leaveAll`) before freeing the `Client`, so channel member vectors never dangle.
+
+### Bonus: CTCP & DCC SEND through the Bot
+
+**Challenge:** The CTCP mechanic used by DCC is barely documented anywhere. You can forward a CTCP by stripping the wrapping `\x01` bytes and re-sending what is inside. But to actually run a file transfer the server needs to hand the receiver a `\x01DCC SEND <file> <ip> <port> <size>\x01` line, open a listener the receiver can connect to, and stream the file. Wiring the two bonuses together (bot + transfer manager) with the bot as the middleman got complicated as the design evolved, and real clients silently abstract all of this away so there was no reference.
+
+**Solution:** Make the bot the DCC sender. `!send` asks the `TransferManager` to validate the filename, open a listener on an OS-picked port, and return the offer port/size. The bot then builds the `DCC SEND ... 127.0.0.1 <port> <size>` CTCP and delivers it wrapped in `\x01` to the target over `PRIVMSG`. The receiver just replies `!accept` and connects to the advertised address/port — which means the whole flow works over a plain `nc` session, no IRC client needed. Using the bot to construct and send the CTCP also makes the query path symmetric: the same `PRIVMSG` interception that answers `!help`/`!version` carries the DCC offer, and CTCP responses go back out as `NOTICE`. Transfer state (offer → accept/reject → stream → expire after 60 s) stayed in `TransferManager`, while the bot is a dumb messenger.
 
 ---
 
