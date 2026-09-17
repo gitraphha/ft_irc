@@ -8,7 +8,7 @@
 #include <sys/types.h> // for ssize_t
 #include <utility>     // for pair
 
-#define RECVBUFFLEN 1024
+#define RECVBUFFLEN 4196
 #define MAXMSGLEN 512
 #define SOCKETERRORLIMIT 3
 
@@ -22,29 +22,30 @@ class Socket {
         size_t      sendErrorCount;
         bool        discardMode;
         bool        isSrvSocket;
-        bool        fdClosed;
+        bool        closeFd;
 
         SocketIOData(bool srvSocket)
             : bytesRead(0), recvErrorCount(0), sendErrorCount(0),
-              discardMode(false), isSrvSocket(srvSocket), fdClosed(false) {}
+              discardMode(false), isSrvSocket(srvSocket), closeFd(false) {}
     };
 
     std::map<int, SocketIOData> sockIODataStore_;
     Logger const               &logger_;
 
-    bool   updateBuffer_(int const fd, SocketIOData &sIOD);
-    size_t bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong);
+    size_t bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong);
+    bool   checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD); // NOLINT
 
   public:
     Socket(Logger const &logger) : logger_(logger) {}
 
     void        addSocket(int const fd, bool srvSocket);
-    bool        checkSocket4Recv(struct pollfd &pfd); // NOLINT
     std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                       bool &msgTooLong);
     bool        sendMsg(int const fd, std::string const &msg);
+    bool       &socketCloseMarker(int const fd);
     void        closeSocket(int const fd);
 
+    bool          updateBuffer_(struct pollfd &pfd);
     SocketIOData *getSockIOData(int const fd);
     bool          isServerSocket(int const fd);
 };

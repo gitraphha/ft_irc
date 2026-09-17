@@ -33,14 +33,7 @@ Server::Server(int const port, std::string const &password)
 Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
-        if (!sockets_.isServerSocket(fd)) {
-            Client *client = clients_.find(fd);
-            if (client)
-                client->sendClosingMsg("Server shutdown - goodbye");
-            clients_.remove(fd, channels_);
-        }
-        sockets_.closeSocket(fd);
-        this->removePollFd_(fd);
+        removeClientSocketPfd_(fd, "Server shutdown - goodbye");
     }
 }
 
@@ -124,13 +117,32 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (!(sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)))
+        if (!(pfd.revents & POLLIN))
             continue;
-        bool buffHasMoreCmds = false;
-        do {
+
+        bool &closeSocket = sockets_.socketCloseMarker(pfd.fd);
+        if (!sockets_.updateBuffer_(pfd))
+            closeSocket = true;
+
+        bool buffHasMoreCmds = true;
+        while (buffHasMoreCmds && !closeSocket) {
             bool        msgTooLong = false;
             std::string cmdLine = sockets_.getCRLFLineFromBuffer(
                 pfd.fd, buffHasMoreCmds, msgTooLong);
+
+            Client *client = clients_.find(pfd.fd);
+            if (!client) {
+                std::ostringstream oss;
+                oss << "Internal error: No client data for fd:" << pfd.fd;
+                log_(oss.str(), Logger::lmError);
+                closeSocket = true;
+                break;
+            }
+
+            if (msgTooLong)
+                cmds_.inputTooLong(*this, *client);
+            if (cmdLine.empty())
+                continue;
 
             {
                 std::ostringstream oss;
@@ -138,41 +150,26 @@ void Server::processClientSockets_() {
                 logger_.logMsg(oss.str(), Logger::lmIn);
             }
 
-            Client *client = clients_.find(pfd.fd);
-            bool    closeConnection = false;
-            if (!client) {
-                std::ostringstream oss;
-                oss << "Internal error: No client data found for "
-                       "fd:"
-                    << pfd.fd;
-                log_(oss.str(), Logger::lmError);
-                closeConnection = true;
-            } else {
-                if (msgTooLong)
-                    cmds_.inputTooLong(*this, *client);
-                if (cmdLine.empty())
-                    continue;
-                // returns true if connection is to be closed
-                closeConnection = cmds_.run(*this, *client, cmdLine);
-            }
-            if (closeConnection) {
-                sockets_.closeSocket(pfd.fd);
-                break;
-            }
-        } while (buffHasMoreCmds);
-    }
-    removeClosedSockets_();
-}
+            // returns true if connection is to be closed
+            closeSocket = cmds_.run(*this, *client, cmdLine);
+        };
 
-void Server::removeClosedSockets_() {
-    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
-        pollfd &pfd = pollFds_.at(idx);
-        if (sockets_.getSockIOData(pfd.fd) == NULL) {
-            clients_.remove(pfd.fd, channels_);
-            removePollFd_(pfd.fd);
+        if (closeSocket) {
+            removeClientSocketPfd_(pfd.fd, "Wrong client input.");
             --idx;
         }
     }
+}
+
+void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
+    if (!sockets_.isServerSocket(fd)) {
+        Client *client = clients_.find(fd);
+        if (client)
+            client->sendClosingMsg(msg);
+        clients_.remove(fd, channels_);
+    }
+    sockets_.closeSocket(fd);
+    removePollFd_(fd);
 }
 
 void Server::acceptClient_(int const serverFd) {
@@ -288,6 +285,5 @@ void Server::sendMsg(int const fd, std::string const &msg) {
             << msg.substr(0, msg.length() - 2);
         logger_.logMsg(oss.str(), Logger::lmOut);
     }
-    if (!sockets_.sendMsg(fd, msg))
-        sockets_.closeSocket(fd);
+    sockets_.sendMsg(fd, msg);
 }
