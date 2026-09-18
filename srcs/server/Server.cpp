@@ -129,8 +129,9 @@ void Server::processClientSockets_() {
             std::string closeMsg;
         } closeData = {false, ""};
 
-        // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
-        // BUG: on this line POLLHUP wins and it never registers client, directly closes
+        /* POLLHUP is deliberately not treated as an error, a client that sends
+         * and closes at once (e.g. printf ... | nc) still has data in the receive
+         * buffer, so it is read normally; recv() returning 0 closes it afterwards. */
         if (pfd.revents & POLLERR) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Socket POLLERR.";
