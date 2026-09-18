@@ -15,6 +15,7 @@ bool Socket::checkSocketData(int const fd) {
     return (getSockIOData(fd) != NULL);
 }
 
+// TODO: not used anymore as POLLERR closes socket nad updateBuffer is not called
 bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
     if ((pfd.revents & POLLERR)) {
         ++sIOD.recvErrorCount;
@@ -67,13 +68,13 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
         return "";
     SocketIOData &sIOD = *sIODptr;
 
-    size_t lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
-    if (lfcrPos == std::string::npos)
-        return "";
-
-    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
-    sIOD.recvErrorCount = 0;
-    sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+    size_t      lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+    std::string cmdLine;
+    if (lfcrPos != std::string::npos) {
+        cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+        sIOD.recvErrorCount = 0;
+        sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+    }
     buffHasMoreCmds = ((sIOD.readBuffer.size() > MAXMSGLEN) ||
                        (sIOD.readBuffer.find("\r\n") != std::string::npos));
     return cmdLine;
@@ -103,8 +104,6 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         rdBuffer.erase(0, lfcrPos + 2);
         sIOD.discardMode = false;
         return std::string::npos;
-        // TODO handle remaining valid line.
-        // else client is stalled until next recv.
     }
     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
@@ -148,8 +147,9 @@ void Socket::sendMsg(int const fd, std::string const &msg) {
 
 bool Socket::socketCloseMarker(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
-    // avoid double removal
-    return sIODptr && sIODptr->closeFd;
+    if (!sIODptr)
+        return true;
+    return sIODptr->closeFd;
 }
 
 void Socket::closeSocket(int const fd) {

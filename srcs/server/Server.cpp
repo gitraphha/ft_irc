@@ -102,6 +102,7 @@ void Server::processServerSocketData_() {
          ++idx) {
         struct pollfd const &serverPollFds = pollFds_.at(idx);
         if ((serverPollFds.revents & POLLERR))
+            // defensible but server exits if this happens
             throw std::runtime_error("Server socket error.");
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
@@ -184,9 +185,6 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    // avoid double removal
-    if (!sockets_.checkSocketData(fd))
-        return;
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
