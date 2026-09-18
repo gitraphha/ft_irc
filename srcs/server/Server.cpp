@@ -121,8 +121,8 @@ void Server::processClientSockets_() {
         pollfd &pfd = pollFds_.at(idx);
 #ifdef BONUS
         // Transfer listener/data fds are never registered in pollfds_, so this
-		// never fires today. Kept as future-proofing: if transfer_fd is ever added
-		// to pollfds_
+        // never fires today. Kept as future-proofing: if transfer_fd is ever added
+        // to pollfds_
         if (tm_.ownsFd(pfd.fd))
             continue;
 #endif
@@ -311,11 +311,11 @@ void Server::run() {
         // Reaping client happens in processClientSockets_ when poll() returns.
         // With poll(-1), an idle loop would sleep forver and never reap these fds,
         // so wake it up every 1000.
-		int timeout = 1000;
-		#ifdef BONUS
-		if (tm_.isActive())
-			timeout = 100;
-		#endif
+        int timeout = 1000;
+#ifdef BONUS
+        if (tm_.isActive())
+            timeout = 100;
+#endif
         int pollResult = poll(pollFds_.data(), pollFds_.size(), timeout);
         if (pollResult == -1) {
             if (SignalHandler::stopLoopSignalReceived())
@@ -402,7 +402,7 @@ void Server::processTransferSocket_() {
     std::string msg;
     if (sent < 0)
         msg = "transfer failed";
-	else if (tm_.transferDone())
+    else if (tm_.transferDone())
         msg = "transfer complete";
     else
         return;
