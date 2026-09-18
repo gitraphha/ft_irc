@@ -184,6 +184,7 @@ void Channel::applyKeyMode_(Client &client, const Mode::ModeChange &change,
                             Mode::ModeChanges &applied) {
     if (change.op == Mode::Remove) {
         setKey("");
+        modes_.setMode(Mode::Key, false);
         applied.push_back(change);
         return;
     }
@@ -199,6 +200,7 @@ void Channel::applyKeyMode_(Client &client, const Mode::ModeChange &change,
         return;
     }
     setKey(change.arg);
+    modes_.setMode(Mode::Key, true);
     applied.push_back(change);
 }
 
@@ -210,6 +212,7 @@ void Channel::applyUserLimitMode_(Client                 &client,
         "expressed in base 10";
     if (change.op == Mode::Remove) {
         setUserLimit(0);
+        modes_.setMode(Mode::UserLimit, false);
         applied.push_back(change);
         return;
     }
@@ -222,6 +225,7 @@ void Channel::applyUserLimitMode_(Client                 &client,
         return;
     }
     setUserLimit(val);
+    modes_.setMode(Mode::UserLimit, true);
     applied.push_back(change);
 }
 

@@ -228,7 +228,7 @@ struct Message {
 // reply() with default text from text().
 //   reply(ERR_NOSUCHNICK, "bob") -> code=401, body="bob :No such nick/channel"
 //   reply(RPL_MYINFO, "irc.local 1.0 itkol") -> code=4, body="irc.local 1.0 itkol"
-inline Message reply(Code code, const std::string &params) {
+inline Message reply(Code code, const std::string &params = "") {
     const char *t = text(code);
     if (*t != '\0')
         return Message(code, params, t);
