@@ -23,6 +23,7 @@ class Socket {
         bool        discardMode;
         bool        isSrvSocket;
         bool        closeFd;
+        std::string closeMsg;
 
         SocketIOData(bool srvSocket)
             : bytesRead(0), recvErrorCount(0), sendErrorCount(0),
@@ -38,15 +39,15 @@ class Socket {
   public:
     Socket(Logger const &logger) : logger_(logger) {}
 
-    void        addSocket(int const fd, bool srvSocket);
-    bool        checkSocketData(int const fd);
-    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
-                                      bool &msgTooLong);
-    void        sendMsg(int const fd, std::string const &msg);
-    bool        socketCloseMarker(int const fd);
-    void        closeSocket(int const fd);
-
+    void          addSocket(int const fd, bool srvSocket);
+    std::string   getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
+                                        bool &msgTooLong);
+    void          sendMsg(int const fd, std::string const &msg);
+    bool          socketCloseMarker(int const fd);
+    void          setSocketCloseState(int const fd, bool doClose,
+                                      std::string const &closeMsg = "");
     bool          updateBuffer_(struct pollfd &pfd);
-    SocketIOData *getSockIOData(int const fd);
-    bool          isServerSocket(int const fd);
+    SocketIOData &getSockIOData(int const fd);
+    void          closeSocket(int const fd);
+    bool          removeSockIOData(int const fd) throw();
 };

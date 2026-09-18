@@ -11,16 +11,13 @@ void Socket::addSocket(int const fd, bool srvSocket) {
     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
 }
 
-bool Socket::checkSocketData(int const fd) {
-    return (getSockIOData(fd) != NULL);
-}
-
 // TODO: not used anymore as POLLERR closes socket nad updateBuffer is not called
 bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
     if ((pfd.revents & POLLERR)) {
         ++sIOD.recvErrorCount;
         if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
             sIOD.closeFd = true;
+            sIOD.closeMsg = "SOCKETERRORLIMIT exceeded (POLLERR)";
             return false;
         }
     }
@@ -28,10 +25,9 @@ bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
 }
 
 bool Socket::updateBuffer_(struct pollfd &pfd) {
-    SocketIOData *sIODptr = getSockIOData(pfd.fd);
-    if (!sIODptr || sIODptr->closeFd)
+    SocketIOData &sIOD = getSockIOData(pfd.fd);
+    if (sIOD.closeFd)
         return false;
-    SocketIOData &sIOD = *sIODptr;
 
     if (!checkSocket4Recv(pfd, sIOD))
         return false;
@@ -41,16 +37,16 @@ bool Socket::updateBuffer_(struct pollfd &pfd) {
     if (sIOD.bytesRead <= 0) {
         ++sIOD.recvErrorCount;
         if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
-            {
-                std::ostringstream oss;
-                oss << "Client sockFd:" << pfd.fd;
-                if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
-                    oss << " exceeded error limit (" << SOCKETERRORLIMIT << ")";
-                else if (sIOD.bytesRead == 0)
-                    oss << " closed connection on their side";
-                logger_.logMsg(oss.str(), Logger::lmInfo);
-            }
+            std::ostringstream clntSockInfo;
+            clntSockInfo << "Client sockFd:" << pfd.fd << ": ";
+            std::string reason;
+            if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+                reason = "SOCKETERRORLIMIT exceeded (recv)";
+            else if (sIOD.bytesRead == 0)
+                reason = "closed connection on their side";
+            logger_.logMsg(clntSockInfo.str() + reason, Logger::lmInfo);
             sIOD.closeFd = true;
+            sIOD.closeMsg = reason;
             return false;
         }
         return true;
@@ -63,13 +59,9 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                           bool &msgTooLong) {
     buffHasMoreCmds = false;
 
-    SocketIOData *sIODptr = getSockIOData(fd);
-    if (!sIODptr)
-        return "";
-    SocketIOData &sIOD = *sIODptr;
-
-    size_t      lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
-    std::string cmdLine;
+    SocketIOData &sIOD = getSockIOData(fd);
+    size_t        lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+    std::string   cmdLine;
     if (lfcrPos != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
         sIOD.recvErrorCount = 0;
@@ -98,14 +90,13 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
     // discard mode
     if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
         sIOD.closeFd = true;
+        sIOD.closeMsg = "SOCKETERRORLIMIT exceeded (discard mode)";
         return std::string::npos;
     }
     if (lfcrPos != std::string::npos) {
         rdBuffer.erase(0, lfcrPos + 2);
         sIOD.discardMode = false;
         return std::string::npos;
-        // TODO handle remaining valid line.
-        // else client is stalled until next recv.
     }
     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
@@ -120,14 +111,14 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
     * uses i/o buffers and error counters in SocketIOData
 */
 void Socket::sendMsg(int const fd, std::string const &msg) {
-    SocketIOData *sIODptr = getSockIOData(fd);
-    if (!sIODptr)
+    SocketIOData &sIOD = getSockIOData(fd);
+    if (sIOD.closeFd)
         return;
 
-    SocketIOData &sIOD = *sIODptr;
     if (msg.length() >
         sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length()) {
         sIOD.closeFd = true;
+        sIOD.closeMsg = "SOCKETERRORLIMIT exceeded (write buffer overflow)";
         return;
     }
     sIOD.writeBuffer += msg;
@@ -135,8 +126,10 @@ void Socket::sendMsg(int const fd, std::string const &msg) {
                              sIOD.writeBuffer.length(), MSG_NOSIGNAL);
     if (bytesSent <= 0) {
         ++sIOD.sendErrorCount;
-        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
+        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
             sIOD.closeFd = true;
+            sIOD.closeMsg = "SOCKETERRORLIMIT exceeded (send)";
+        }
         return;
     }
 
@@ -148,9 +141,14 @@ void Socket::sendMsg(int const fd, std::string const &msg) {
 }
 
 bool Socket::socketCloseMarker(int const fd) {
-    SocketIOData *sIODptr = getSockIOData(fd);
-    // avoid double removal
-    return sIODptr && sIODptr->closeFd;
+    return getSockIOData(fd).closeFd;
+}
+
+void Socket::setSocketCloseState(int const fd, bool doClose,
+                                 std::string const &closeMsg) {
+    SocketIOData &sIOD = getSockIOData(fd);
+    sIOD.closeFd = doClose;
+    sIOD.closeMsg = closeMsg;
 }
 
 /*
@@ -159,36 +157,41 @@ Wrap in try catch to remove this redundancy
 or make socketClosed return a pointer instead
 */
 void Socket::closeSocket(int const fd) {
-    SocketIOData *sIODptr = getSockIOData(fd);
-    if (!sIODptr) {
-        close(fd);
-        return;
+    try {
+        SocketIOData      &sIOD = getSockIOData(fd);
+        int const          addrFam = srvHelp::sockAddrFamily(fd);
+        std::ostringstream oss;
+        if (sIOD.isSrvSocket)
+            oss << "Closing server socket ("
+                << srvHelp::getAdressFamilyStr(addrFam) << ")";
+        else
+            oss << "Closing client sockFd:" << fd;
+        logger_.logMsg(oss.str(), Logger::lmInfo);
+        sockIODataStore_.erase(fd);
+    } catch (std::exception const &e) {
+        std::ostringstream oss;
+        oss << "Error while closing socket Fd:" << fd
+            << ": Cannot get socketIOData (fd will be closed anyways)";
+        logger_.logMsg(oss.str(), Logger::lmWarn);
     }
-    // call sockAddrFamily only on known fd
-    int const          addrFam = srvHelp::sockAddrFamily(fd);
-    SocketIOData      &sIOD = *sIODptr;
-    std::ostringstream oss;
-    if (sIOD.isSrvSocket)
-        oss << "Closing server socket (" << srvHelp::getAdressFamilyStr(addrFam)
-            << ")";
-    else
-        oss << "Closing client sockFd:" << fd;
-    logger_.logMsg(oss.str(), Logger::lmInfo);
-
     close(fd);
-    sockIODataStore_.erase(fd);
 }
 
-Socket::SocketIOData *Socket::getSockIOData(int const fd) {
+Socket::SocketIOData &Socket::getSockIOData(int const fd) {
     std::map<int, SocketIOData>::iterator it = sockIODataStore_.find(fd);
-    if (it == sockIODataStore_.end())
-        return NULL;
-    return &(it->second);
+    if (it == sockIODataStore_.end()) {
+        std::ostringstream oss;
+        oss << "Couldn't retrieve socketIOData for fd:" << fd;
+        throw std::runtime_error(oss.str());
+    }
+    return it->second;
 }
 
-bool Socket::isServerSocket(int const fd) {
-    SocketIOData const *const sIODptr = getSockIOData(fd);
-    if (sIODptr)
-        return sIODptr->isSrvSocket;
-    return false;
+bool Socket::removeSockIOData(int const fd) throw() {
+    return (sockIODataStore_.erase(fd) > 0);
 }
+
+// bool Socket::isServerSocket(int const fd) {
+//     SocketIOData const &sIOD = getSockIOData(fd);
+//     return sIOD.isSrvSocket;
+// }
