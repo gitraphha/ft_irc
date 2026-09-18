@@ -47,7 +47,7 @@ Please note that you may need system admin permissions to use privileged ports (
 ### Registration
 - `PASS <password>` — authenticate during registration.
 - `NICK <nickname>` — set/change the nick.
-- `USER <nick> <mode> <unused> <realname>` — complete registration credentials.
+- `USER <user> <mode> <unused> <realname>` — complete registration credentials.
 
 ### Channels
 - `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
