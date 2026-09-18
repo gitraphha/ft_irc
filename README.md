@@ -1,6 +1,6 @@
 *This project has been created as part of the 42 curriculum by blnunez-, kmurugan, rhaas.*
 
-# <p align="center"> ft_irc - IRC Server </p>
+#ft_irc - IRC Server
 
 ## Description
 
@@ -10,7 +10,7 @@
 Build an IRC server in C++98 that handles multiple concurrent clients over TCP, implementing the core IRC protocol (registration, channels, modes, private messaging, and operator commands) over an event-driven sockets layer.
 
 ### Overview
-**ft_irc** is a 42 project that teaches event-driven I/O, the poll/epoll multiplexing model, and the IRC protocol. The server listens on a given port and password, accepts multiple clients via non-blocking sockets, registers them with PASS/NICK/USER, and lets them join channels, exchange private and channel messages, and manage channels with KICK/INVITE/TOPIC/MODE and operator privileges.
+**ft_irc** is a 42 project that teaches event-driven I/O, the poll multiplexing model, and the IRC protocol. The server listens on a given port and password, accepts multiple clients via non-blocking sockets, registers them with PASS/NICK/USER, and lets them join channels, exchange private and channel messages, and manage channels with KICK/INVITE/TOPIC/MODE and operator privileges.
 
 ---
 
@@ -37,7 +37,8 @@ USER <user> 0 * :<realname>
 JOIN #channel
 ```
 
-Port must be in the range `1-65535`, a password must be supplied.
+Port must be in the range `1-65535`, a password must be supplied.\
+Please note that you may need system admin permissions to use privileged ports (usually 1–1023).
 
 ---
 
@@ -47,14 +48,13 @@ Port must be in the range `1-65535`, a password must be supplied.
 - `PASS <password>` — authenticate during registration.
 - `NICK <nickname>` — set/change the nick.
 - `USER <nick> <mode> <unused> <realname>` — complete registration credentials.
-- `PING`/`PONG` — keepalive and latency check.
 
 ### Channels
 - `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
 - `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
 - `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
-- `INVITE <nick> <#channel>` — invite a user (subject to `+i`).
-- `TOPIC <#channel> [<topic>]` — view/set the topic (may require `+t`).
+- `INVITE <nick> <#channel>` — invite a user (may require operator rank).
+- `TOPIC <#channel> [<topic>]` — view/set the topic (may require operator rank).
 - `NAMES <#channel>` — list current members.
 - `MODE <#channel> [modes]` — view/set channel modes and user modes.
 
@@ -72,9 +72,12 @@ Port must be in the range `1-65535`, a password must be supplied.
 | `l`  | yes | User limit — max concurrent members |
 
 ### Channel User Modes
-`q` Founder · `a` Admin · `o` Operator · `h` Half-operator · `v` Voice
+`o` Operator · none
 
-Modes act on the target `nick`: hosts `~` founder, `&` admin, `@` operator, `%` half-op, `+` voice. Privileges are rank-ordered (Founder > Admin > Operator > Half-op > Voice > none) and rules enforcing who may act on whom are checked on every MODE/KICK.
+Modes act on the target `nick` and are shown as `@` for operator or none for regular users. Privileges are checked on every call to a command that needs elevated privileges (this may also depend on the state of a channel, e.g. whether changing the TOPIC is restricted or not).
+
+### Other
+- `PING`/`PONG` — keepalive and latency check.
 
 ---
 
@@ -83,6 +86,11 @@ Modes act on the target `nick`: hosts `~` founder, `&` admin, `@` operator, `%` 
 Built with `make bonus` → `./ircserv_bonus <port> <password>`.
 
 ### DCCBot
+
+| Abbr.| Meaning   |
+|------|---------------------------|
+| CTCP | Client-to-client protocol |
+| DDC  | Direct Client-to-Client   |
 
 A bot named `DCCBot` (also reached as `bot` / `BOT` / `#bot`, or by sending a bot command to any channel) that intercepts `PRIVMSG`: bot commands are answered with `PRIVMSG`, CTCP queries with `NOTICE`.
 
@@ -125,13 +133,17 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 ## Key Challenges & Solutions
 
-TODO: add poll and client
-
 ### Protocol-Correct Error Replies
 
 **Challenge:** Every command can fail in several ways (wrong channel, no such nick, missing params, insufficient privileges) and each failure must produce the correct RFC 2812 numeric to the client.
 
 **Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text. A central `Error` exception carries a pre-built reply. Command processing throws `Error::reply(...)` on the first invalid condition and the server loop catches it once, formats `:server <code> <nick> <params> :<text>\r\n`, and sends it — guaranteeing exactly one well-formed reply per failure and keeping handlers free of repetitive error plumbing.
+
+### Usage of `poll` and buffers
+
+**Challenge:** Apart from setting up sockets correctly for receiving data streams, caching and handling of incomplete or overlong messages needed to be implemented. Additionally, a certain amount of fault tolerance was desired, e.g. for not disconnecting a client on the first too long message.
+
+**Solution:** Before passing on any data to command parsers and processors, the validity of a full line is checked. No incomplete or overlong data is ever forwarded to the internal handlers. Additionally an error counter is installed separately for each client, which limits the amount of consecutive errors and is reset on every valid input.
 
 ### Channel Lifetime & Ownership
 
