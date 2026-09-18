@@ -30,7 +30,7 @@ make bonus && ./ircserv_bonus <port> <password>
 
 ```sh
 # connect with netcat and register
-nc -C <host> <port>   # -C sends CRLF line endings, which the server requires (on macOS use -c)
+nc -C <host> <port>   # -C sends CRLF line endings (on macOS use -c)
 PASS <password>
 NICK <nick>
 USER <user> 0 * :<realname>
