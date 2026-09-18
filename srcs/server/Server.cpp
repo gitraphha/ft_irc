@@ -1,8 +1,6 @@
 #include "Server.hpp"
 
 #include "Client.hpp"        // for Client
-#include "Errors.hpp"        // for Error
-#include "Reply.hpp"         // for build
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
@@ -104,6 +102,7 @@ void Server::processServerSocketData_() {
          ++idx) {
         struct pollfd const &serverPollFds = pollFds_.at(idx);
         if ((serverPollFds.revents & POLLERR))
+            // defensible but server exits if this happens
             throw std::runtime_error("Server socket error.");
         if (serverPollFds.revents & POLLIN)
             acceptClient_(serverPollFds.fd);
@@ -130,9 +129,10 @@ void Server::processClientSockets_() {
             std::string closeMsg;
         } closeData = {false, ""};
 
-        // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
-        // BUG: on this line POLLHUP wins and it never registers client, directly closes
-        if (pfd.revents & (POLLERR|POLLHUP)) {
+        /* POLLHUP is deliberately not treated as an error, a client that sends
+         * and closes at once (e.g. printf ... | nc) still has data in the receive
+         * buffer, so it is read normally; recv() returning 0 closes it afterwards. */
+        if (pfd.revents & POLLERR) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Socket POLLERR.";
         } else if (!(sockets_.checkSocketData(pfd.fd) &&
