@@ -1,6 +1,6 @@
 *This project has been created as part of the 42 curriculum by blnunez-, kmurugan, rhaas.*
 
-#ft_irc - IRC Server
+# ft_irc - IRC Server
 
 ## Description
 
