@@ -52,7 +52,7 @@ Please note that you may need system admin permissions to use privileged ports (
 ### Channels
 - `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
 - `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
-- `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
+- `KICK <#channel> <nick> [<msg>]` — remove a member (the issuer must outrank the target).
 - `INVITE <nick> <#channel>` — invite a user (may require operator rank).
 - `TOPIC <#channel> [<topic>]` — view/set the topic (may require operator rank).
 - `NAMES <#channel>` — list current members.
@@ -137,7 +137,8 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 **Challenge:** Every command can fail in several ways (wrong channel, no such nick, missing params, insufficient privileges) and each failure must produce the correct RFC 2812 numeric to the client.
 
-**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text. A central `Error` exception carries a pre-built reply. Command processing throws `Error::reply(...)` on the first invalid condition and the server loop catches it once, formats `:server <code> <nick> <params> :<text>\r\n`, and sends it — guaranteeing exactly one well-formed reply per failure and keeping handlers free of repetitive error plumbing.
+**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text, and an `Error` carries a pre-built `Reply::Message`.`CommandProcessor::run` validates the command name, registration state,
+operator requirement and parameter count up front. On the first bad condition it sends the error to the offending client via `sendError_` and stops that command line without throwing. Lower-level helpers (`Channel`, `ChannelManager`, `ClientManager`) still throw `Error`, and each handler wraps its calls in a small local `try/catch (Error)` that forwards `e.reply()` to the client. Every failure therefore produces exactly one well-formed `:server <code> <nick> <params> :<text>\r\n`, and no exception escapes into the event loop.
 
 ### Usage of `poll` and buffers
 
@@ -145,11 +146,23 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 **Solution:** Before passing on any data to command parsers and processors, the validity of a full line is checked. No incomplete or overlong data is ever forwarded to the internal handlers. Additionally an error counter is installed separately for each client, which limits the amount of consecutive errors and is reset on every valid input.
 
+### Single-Author Event Loop
+
+**Challenge:** One person owned the whole loop, so every change touched it all at once and nothing could be changed in isolation. `Server` and `Socket` were not separated into distinct jobs, and the work arrived as one PR with 30-50 commits, making every review unsafe.
+
+**Solution:** If redone: separate `Socket` (fd, buffer, limits) from `Server` (pollfd vector, close decisions) from day one, and ship changes as small, one-behaviour PRs.
+
 ### Channel Lifetime & Ownership
 
 **Challenge:** Channels are created on join, destroyed when the last member parts, and must never hold a pointer to a freed `Client`.
 
 **Solution:** `ChannelManager` owns `Channel` objects in a case-folded map and cleans up empty channels after PART/KICK/leaveAll. `MemberSet` stores `Client*` + `ModeSet`. `ClientManager::remove` first parts the client from every channel (via `ChannelManager::leaveAll`) before freeing the `Client`, so channel member vectors never dangle.
+
+### Over-Length Input Handling
+
+**Challenge:** Not disconnecting on the first over-length message forced a discard-mode state machine, a per-client error counter and deferred-close markers into the loop — where the hard-to-find bugs lived.
+
+**Solution:** If redone: close on the first over-length line. That deletes the discard state, the error counter and the close markers. The loop becomes just "lines in, close on error".
 
 ### Bonus: CTCP & DCC SEND through the Bot
 
