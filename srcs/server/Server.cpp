@@ -132,7 +132,7 @@ void Server::processClientSockets_() {
 
         // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
         // BUG: on this line POLLHUP wins and it never registers client, directly closes
-        if (pfd.revents & POLLERR) {
+        if (pfd.revents & (POLLERR|POLLHUP)) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Socket POLLERR.";
         } else if (!(sockets_.checkSocketData(pfd.fd) &&
