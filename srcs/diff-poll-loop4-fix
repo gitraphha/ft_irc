@@ -1,0 +1,209 @@
+diff --git a/includes/CommandProcessor.hpp b/includes/CommandProcessor.hpp
+index d2d9f08..2b7375d 100644
+--- a/includes/CommandProcessor.hpp
++++ b/includes/CommandProcessor.hpp
+@@ -52,5 +52,5 @@ class CommandProcessor {
+     bool run(Server &server, Client &client, const std::string &line);
+     void add(const std::string &name, const Command &cmd);
+ 
+-    void inputTooLong(Server &srv, Client &client);
++    void inputTooLong(Client &client);
+ };
+diff --git a/includes/Socket.hpp b/includes/Socket.hpp
+index ee13af1..380cb02 100644
+--- a/includes/Socket.hpp
++++ b/includes/Socket.hpp
+@@ -42,7 +42,7 @@ class Socket {
+     bool        checkSocketData(int const fd);
+     std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
+                                       bool &msgTooLong);
+-    bool        sendMsg(int const fd, std::string const &msg);
++    void        sendMsg(int const fd, std::string const &msg);
+     bool        socketCloseMarker(int const fd);
+     void        closeSocket(int const fd);
+ 
+diff --git a/srcs/commands/CommandProcessor.cpp b/srcs/commands/CommandProcessor.cpp
+index e0c1733..d719d6b 100644
+--- a/srcs/commands/CommandProcessor.cpp
++++ b/srcs/commands/CommandProcessor.cpp
+@@ -83,10 +83,6 @@ void CommandProcessor::add(const std::string &name, const Command &cmd) {
+     commands_.insert(std::make_pair(name, cmd));
+ }
+ 
+-void CommandProcessor::inputTooLong(Server &srv, Client &client) {
+-    (void)srv;
+-    std::ostringstream oss;
+-    oss << "Hello fd:" << client.getFd() << " : msg too long.\r\n";
+-    client.send(oss.str());
+-    // tbd.
+-}
+\ No newline at end of file
++void CommandProcessor::inputTooLong(Client &client) {
++    client.sendReply(Reply::reply(Reply::ERR_INPUTTOOLONG));
++}
+diff --git a/srcs/server/Server.cpp b/srcs/server/Server.cpp
+index 681baaa..981a41a 100644
+--- a/srcs/server/Server.cpp
++++ b/srcs/server/Server.cpp
+@@ -114,6 +114,12 @@ void Server::processClientSockets_() {
+          ++idx) {
+         pollfd &pfd = pollFds_.at(idx);
+ 
++        if (sockets_.socketCloseMarker(pfd.fd)) {
++            removeClientSocketPfd_(pfd.fd, "Socket marked for closing.");
++            --idx;
++            continue;
++        }
++
+         if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
+             continue;
+ 
+@@ -122,9 +128,11 @@ void Server::processClientSockets_() {
+             std::string closeMsg;
+         } closeData = {false, ""};
+ 
+-        if (pfd.revents & (POLLERR | POLLHUP)) {
++        // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
++        // BUG: on this line POLLHUP wins and it never registers client, directly closes
++        if (pfd.revents & POLLERR) {
+             closeData.closeSocket = true;
+-            closeData.closeMsg = "Socket POLLERR / POLLHUP.";
++            closeData.closeMsg = "Socket POLLERR.";
+         } else if (!(sockets_.checkSocketData(pfd.fd) &&
+                      sockets_.updateBuffer_(pfd))) {
+             closeData.closeSocket = true;
+@@ -153,7 +161,7 @@ void Server::processClientSockets_() {
+             }
+ 
+             if (msgTooLong)
+-                cmds_.inputTooLong(*this, *client);
++                cmds_.inputTooLong(*client);
+             if (cmdLine.empty())
+                 continue;
+ 
+@@ -176,6 +184,9 @@ void Server::processClientSockets_() {
+ }
+ 
+ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
++    // avoid double removal
++    if (!sockets_.checkSocketData(fd))
++        return;
+     if (!sockets_.isServerSocket(fd)) {
+         if (!msg.empty()) {
+             Client *client = clients_.find(fd);
+@@ -278,7 +289,13 @@ void Server::run() {
+         return;
+ 
+     while (!SignalHandler::stopLoopSignalReceived()) {
+-        int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
++		// Closing socket in Server::sendMsg messes up processClientSockets_'s loop.
++		// It erases pollFds while processClientSockets_ is iterating
++		// So, Socket::sendMsg only marks the failed fds to be closed.
++		// Reaping client happens in processClientSockets_ when poll() returns.
++		// With poll(-1), an idle loop would sleep forver and never reap these fds,
++		// so wake it up every 1000.
++        int pollResult = poll(pollFds_.data(), pollFds_.size(), 1000);
+         if (pollResult == -1) {
+             if (SignalHandler::stopLoopSignalReceived())
+                 break;
+@@ -301,6 +318,5 @@ void Server::sendMsg(int const fd, std::string const &msg) {
+             << msg.substr(0, msg.length() - 2);
+         logger_.logMsg(oss.str(), Logger::lmOut);
+     }
+-    if (!sockets_.sendMsg(fd, msg))
+-        removeClientSocketPfd_(fd, "Error while sending Msg.");
++    sockets_.sendMsg(fd, msg);
+ }
+diff --git a/srcs/server/Socket.cpp b/srcs/server/Socket.cpp
+index 528e0d4..9c95438 100644
+--- a/srcs/server/Socket.cpp
++++ b/srcs/server/Socket.cpp
+@@ -103,6 +103,8 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
+         rdBuffer.erase(0, lfcrPos + 2);
+         sIOD.discardMode = false;
+         return std::string::npos;
++		// TODO handle remaining valid line.
++		// else client is stalled until next recv.
+     }
+     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+         rdBuffer = "\r";
+@@ -116,30 +118,26 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
+     * send string msg to a network socket
+     * uses i/o buffers and error counters in SocketIOData
+ 	* returns false in case of too many errors - caller must close socket
+-
+-	NOTE: caller MUST close socket when sendMsg returns false
+ */
+-bool Socket::sendMsg(int const fd, std::string const &msg) {
++void Socket::sendMsg(int const fd, std::string const &msg) {
+     SocketIOData *sIODptr = getSockIOData(fd);
+     if (!sIODptr)
+-        return false;
++        return;
+ 
+     SocketIOData &sIOD = *sIODptr;
+     if (msg.length() >
+         sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length()) {
+         sIOD.closeFd = true;
+-        return false;
++        return;
+     }
+     sIOD.writeBuffer += msg;
+     ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
+                              sIOD.writeBuffer.length(), MSG_NOSIGNAL);
+     if (bytesSent <= 0) {
+         ++sIOD.sendErrorCount;
+-        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
++        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
+             sIOD.closeFd = true;
+-            return false;
+-        }
+-        return true;
++        return;
+     }
+ 
+     sIOD.sendErrorCount = 0;
+@@ -147,33 +145,32 @@ bool Socket::sendMsg(int const fd, std::string const &msg) {
+         sIOD.writeBuffer.erase(0, bytesSent);
+     else
+         sIOD.writeBuffer.clear();
+-    return true;
+ }
+ 
+ bool Socket::socketCloseMarker(int const fd) {
+     SocketIOData *sIODptr = getSockIOData(fd);
+-    if (!sIODptr)
+-        return true;
+-    return sIODptr->closeFd;
++    // avoid double removal
++    return sIODptr && sIODptr->closeFd;
+ }
+ 
+ void Socket::closeSocket(int const fd) {
+     SocketIOData *sIODptr = getSockIOData(fd);
+-    int const     addrFam = srvHelp::sockAddrFamily(fd);
+-    close(fd);
+-
+-    if (!sIODptr)
++    if (!sIODptr) {
++        close(fd);
+         return;
++    }
++    // call sockAddrFamily only on known fd
++    int const          addrFam = srvHelp::sockAddrFamily(fd);
+     SocketIOData      &sIOD = *sIODptr;
+     std::ostringstream oss;
+-    if (sIOD.isSrvSocket) {
++    if (sIOD.isSrvSocket)
+         oss << "Closing server socket (" << srvHelp::getAdressFamilyStr(addrFam)
+             << ")";
+-    } else {
++    else
+         oss << "Closing client sockFd:" << fd;
+-    }
+     logger_.logMsg(oss.str(), Logger::lmInfo);
+ 
++    close(fd);
+     sockIODataStore_.erase(fd);
+ }
+ 

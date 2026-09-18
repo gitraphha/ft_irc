@@ -103,8 +103,8 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         rdBuffer.erase(0, lfcrPos + 2);
         sIOD.discardMode = false;
         return std::string::npos;
-		// TODO handle remaining valid line.
-		// else client is stalled until next recv.
+        // TODO handle remaining valid line.
+        // else client is stalled until next recv.
     }
     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
