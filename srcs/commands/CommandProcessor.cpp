@@ -82,3 +82,7 @@ bool CommandProcessor::run(Server &server, Client &client,
 void CommandProcessor::add(const std::string &name, const Command &cmd) {
     commands_.insert(std::make_pair(name, cmd));
 }
+
+void CommandProcessor::inputTooLong(Client &client) {
+    client.sendReply(Reply::reply(Reply::ERR_INPUTTOOLONG));
+}

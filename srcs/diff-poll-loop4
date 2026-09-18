@@ -1,0 +1,595 @@
+diff --git a/includes/CommandProcessor.hpp b/includes/CommandProcessor.hpp
+index 2b1304c..84f2768 100644
+--- a/includes/CommandProcessor.hpp
++++ b/includes/CommandProcessor.hpp
+@@ -50,4 +50,6 @@ class CommandProcessor {
+                std::vector<std::string> &params);
+     bool run(Server &server, Client &client, const std::string &line);
+     void add(const std::string &name, const Command &cmd);
++
++    void inputTooLong(Server &srv, Client &client);
+ };
+diff --git a/includes/Logger.hpp b/includes/Logger.hpp
+index a62eaad..32b6c75 100644
+--- a/includes/Logger.hpp
++++ b/includes/Logger.hpp
+@@ -3,6 +3,8 @@
+ #include <ctime>  // for localtime, strftime, time, time_t
+ #include <string> // for basic_string, string
+ 
++#define DBGLOG
++
+ class Logger {
+     std::string prefix_;
+ 
+@@ -15,7 +17,7 @@ class Logger {
+         return std::string(&buffer[0]);
+     }
+ 
+-    enum logMode { lmInfo, lmWarn, lmError, lmExcept };
++    enum logMode { lmInfo, lmWarn, lmError, lmExcept, lmIn, lmOut };
+ 
+     Logger(std::string const &prefix) : prefix_(prefix) {}
+ 
+diff --git a/includes/Server.hpp b/includes/Server.hpp
+index ce66f81..c4e60a3 100644
+--- a/includes/Server.hpp
++++ b/includes/Server.hpp
+@@ -13,7 +13,7 @@
+ 
+ #define SERVER_NAME "irc.local"
+ #define SERVER_VERSION "1.0"
+-#define MAX_CONNECTIONS 512
++#define MAX_CONNECTIONQUEUE 512
+ 
+ class Server {
+   private:
+@@ -38,7 +38,7 @@ class Server {
+     void processServerSocketData_();
+     void acceptClient_(int const serverFd);
+     void processClientSockets_();
+-    void removeClosedSockets_();
++    void removeClientSocketPfd_(int const fd, std::string const &msg);
+     void storePollFd_(int const socketFd, bool srvSocket);
+     void removePollFd_(int const fd);
+     void log_(std::string const &msg, Logger::logMode const lm);
+diff --git a/includes/Socket.hpp b/includes/Socket.hpp
+index 1c46b4d..ee13af1 100644
+--- a/includes/Socket.hpp
++++ b/includes/Socket.hpp
+@@ -8,7 +8,7 @@
+ #include <sys/types.h> // for ssize_t
+ #include <utility>     // for pair
+ 
+-#define RECVBUFFLEN 1024
++#define RECVBUFFLEN 4096
+ #define MAXMSGLEN 512
+ #define SOCKETERRORLIMIT 3
+ 
+@@ -22,37 +22,31 @@ class Socket {
+         size_t      sendErrorCount;
+         bool        discardMode;
+         bool        isSrvSocket;
+-        bool        fdClosed;
++        bool        closeFd;
+ 
+         SocketIOData(bool srvSocket)
+             : bytesRead(0), recvErrorCount(0), sendErrorCount(0),
+-              discardMode(false), isSrvSocket(srvSocket), fdClosed(false) {}
++              discardMode(false), isSrvSocket(srvSocket), closeFd(false) {}
+     };
+ 
+     std::map<int, SocketIOData> sockIODataStore_;
+     Logger const               &logger_;
+ 
+-    bool   updateBuffer_(int const fd);
+-    size_t bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong);
++    size_t bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong);
++    bool   checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD); // NOLINT
+ 
+   public:
+     Socket(Logger const &logger) : logger_(logger) {}
+ 
+     void        addSocket(int const fd, bool srvSocket);
+-    bool        checkSocket4Recv(struct pollfd &pfd); // NOLINT
+-    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds);
++    bool        checkSocketData(int const fd);
++    std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
++                                      bool &msgTooLong);
+     bool        sendMsg(int const fd, std::string const &msg);
++    bool        socketCloseMarker(int const fd);
+     void        closeSocket(int const fd);
+ 
+-    bool socketClosed(int const fd) const {
+-        return (sockIODataStore_.find(fd) == sockIODataStore_.end());
+-    }
+-
+-    bool isServerSocket(int const fd) const {
+-        std::map<int, SocketIOData>::const_iterator it =
+-            sockIODataStore_.find(fd);
+-        if (it != sockIODataStore_.end())
+-            return it->second.isSrvSocket;
+-        return false;
+-    };
++    bool          updateBuffer_(struct pollfd &pfd);
++    SocketIOData *getSockIOData(int const fd);
++    bool          isServerSocket(int const fd);
+ };
+diff --git a/srcs/commands/CommandProcessor.cpp b/srcs/commands/CommandProcessor.cpp
+index 31555c2..0f9f211 100644
+--- a/srcs/commands/CommandProcessor.cpp
++++ b/srcs/commands/CommandProcessor.cpp
+@@ -77,3 +77,11 @@ bool CommandProcessor::run(Server &server, Client &client,
+ void CommandProcessor::add(const std::string &name, const Command &cmd) {
+     commands_.insert(std::make_pair(name, cmd));
+ }
++
++void CommandProcessor::inputTooLong(Server &srv, Client &client) {
++    (void)srv;
++    std::ostringstream oss;
++    oss << "Hello fd:" << client.getFd() << " : msg too long.\r\n";
++    client.send(oss.str());
++    // tbd.
++}
+diff --git a/srcs/server/Logger.cpp b/srcs/server/Logger.cpp
+index cd3ed79..f381767 100644
+--- a/srcs/server/Logger.cpp
++++ b/srcs/server/Logger.cpp
+@@ -9,6 +9,11 @@
+    to stdout/stderr respectively.
+ */
+ void Logger::logMsg(std::string msg, logMode const lm) const {
++#ifndef DBGLOG
++    if (lm == Logger::lmIn || lm == Logger::lmOut)
++        return;
++#endif
++
+     std::ostream *os = &std::cout;
+     if (lm == Logger::lmError || lm == Logger::lmExcept)
+         os = &std::cerr;
+@@ -30,6 +35,14 @@ void Logger::logMsg(std::string msg, logMode const lm) const {
+             msg.insert(0, " [EXCEPT]: ");
+             *os << CMgnta;
+             break;
++        case Logger::lmIn:
++            msg.insert(0, " [INPUT ]: ");
++            *os << CWhite;
++            break;
++        case Logger::lmOut:
++            msg.insert(0, " [OUTPUT]: ");
++            *os << CBlue;
++            break;
+     }
+     *os << nowStr() << " " << prefix_ << msg << CReset << std::endl;
+ }
+diff --git a/srcs/server/Server.cpp b/srcs/server/Server.cpp
+index 3f26fd5..879932c 100644
+--- a/srcs/server/Server.cpp
++++ b/srcs/server/Server.cpp
+@@ -32,14 +32,7 @@ Server::Server(int const port, std::string const &password)
+ Server::~Server() {
+     while (!pollFds_.empty()) {
+         int const fd = pollFds_.back().fd;
+-        if (!sockets_.isServerSocket(fd)) {
+-            Client *client = clients_.find(fd);
+-            if (client)
+-                client->sendClosingMsg("Server shutdown - goodbye");
+-            clients_.remove(fd, channels_);
+-        }
+-        sockets_.closeSocket(fd);
+-        this->removePollFd_(fd);
++        removeClientSocketPfd_(fd, "Server shutdown - goodbye");
+     }
+ }
+ 
+@@ -95,7 +88,7 @@ int Server::createServerSocket_(int const domain) {
+ 
+     srvHelp::bindServerSocket(socketFd, domain, port_);
+ 
+-    if (listen(socketFd, MAX_CONNECTIONS) < 0)
++    if (listen(socketFd, MAX_CONNECTIONQUEUE) < 0)
+         throw std::runtime_error("Error while listening on socket for " +
+                                  srvHelp::getAdressFamilyStr(domain) + " !");
+ 
+@@ -123,54 +116,78 @@ void Server::processClientSockets_() {
+          ++idx) {
+         pollfd &pfd = pollFds_.at(idx);
+ 
+-        if (sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)) {
+-            std::string cmdLine;
+-            bool        buffHasMoreCmds = false;
+-            do {
+-#define ERRMSG2CLIENTBYEXCEPT
+-#ifdef ERRMSG2CLIENTBYEXCEPT
+-                try {
+-#endif
+-                    cmdLine =
+-                        sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
+-                    if (!cmdLine.empty()) {
+-                        // returns true if connection is to be closed
+-                        if (cmds_.run(*this, clients_.at(pfd.fd), cmdLine)) {
+-                            sockets_.closeSocket(pfd.fd);
+-                            break;
+-                        }
+-                    }
+-#ifdef ERRMSG2CLIENTBYEXCEPT
+-                } catch (Error const &e) {
+-                    if (e.hasReply()) {
+-                        Client     *client = clients_.find(pfd.fd);
+-                        std::string nickName =
+-                            (client ? client->getNick() : "dbgDummyNick");
+-                        sendMsg(pfd.fd,
+-                                Reply::build(serverName_, nickName, e.reply()));
+-                    } else {
+-                        std::string tmp(
+-                            "Error while trying to get/execute cmd:\n");
+-                        tmp.append("'" + cmdLine + "'\n" + e.what());
+-                        log_(tmp, Logger::lmExcept);
+-                    }
+-                }
+-#endif
+-            } while (buffHasMoreCmds);
++        if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
++            continue;
++
++        struct {
++            bool        closeSocket;
++            std::string closeMsg;
++        } closeData = {false, ""};
++
++        if (pfd.revents & (POLLERR | POLLHUP)) {
++            closeData.closeSocket = true;
++            closeData.closeMsg = "Socket POLLERR / POLLHUP.";
++        } else if (!(sockets_.checkSocketData(pfd.fd) &&
++                     sockets_.updateBuffer_(pfd))) {
++            closeData.closeSocket = true;
++            closeData.closeMsg = "Socket error while updating buffer.";
++        }
++
++        bool buffHasMoreCmds = true;
++        while (buffHasMoreCmds && !closeData.closeSocket) {
++            bool        msgTooLong = false;
++            std::string cmdLine = sockets_.getCRLFLineFromBuffer(
++                pfd.fd, buffHasMoreCmds, msgTooLong);
++            if (sockets_.socketCloseMarker(pfd.fd)) {
++                closeData.closeSocket = true;
++                closeData.closeMsg =
++                    "Error while composing command line from buffer.";
++            }
++
++            Client *client = clients_.find(pfd.fd);
++            if (!client) {
++                std::ostringstream oss;
++                oss << "Internal error: No client data for fd:" << pfd.fd;
++                log_(oss.str(), Logger::lmError);
++                closeData.closeSocket = true;
++                closeData.closeMsg = oss.str();
++                break;
++            }
++
++            if (msgTooLong)
++                cmds_.inputTooLong(*this, *client);
++            if (cmdLine.empty())
++                continue;
++
++            {
++                std::ostringstream oss;
++                oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
++                logger_.logMsg(oss.str(), Logger::lmIn);
++            }
++
++            // returns true if connection is to be closed
++            closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
++            closeData.closeMsg = "";
++        };
++
++        if (closeData.closeSocket) {
++            removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
++            --idx;
+         }
+     }
+-    removeClosedSockets_();
+ }
+ 
+-void Server::removeClosedSockets_() {
+-    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+-        pollfd &pfd = pollFds_.at(idx);
+-        if (sockets_.socketClosed(pfd.fd)) {
+-            clients_.remove(pfd.fd, channels_);
+-            removePollFd_(pfd.fd);
+-            --idx;
++void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
++    if (!sockets_.isServerSocket(fd)) {
++        if (!msg.empty()) {
++            Client *client = clients_.find(fd);
++            if (client)
++                client->sendClosingMsg(msg);
+         }
++        clients_.remove(fd, channels_);
+     }
++    sockets_.closeSocket(fd);
++    removePollFd_(fd);
+ }
+ 
+ void Server::acceptClient_(int const serverFd) {
+@@ -277,15 +294,15 @@ void Server::run() {
+ }
+ 
+ /*
+-NOTE: all send should go though server::sendMsg
++   NOTE: all send should go though server::sendMsg
+ */
+ void Server::sendMsg(int const fd, std::string const &msg) {
+-    if (!sockets_.sendMsg(fd, msg)) {
+-        sockets_.closeSocket(fd);
+-#if NETCATDBG
++    if (msg.length() > 2) {
+         std::ostringstream oss;
+-        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
+-        logger_.logMsg(oss.str(), Logger::lmError);
+-#endif
++        oss << "SendMsg event:\nSendto FD " << fd << ": "
++            << msg.substr(0, msg.length() - 2);
++        logger_.logMsg(oss.str(), Logger::lmOut);
+     }
++    if (!sockets_.sendMsg(fd, msg))
++        removeClientSocketPfd_(fd, "Error while sending Msg.");
+ }
+diff --git a/srcs/server/Socket.cpp b/srcs/server/Socket.cpp
+index 198558c..528e0d4 100644
+--- a/srcs/server/Socket.cpp
++++ b/srcs/server/Socket.cpp
+@@ -11,94 +11,104 @@ void Socket::addSocket(int const fd, bool srvSocket) {
+     sockIODataStore_.insert(std::make_pair(fd, SocketIOData(srvSocket)));
+ }
+ 
+-bool Socket::checkSocket4Recv(struct pollfd &pfd) {
+-    if (socketClosed(pfd.fd))
+-        return false;
++bool Socket::checkSocketData(int const fd) {
++    return (getSockIOData(fd) != NULL);
++}
+ 
+-    SocketIOData &sIOD = sockIODataStore_.at(pfd.fd);
++bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
+     if ((pfd.revents & POLLERR)) {
+-        if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+-            closeSocket(pfd.fd);
+-        else
+-            ++sIOD.recvErrorCount;
+-        return false;
++        ++sIOD.recvErrorCount;
++        if (sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
++            sIOD.closeFd = true;
++            return false;
++        }
+     }
+     return true;
+ }
+ 
+-bool Socket::updateBuffer_(int const fd) {
+-    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+-    char                  recvBuffer[RECVBUFFLEN];
+-    sIOD.bytesRead = recv(fd, &recvBuffer[0], RECVBUFFLEN, 0);
++bool Socket::updateBuffer_(struct pollfd &pfd) {
++    SocketIOData *sIODptr = getSockIOData(pfd.fd);
++    if (!sIODptr || sIODptr->closeFd)
++        return false;
++    SocketIOData &sIOD = *sIODptr;
++
++    if (!checkSocket4Recv(pfd, sIOD))
++        return false;
++
++    char recvBuffer[RECVBUFFLEN];
++    sIOD.bytesRead = recv(pfd.fd, &recvBuffer[0], RECVBUFFLEN, 0);
+     if (sIOD.bytesRead <= 0) {
+         ++sIOD.recvErrorCount;
+         if (sIOD.bytesRead == 0 || sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+-            std::ostringstream oss;
+-            oss << "Client sockFd:" << fd;
+-            if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
+-                oss << " exceeded error limit (" << SOCKETERRORLIMIT << ")";
+-            else if (sIOD.bytesRead == 0)
+-                oss << " closed connection on their side";
+-            logger_.logMsg(oss.str(), Logger::lmInfo);
+-            closeSocket(fd);
++            {
++                std::ostringstream oss;
++                oss << "Client sockFd:" << pfd.fd;
++                if (sIOD.recvErrorCount >= SOCKETERRORLIMIT)
++                    oss << " exceeded error limit (" << SOCKETERRORLIMIT << ")";
++                else if (sIOD.bytesRead == 0)
++                    oss << " closed connection on their side";
++                logger_.logMsg(oss.str(), Logger::lmInfo);
++            }
++            sIOD.closeFd = true;
++            return false;
+         }
+-        return false;
++        return true;
+     }
+     sIOD.readBuffer += std::string(&recvBuffer[0], sIOD.bytesRead);
+     return true;
+ }
+ 
+-std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds) {
+-    if (!buffHasMoreCmds) {
+-        if (!updateBuffer_(fd))
+-            return "";
+-    }
++std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
++                                          bool &msgTooLong) {
++    buffHasMoreCmds = false;
+ 
+-    bool   msgTooLong = false;
+-    size_t lfcrPos = bufferLengthAndSanityCheck_(fd, msgTooLong);
+-    if (msgTooLong)
+-        return std::string(MAXMSGLEN + 1, '\0');
++    SocketIOData *sIODptr = getSockIOData(fd);
++    if (!sIODptr)
++        return "";
++    SocketIOData &sIOD = *sIODptr;
++
++    size_t lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+     if (lfcrPos == std::string::npos)
+         return "";
+ 
+-    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+-    std::string           cmdLine;
+-    cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
++    std::string cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+     sIOD.recvErrorCount = 0;
+     sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+-    buffHasMoreCmds = (sIOD.readBuffer.find("\r\n") != std::string::npos);
++    buffHasMoreCmds = ((sIOD.readBuffer.size() > MAXMSGLEN) ||
++                       (sIOD.readBuffer.find("\r\n") != std::string::npos));
+     return cmdLine;
+ }
+ 
+-size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
+-    Socket::SocketIOData &sIOD = sockIODataStore_.at(fd);
+-    std::string          &rdBuffer = sIOD.readBuffer;
+-    size_t                lfcrPos = rdBuffer.find("\r\n");
++size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
++                                           bool         &msgTooLong) {
++    std::string &rdBuffer = sIOD.readBuffer;
++    size_t       lfcrPos = rdBuffer.find("\r\n");
+ 
++    msgTooLong = false;
+     if (!sIOD.discardMode) {
+         if ((rdBuffer.length() < MAXMSGLEN) ||
+-            (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2))
++            (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2)) {
+             return lfcrPos;
+-        sIOD.discardMode = true;
+-        msgTooLong = true;
++        } else {
++            sIOD.discardMode = true;
++            msgTooLong = true;
++        }
+     }
+     // discard mode
+     if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+-        closeSocket(fd);
++        sIOD.closeFd = true;
+         return std::string::npos;
+     }
+     if (lfcrPos != std::string::npos) {
+         rdBuffer.erase(0, lfcrPos + 2);
+         sIOD.discardMode = false;
+-        sIOD.recvErrorCount = 0;
+-        return rdBuffer.find("\r\n");
++        return std::string::npos;
+     }
+-    // lfcrPos == std::string::npos
+     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+         rdBuffer = "\r";
+     else
+         rdBuffer.clear();
+-    return lfcrPos;
++    return std::string::npos;
+ }
+ 
+ /*
+@@ -110,58 +120,73 @@ size_t Socket::bufferLengthAndSanityCheck_(int const fd, bool &msgTooLong) {
+ 	NOTE: caller MUST close socket when sendMsg returns false
+ */
+ bool Socket::sendMsg(int const fd, std::string const &msg) {
+-    if (socketClosed(fd))
+-        return true;
+-    SocketIOData &sIOD = sockIODataStore_.at(fd);
++    SocketIOData *sIODptr = getSockIOData(fd);
++    if (!sIODptr)
++        return false;
+ 
+-    if (msg.length() > sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length())
++    SocketIOData &sIOD = *sIODptr;
++    if (msg.length() >
++        sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length()) {
++        sIOD.closeFd = true;
+         return false;
++    }
+     sIOD.writeBuffer += msg;
+     ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
+                              sIOD.writeBuffer.length(), MSG_NOSIGNAL);
+-    if (bytesSent == -1) {
++    if (bytesSent <= 0) {
+         ++sIOD.sendErrorCount;
+-        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
++        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT) {
++            sIOD.closeFd = true;
+             return false;
++        }
+         return true;
+     }
+ 
+     sIOD.sendErrorCount = 0;
+-    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length()) {
+-#if NETCATDBG
+-        std::ostringstream oss;
+-        oss << "SendMsg event:\n"
+-            << " WriteBuffer: '" << sIOD.writeBuffer << "':\n";
+-        oss << " partly (" << bytesSent << "/" << sIOD.writeBuffer.length()
+-            << ") " << sIOD.writeBuffer.substr(0, bytesSent)
+-            << " sent to FD: " << fd;
+-        logger_.logMsg(oss.str(), Logger::lmInfo);
+-#endif
++    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
+         sIOD.writeBuffer.erase(0, bytesSent);
+-    } else
++    else
+         sIOD.writeBuffer.clear();
+     return true;
+ }
+ 
+-/*
+-Performance note: 2 searches of sockIODataStore.
+-Wrap in try catch to remove this redundancy
+-or make socketClosed return a pointer instead
+-*/
++bool Socket::socketCloseMarker(int const fd) {
++    SocketIOData *sIODptr = getSockIOData(fd);
++    if (!sIODptr)
++        return true;
++    return sIODptr->closeFd;
++}
++
+ void Socket::closeSocket(int const fd) {
+-    if (socketClosed(fd))
+-        return;
+-    SocketIOData &sIOD = sockIODataStore_.at(fd); // throws
++    SocketIOData *sIODptr = getSockIOData(fd);
++    int const     addrFam = srvHelp::sockAddrFamily(fd);
++    close(fd);
+ 
++    if (!sIODptr)
++        return;
++    SocketIOData      &sIOD = *sIODptr;
+     std::ostringstream oss;
+     if (sIOD.isSrvSocket) {
+-        oss << "Closing server socket ("
+-            << srvHelp::getAdressFamilyStr(srvHelp::sockAddrFamily(fd)) << ")";
++        oss << "Closing server socket (" << srvHelp::getAdressFamilyStr(addrFam)
++            << ")";
+     } else {
+         oss << "Closing client sockFd:" << fd;
+     }
+     logger_.logMsg(oss.str(), Logger::lmInfo);
+ 
+-    close(fd);
+     sockIODataStore_.erase(fd);
+ }
++
++Socket::SocketIOData *Socket::getSockIOData(int const fd) {
++    std::map<int, SocketIOData>::iterator it = sockIODataStore_.find(fd);
++    if (it == sockIODataStore_.end())
++        return NULL;
++    return &(it->second);
++}
++
++bool Socket::isServerSocket(int const fd) {
++    SocketIOData const *const sIODptr = getSockIOData(fd);
++    if (sIODptr)
++        return sIODptr->isSrvSocket;
++    return false;
++}

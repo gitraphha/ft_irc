@@ -51,4 +51,6 @@ class CommandProcessor {
                std::vector<std::string> &params);
     bool run(Server &server, Client &client, const std::string &line);
     void add(const std::string &name, const Command &cmd);
+
+    void inputTooLong(Client &client);
 };

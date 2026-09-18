@@ -30,14 +30,7 @@ Server::Server(int const port, std::string const &password)
 Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
-        if (!sockets_.isServerSocket(fd)) {
-            Client *client = clients_.find(fd);
-            if (client)
-                client->sendClosingMsg("Server shutdown - goodbye");
-            clients_.remove(fd, channels_);
-        }
-        sockets_.closeSocket(fd);
-        this->removePollFd_(fd);
+        removeClientSocketPfd_(fd, "Server shutdown - goodbye");
     }
 }
 
@@ -93,7 +86,7 @@ int Server::createServerSocket_(int const domain) {
 
     srvHelp::bindServerSocket(socketFd, domain, port_);
 
-    if (listen(socketFd, MAX_CONNECTIONS) < 0)
+    if (listen(socketFd, MAX_CONNECTIONQUEUE) < 0)
         throw std::runtime_error("Error while listening on socket for " +
                                  srvHelp::getAdressFamilyStr(domain) + " !");
 
@@ -121,36 +114,89 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
-        if (!(sockets_.checkSocket4Recv(pfd) && (pfd.revents & POLLIN)))
+        if (sockets_.socketCloseMarker(pfd.fd)) {
+            removeClientSocketPfd_(pfd.fd, "Socket marked for closing.");
+            --idx;
             continue;
-        bool buffHasMoreCmds = false;
-        do {
-            std::string cmdLine =
-                sockets_.getCRLFLineFromBuffer(pfd.fd, buffHasMoreCmds);
-            if (cmdLine.empty())
-                continue;
+        }
+
+        if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
+            continue;
+
+        struct {
+            bool        closeSocket;
+            std::string closeMsg;
+        } closeData = {false, ""};
+
+        // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
+        // BUG: on this line POLLHUP wins and it never registers client, directly closes
+        if (pfd.revents & POLLERR) {
+            closeData.closeSocket = true;
+            closeData.closeMsg = "Socket POLLERR.";
+        } else if (!(sockets_.checkSocketData(pfd.fd) &&
+                     sockets_.updateBuffer_(pfd))) {
+            closeData.closeSocket = true;
+            closeData.closeMsg = "Socket error while updating buffer.";
+        }
+
+        bool buffHasMoreCmds = true;
+        while (buffHasMoreCmds && !closeData.closeSocket) {
+            bool        msgTooLong = false;
+            std::string cmdLine = sockets_.getCRLFLineFromBuffer(
+                pfd.fd, buffHasMoreCmds, msgTooLong);
+            if (sockets_.socketCloseMarker(pfd.fd)) {
+                closeData.closeSocket = true;
+                closeData.closeMsg =
+                    "Error while composing command line from buffer.";
+            }
+
             Client *client = clients_.find(pfd.fd);
-            if (!client)
-                break;
-            // returns true if connection is to be closed
-            if (cmds_.run(*this, *client, cmdLine)) {
-                sockets_.closeSocket(pfd.fd);
+            if (!client) {
+                std::ostringstream oss;
+                oss << "Internal error: No client data for fd:" << pfd.fd;
+                log_(oss.str(), Logger::lmError);
+                closeData.closeSocket = true;
+                closeData.closeMsg = oss.str();
                 break;
             }
-        } while (buffHasMoreCmds);
-    }
-    removeClosedSockets_();
-}
 
-void Server::removeClosedSockets_() {
-    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
-        pollfd &pfd = pollFds_.at(idx);
-        if (sockets_.socketClosed(pfd.fd)) {
-            clients_.remove(pfd.fd, channels_);
-            removePollFd_(pfd.fd);
+            if (msgTooLong)
+                cmds_.inputTooLong(*client);
+            if (cmdLine.empty())
+                continue;
+
+            {
+                std::ostringstream oss;
+                oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
+                logger_.logMsg(oss.str(), Logger::lmIn);
+            }
+
+            // returns true if connection is to be closed
+            closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
+            closeData.closeMsg = "";
+        };
+
+        if (closeData.closeSocket) {
+            removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
             --idx;
         }
     }
+}
+
+void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
+    // avoid double removal
+    if (!sockets_.checkSocketData(fd))
+        return;
+    if (!sockets_.isServerSocket(fd)) {
+        if (!msg.empty()) {
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg(msg);
+        }
+        clients_.remove(fd, channels_);
+    }
+    sockets_.closeSocket(fd);
+    removePollFd_(fd);
 }
 
 void Server::acceptClient_(int const serverFd) {
@@ -243,7 +289,13 @@ void Server::run() {
         return;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
+        // Closing socket in Server::sendMsg messes up processClientSockets_'s loop.
+        // It erases pollFds while processClientSockets_ is iterating
+        // So, Socket::sendMsg only marks the failed fds to be closed.
+        // Reaping client happens in processClientSockets_ when poll() returns.
+        // With poll(-1), an idle loop would sleep forver and never reap these fds,
+        // so wake it up every 1000.
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), 1000);
         if (pollResult == -1) {
             if (SignalHandler::stopLoopSignalReceived())
                 break;
@@ -257,15 +309,14 @@ void Server::run() {
 }
 
 /*
-NOTE: all send should go though server::sendMsg
+   NOTE: all send should go though server::sendMsg
 */
 void Server::sendMsg(int const fd, std::string const &msg) {
-    if (!sockets_.sendMsg(fd, msg)) {
-        sockets_.closeSocket(fd);
-#if NETCATDBG
+    if (msg.length() > 2) {
         std::ostringstream oss;
-        oss << "SendMsg event:\nSendto FD " << fd << " failed.";
-        logger_.logMsg(oss.str(), Logger::lmError);
-#endif
+        oss << "SendMsg event:\nSendto FD " << fd << ": "
+            << msg.substr(0, msg.length() - 2);
+        logger_.logMsg(oss.str(), Logger::lmOut);
     }
+    sockets_.sendMsg(fd, msg);
 }
