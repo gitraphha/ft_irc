@@ -6,7 +6,6 @@
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
-
 #include <algorithm>    // for find_if
 #include <exception>    // for exception
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
@@ -125,8 +124,11 @@ void Server::processClientSockets_() {
             std::string closeMsg;
         } closeData = {false, ""};
 
-        if (!(sockets_.checkSocketData(pfd.fd) &&
-              sockets_.updateBuffer_(pfd))) {
+        if (pfd.revents & (POLLERR | POLLHUP)) {
+            closeData.closeSocket = true;
+            closeData.closeMsg = "Socket POLLERR / POLLHUP.";
+        } else if (!(sockets_.checkSocketData(pfd.fd) &&
+                     sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Socket error while updating buffer.";
         }
@@ -176,10 +178,12 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    if (!msg.empty() && !sockets_.isServerSocket(fd)) {
-        Client *client = clients_.find(fd);
-        if (client)
-            client->sendClosingMsg(msg);
+    if (!sockets_.isServerSocket(fd)) {
+        if (!msg.empty()) {
+            Client *client = clients_.find(fd);
+            if (client)
+                client->sendClosingMsg(msg);
+        }
         clients_.remove(fd, channels_);
     }
     sockets_.closeSocket(fd);
