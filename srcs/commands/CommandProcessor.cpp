@@ -83,10 +83,6 @@ void CommandProcessor::add(const std::string &name, const Command &cmd) {
     commands_.insert(std::make_pair(name, cmd));
 }
 
-void CommandProcessor::inputTooLong(Server &srv, Client &client) {
-    (void)srv;
-    std::ostringstream oss;
-    oss << "Hello fd:" << client.getFd() << " : msg too long.\r\n";
-    client.send(oss.str());
-    // tbd.
+void CommandProcessor::inputTooLong(Client &client) {
+    client.sendReply(Reply::reply(Reply::ERR_INPUTTOOLONG));
 }

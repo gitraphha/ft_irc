@@ -116,6 +116,12 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 
+        if (sockets_.socketCloseMarker(pfd.fd)) {
+            removeClientSocketPfd_(pfd.fd, "Socket marked for closing.");
+            --idx;
+            continue;
+        }
+
         if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
             continue;
 
@@ -124,9 +130,11 @@ void Server::processClientSockets_() {
             std::string closeMsg;
         } closeData = {false, ""};
 
-        if (pfd.revents & (POLLERR | POLLHUP)) {
+        // printf 'PASS pass\r\nNICK bob\r\nUSER u 0 * :Real\r\nJOIN #chan\r\nMODE #chan\r\nQUIT\r\n' | nc 127.0.0.1 6667
+        // BUG: on this line POLLHUP wins and it never registers client, directly closes
+        if (pfd.revents & POLLERR) {
             closeData.closeSocket = true;
-            closeData.closeMsg = "Socket POLLERR / POLLHUP.";
+            closeData.closeMsg = "Socket POLLERR.";
         } else if (!(sockets_.checkSocketData(pfd.fd) &&
                      sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
@@ -155,7 +163,7 @@ void Server::processClientSockets_() {
             }
 
             if (msgTooLong)
-                cmds_.inputTooLong(*this, *client);
+                cmds_.inputTooLong(*client);
             if (cmdLine.empty())
                 continue;
 
@@ -178,6 +186,9 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
+    // avoid double removal
+    if (!sockets_.checkSocketData(fd))
+        return;
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
@@ -280,7 +291,13 @@ void Server::run() {
         return;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), -1);
+        // Closing socket in Server::sendMsg messes up processClientSockets_'s loop.
+        // It erases pollFds while processClientSockets_ is iterating
+        // So, Socket::sendMsg only marks the failed fds to be closed.
+        // Reaping client happens in processClientSockets_ when poll() returns.
+        // With poll(-1), an idle loop would sleep forver and never reap these fds,
+        // so wake it up every 1000.
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), 1000);
         if (pollResult == -1) {
             if (SignalHandler::stopLoopSignalReceived())
                 break;
@@ -303,6 +320,5 @@ void Server::sendMsg(int const fd, std::string const &msg) {
             << msg.substr(0, msg.length() - 2);
         logger_.logMsg(oss.str(), Logger::lmOut);
     }
-    if (!sockets_.sendMsg(fd, msg))
-        removeClientSocketPfd_(fd, "Error while sending Msg.");
+    sockets_.sendMsg(fd, msg);
 }
