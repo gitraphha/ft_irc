@@ -120,6 +120,9 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 #ifdef BONUS
+        // Transfer listener/data fds are never registered in pollfds_, so this
+		// never fires today. Kept as future-proofing: if transfer_fd is ever added
+		// to pollfds_
         if (tm_.ownsFd(pfd.fd))
             continue;
 #endif
@@ -397,10 +400,10 @@ void Server::processTransferSocket_() {
         sent = tm_.sendChunk();
     } while (sent > 0);
     std::string msg;
-    if (tm_.transferDone()) {
-        msg = "transfer complete";
-    } else if (sent < 0)
+    if (sent < 0)
         msg = "transfer failed";
+	else if (tm_.transferDone())
+        msg = "transfer complete";
     else
         return;
     Client *client = clients_.find(tm_.current()->clientFd);
