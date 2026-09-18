@@ -110,8 +110,6 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         rdBuffer.erase(0, eol + 1);
         sIOD.discardMode = false;
         return std::string::npos;
-        // TODO handle remaining valid line.
-        // else client is stalled until next recv.
     }
     if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
@@ -155,8 +153,9 @@ void Socket::sendMsg(int const fd, std::string const &msg) {
 
 bool Socket::socketCloseMarker(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
-    // avoid double removal
-    return sIODptr && sIODptr->closeFd;
+    if (!sIODptr)
+        return true;
+    return sIODptr->closeFd;
 }
 
 void Socket::closeSocket(int const fd) {

@@ -186,9 +186,6 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    // avoid double removal
-    if (!sockets_.checkSocketData(fd))
-        return;
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
