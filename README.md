@@ -42,6 +42,190 @@ Please note that you may need system admin permissions to use privileged ports (
 
 ---
 
+## Architecture
+
+### Overview
+
+```mermaid
+flowchart LR
+    subgraph CLIENT["client connection"]
+        IRC["irc client"]
+        DCCP["DCC peer"]
+    end
+
+    subgraph CONN["connection"]
+        LISTENER["IRC listener"]
+        SOCKET["Socket"]
+    end
+
+    subgraph CORE["server core"]
+        SERVER["Server"]
+        CMD["CommandProcessor"]
+        CM["ClientManager"]
+        CHM["ChannelManager"]
+    end
+
+    IRC --> LISTENER --> SOCKET --> SERVER
+    SERVER --> CMD
+    SERVER --> CM
+    SERVER --> CHM
+    CM --> CHM
+    DCCP -. "direct peer transfer" .-> SERVER
+
+    class IRC,DCCP,LISTENER,SOCKET,SERVER,CMD,CM,CHM node;
+```
+
+### Core Server
+
+```mermaid
+flowchart TB
+    subgraph SRV["Server"]
+        direction TB
+        LSTN["IRC listeners\n (bind + listen)"]
+        ACCEPT["Accept client"]
+        LOOP["Event loop\n (poll(), non-blocking)"]
+        SOCK["Socket\n (buffered reads, overlong-line discard)"]
+        SIG["SignalHandler"]
+        LOG["Logger"]
+    end
+
+    subgraph DRIVES["owned and driven by the loop"]
+        direction TB
+        CMD["CommandProcessor"]
+        CM["ClientManager"]
+        CHM["ChannelManager"]
+        TM["TransferManager (bonus)"]
+    end
+
+    LSTN --> ACCEPT --> SOCK --> LOOP
+    LOOP --> CMD
+    LOOP --> CM
+    LOOP --> CHM
+    LOOP --> TM
+
+    class LSTN,ACCEPT,LOOP,SOCK,SIG,LOG node;
+    class CMD,CM,CHM,TM node;
+```
+
+### Client System
+```mermaid
+flowchart TB
+    subgraph CORE["server core"]
+        SRV["Server"]
+        CMD["CommandProcessor"]
+    end
+
+    subgraph CLISYS["client system"]
+        CLI["Client"]
+        CLM["ClientManager\n (lookup by nick)"]
+        REG["Registration\n (PASS NICK USER)"]
+        QUIT["QUIT/disconnect\n (part all channels)"]
+    end
+
+    SRV -->|"accepted connection"| CLM --> CLI
+    CMD -->|"commands by nick"| CLM
+	CLM --> QUIT -. "leave all channels" .-> CHM["ChannelManager"]
+    CLI --> REG -->|"send welcome message"| CLIENT["client"]
+
+    class SRV,CMD,CLIENT node;
+    class CLISYS,CLI,CLM,REG,QUIT node;
+```
+
+### Channel System
+
+```mermaid
+flowchart TB
+    subgraph CORE["server core"]
+        SRV["Server"]
+        CM["ClientManager"]
+    end
+
+    subgraph CHSYS["channel system"]
+        CHM["ChannelManager"]
+        CH["Channel"]
+        MEM["MemberSet\n (Client pointers, per-member ModeSet)"]
+        MS["ModeSet"]
+        MOD["Mode"]
+    end
+
+    SRV --> CHM --> CH
+    CM --> |"provides client objects"| CH
+    CH -->|contains| MEM
+    CH -->|has| MS
+    CH -->|uses| MOD
+    MEM -->|stores per-member| MS
+    MS -->|uses| MOD
+
+    class SRV,CM node;
+    class CHSYS,CHM,CH,MEM,MS,MOD node;
+```
+
+### Command Processing
+
+```mermaid
+flowchart TB
+
+    CI["client input"]
+    SOCKIN["socket"]
+    RB["response buffer"]
+    SO["socket output"]
+
+    subgraph CP["Command Processing"]
+        PA["command parser"]
+        VA["command validation"]
+        H["command handler"]
+        INV["invalid"]
+    end
+
+    CI --> SOCKIN --> PA
+    PA --> VA
+    VA --> H
+    VA -.-> INV
+    H --> RB
+    INV --> RB
+    RB --> SO
+
+    class CI,SOCKIN,RB,SO node;
+    class CP,PA,VA,H,INV node;
+```
+
+### Bonus
+
+```mermaid
+flowchart TB
+    PRIVMSG["PRIVMSG"]
+	NORMAL["Client"]
+	BOT["DCCBot"]
+
+    subgraph FT["file transfer"]
+        VAL["Validate filename in files/"]
+        LSN["Open listener - OS-picked port"]
+        BUILD["Build DCC SEND CTCP offer"]
+        OFFER["Send offer to target client"]
+        ACC["!accept - only the target"]
+        STREAM["connect + stream - 1 KiB chunks"]
+        DONE["transfer complete"]
+        EXPIRE["rejected or 60 s expiry"]
+    end
+
+    PARSE["Parse CTCP (VERSION / PING)"]
+    REPLY["NOTICE reply to client"]
+    OTHER["!help !version !whoami !accept !reject"]
+
+    PRIVMSG -->|"target is bot"| BOT
+    PRIVMSG -->|"target is client"| NORMAL
+    BOT -->|"CTCP"| PARSE --> REPLY
+    BOT -->|"other command"| OTHER
+    BOT -->|"!send"| VAL --> LSN --> BUILD --> OFFER
+    OFFER -->|"client accepts"| ACC --> STREAM --> DONE
+    OFFER -->|"!reject / timeout"| EXPIRE
+
+    class PRIVMSG,NORMAL,BOT,REPLY,OTHER node;
+    class FT,VAL,LSN,BUILD,OFFER,ACC,STREAM,DONE,EXPIRE node;
+```
+
+---
+
 ## IRC Command & Message Reference
 
 ### Registration
