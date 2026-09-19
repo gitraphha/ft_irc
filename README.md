@@ -89,8 +89,8 @@ Built with `make bonus` → `./ircserv_bonus <port> <password>`.
 
 | Abbr.| Meaning   |
 |------|---------------------------|
-| CTCP | Client-to-client protocol |
-| DDC  | Direct Client-to-Client   |
+| CTCP | Client-To-Client Protocol |
+| DCC  | Direct Client-to-Client   |
 
 A bot named `DCCBot` (also reached as `bot` / `BOT` / `#bot`, or by sending a bot command to any channel) that intercepts `PRIVMSG`: bot commands are answered with `PRIVMSG`, CTCP queries with `NOTICE`.
 
@@ -107,7 +107,58 @@ CTCP queries (`\x01VERSION\x01`, `\x01PING <token>\x01`) sent to the bot via `PR
 
 ### File transfer (DCC SEND)
 
+#### Using irssi
+
+Sender:
+```sh
+/dcc send <receiver_nick> <filepath>
+```
+
+Receiver receives:
+
+`DCC SEND from <sender_nick> [<ip_to_recv> port <port_to_recv>]: <filename> <filesize>`
+
+Receiver:
+```sh
+# set filepath
+/set dcc_download_path <folder_path>
+
+# receive file
+/dcc get <sender_nick> <filename>
+```
+
+#### Using nc
+
+Sender:
+```sh
+PRIVMSG <receiver_nick> :\x01DCC SEND <filepath> <ip_to_connect_to> <port> <size>\x01
+```
+
+Receiver receives:
+
+`:sender!sender@127.0.0.1 PRIVMSG receiver :\x01DCC SEND <filepath> <ip_to_connect_to> <port> <size>\x01`
+
+Receiver in another terminal must open nc to receive:
+```sh
+nc <ip_to_connect_to> <port> > <filepath_to_save>
+```
+
+#### Using the BOT
+
 `!send` opens a listener on an OS-picked port and hands the target a CTCP `DCC SEND <file> 127.0.0.1 <port> <size>` line. The receiver replies with `!accept`, connects to the advertised address/port and receives the file in 1 KiB chunks. Only one transfer is active at a time (`bot busy` otherwise). Pending offers expire after 60 seconds. Offered files must live in a `files/` directory next to the server; filenames containing `/` or `..` are rejected.
+
+Sender:
+```sh
+/msg bot !send <receiver_nick> <filename_for_file_in_files_folder>
+```
+
+Receiver:
+```sh
+/msg bot !accept
+
+# Receiver in another terminal must open nc to receive:
+nc 127.0.0.1 <port> > <filepath_to_save>
+```
 
 ---
 
