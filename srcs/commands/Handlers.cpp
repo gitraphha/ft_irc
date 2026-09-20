@@ -31,8 +31,8 @@ bool Handlers::invite(Server &server, Client &client,
         if (cm.hasChannel(params[1])) {
             Channel &chan = cm.at(params[1]);
             chan.checkInvite(client, target);
+            target.addInvite(params[1], chan.getCreatedTime());
         }
-        target.addInvite(params[1]);
         client.sendReply(Reply::reply(Reply::RPL_INVITING,
                                       params[1] + " " + target.getNick()));
         target.send(Reply::fromClient(client.getPrefix(), "INVITE",

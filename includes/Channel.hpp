@@ -60,6 +60,7 @@ class Channel {
     const std::string &getName() const;
     const std::string &getNameCaseFolded() const;
     int                getUserLimit() const;
+    std::time_t        getCreatedTime() const;
     bool               inviteOnly() const;
     bool               hasTopic() const;
     const std::string &getTopic() const;
