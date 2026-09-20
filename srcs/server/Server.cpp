@@ -1,6 +1,7 @@
 #include "Server.hpp"
 
 #include "Client.hpp"        // for Client
+#include "Reply.hpp"         // for fromClient
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
@@ -138,7 +139,7 @@ void Server::processClientSockets_() {
         } else if (!(sockets_.checkSocketData(pfd.fd) &&
                      sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
-            closeData.closeMsg = "Socket error while updating buffer.";
+            closeData.closeMsg = "Connection closed";
         }
 
         bool buffHasMoreCmds = true;
@@ -148,8 +149,7 @@ void Server::processClientSockets_() {
                 pfd.fd, buffHasMoreCmds, msgTooLong);
             if (sockets_.socketCloseMarker(pfd.fd)) {
                 closeData.closeSocket = true;
-                closeData.closeMsg =
-                    "Error while composing command line from buffer.";
+                closeData.closeMsg = "Connection closed";
             }
 
             Client *client = clients_.find(pfd.fd);
@@ -189,8 +189,14 @@ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
-            if (client)
+            if (client) {
+                // Client left without QUIT (killed, error limit) so tell its channels
+                if (client->isRegistered())
+                    channels_.broadcastToPeers(
+                        *client, Reply::fromClient(client->getPrefix(), "QUIT",
+                                                   "", msg));
                 client->sendClosingMsg(msg);
+            }
         }
         clients_.remove(fd, channels_);
     }
