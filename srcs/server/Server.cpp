@@ -149,7 +149,7 @@ void Server::processClientSockets_() {
                 pfd.fd, buffHasMoreCmds, msgTooLong);
             if (sockets_.socketCloseMarker(pfd.fd)) {
                 closeData.closeSocket = true;
-                closeData.closeMsg = "Input too long";
+                closeData.closeMsg = "Connection closed";
             }
 
             Client *client = clients_.find(pfd.fd);
@@ -291,7 +291,7 @@ ClientManager &Server::getClientManager() {
 */
 void Server::run() {
     if (!setupServerSockets_())
-        return ;
+        return;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         // Closing socket in Server::sendMsg messes up processClientSockets_'s loop.
