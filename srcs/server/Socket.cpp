@@ -188,7 +188,10 @@ Socket::SocketIOData &Socket::getSockIOData(int const fd) {
 }
 
 bool Socket::removeSockIOData(int const fd) throw() {
-    return (sockIODataStore_.erase(fd) > 0);
+	std::map<int, SocketIOData>::iterator it = sockIODataStore_.find(fd);
+	if (it == sockIODataStore_.end())
+		return true;
+    return it->second.closeFd;
 }
 
 // bool Socket::isServerSocket(int const fd) {
