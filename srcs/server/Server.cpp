@@ -149,7 +149,7 @@ void Server::processClientSockets_() {
             logger_.logMsg(e.what(), Logger::lmExcept);
             // In this case, we may not have SocketIOData anymore, so remove directly
             // sockets_.setSocketCloseState(pfd.fd, true, e.what());
-            if (removeClientSocketPfd_(pfd.fd, e.what());
+            removeClientSocketPfd_(pfd.fd, e.what(), true);
             --idx;
         }
     }
@@ -162,9 +162,11 @@ void Server::processClientSockets_() {
     }
 }
 
-bool Server::removeClientSocketPfd_(int const          fd,
-                                    std::string const &msg) throw() {
-    if (!sockets_.removeSockIOData(fd))
+bool Server::removeClientSocketPfd_(int const fd, std::string const &msg,
+                                    bool force) throw() {
+    bool sIODwasRemoved = sockets_.removeSockIOData(fd);
+
+    if (!sIODwasRemoved && !force)
         return false;
 
     if (!msg.empty()) {
