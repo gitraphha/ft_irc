@@ -57,7 +57,7 @@ bool deliver(Server &server, Client &client,
     }
     if (params.size() < 2 || params[1].empty()) {
         if (!silent)
-            client.sendReply(Reply::reply(Reply::ERR_NOTEXTTOSEND, ""));
+            client.sendReply(Reply::reply(Reply::ERR_NOTEXTTOSEND));
         return false;
     }
     const std::vector<std::string> targets = Utils::split(params[0], ',');
