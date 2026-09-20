@@ -132,10 +132,12 @@ void Server::processClientSockets_() {
 
         /* POLLHUP is deliberately not treated as an error, a client that sends
          * and closes at once (e.g. printf ... | nc) still has data in the receive
-         * buffer, so it is read normally; recv() returning 0 closes it afterwards.
-         * POLLERR is counted in Socket::checkSocket4Recv (called by updateBuffer_).  */
-        if (!(sockets_.checkSocketData(pfd.fd) &&
-              sockets_.updateBuffer_(pfd))) {
+         * buffer, so it is read normally; recv() returning 0 closes it afterwards. */
+        if (pfd.revents & POLLERR) {
+            closeData.closeSocket = true;
+            closeData.closeMsg = "Socket POLLERR.";
+        } else if (!(sockets_.checkSocketData(pfd.fd) &&
+                     sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
             closeData.closeMsg = "Connection closed";
         }
@@ -289,7 +291,7 @@ ClientManager &Server::getClientManager() {
 */
 void Server::run() {
     if (!setupServerSockets_())
-        throw std::runtime_error("Server could not start.");
+        return ;
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         // Closing socket in Server::sendMsg messes up processClientSockets_'s loop.

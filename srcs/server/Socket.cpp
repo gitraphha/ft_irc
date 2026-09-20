@@ -15,9 +15,7 @@ bool Socket::checkSocketData(int const fd) {
     return (getSockIOData(fd) != NULL);
 }
 
-// POLLERR counts as one receive error, and the socket is closed on the third
-// consecutive one. So a client is not dropped on the first POLLERR, there has
-// to be three in a row without a valid line in between.
+// TODO: not used anymore as POLLERR closes socket nad updateBuffer is not called
 bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
     if ((pfd.revents & POLLERR)) {
         ++sIOD.recvErrorCount;
