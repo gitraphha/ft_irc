@@ -81,10 +81,15 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
     std::string &rdBuffer = sIOD.readBuffer;
     size_t       eol = rdBuffer.find('\n');
 
+    size_t eolMaxIdxPos = MAXMSGLEN - 2;
+    if ((eol > 0) && (eol != std::string::npos) &&
+        (rdBuffer.at(eol - 1) == '\r'))
+        eolMaxIdxPos = MAXMSGLEN - 1;
+
     msgTooLong = false;
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
-            (eol != std::string::npos && eol < MAXMSGLEN)) {
+            (eol != std::string::npos && (eol <= eolMaxIdxPos))) {
             return eol;
         } else {
             sIOD.discardMode = true;
