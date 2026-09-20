@@ -78,7 +78,7 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     std::string cmdLine;
     if (eol != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, eol);
-        while (!cmdLine.empty() && *cmdLine.rbegin() == '\r')
+        if (!cmdLine.empty() && *cmdLine.rbegin() == '\r')
             cmdLine.erase(cmdLine.size() - 1);
         sIOD.recvErrorCount = 0;
         sIOD.readBuffer = sIOD.readBuffer.substr(eol + 1);
@@ -163,9 +163,7 @@ bool Socket::socketCloseMarker(int const fd) {
 void Socket::closeSocket(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
     if (!sIODptr) {
-        std::ostringstream oss;
-        oss << "closeSocket: no data for fd:" << fd << ", not closing it";
-        logger_.logMsg(oss.str(), Logger::lmWarn);
+        close(fd);
         return;
     }
     // call sockAddrFamily only on known fd
