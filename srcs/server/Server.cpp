@@ -5,6 +5,10 @@
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
+#ifdef BONUS
+#include "Bot.hpp" // for Bot
+#endif
+
 #include <algorithm>    // for find_if
 #include <exception>    // for exception
 #include <netinet/in.h> // for IPPROTO_IPV6, IPV6_V6ONLY
@@ -115,6 +119,13 @@ void Server::processClientSockets_() {
          !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
+#ifdef BONUS
+        // Transfer listener/data fds are never registered in pollfds_, so this
+        // never fires today. Kept as future-proofing: if transfer_fd is ever added
+        // to pollfds_
+        if (tm_.ownsFd(pfd.fd))
+            continue;
+#endif
 
         if (sockets_.socketCloseMarker(pfd.fd)) {
             removeClientSocketPfd_(pfd.fd, "Socket marked for closing.");
@@ -300,7 +311,12 @@ void Server::run() {
         // Reaping client happens in processClientSockets_ when poll() returns.
         // With poll(-1), an idle loop would sleep forver and never reap these fds,
         // so wake it up every 1000.
-        int pollResult = poll(pollFds_.data(), pollFds_.size(), 1000);
+        int timeout = 1000;
+#ifdef BONUS
+        if (tm_.isActive())
+            timeout = 100;
+#endif
+        int pollResult = poll(pollFds_.data(), pollFds_.size(), timeout);
         if (pollResult == -1) {
             if (SignalHandler::stopLoopSignalReceived())
                 break;
@@ -310,6 +326,9 @@ void Server::run() {
 
         processServerSocketData_();
         processClientSockets_();
+#ifdef BONUS
+        processTransferSocket_();
+#endif
     }
 }
 
@@ -325,3 +344,73 @@ void Server::sendMsg(int const fd, std::string const &msg) {
     }
     sockets_.sendMsg(fd, msg);
 }
+
+#ifdef BONUS
+TransferManager &Server::getTransferManager() {
+    return tm_;
+}
+
+Bot &Server::getBot() {
+    return bot_;
+}
+
+void Server::processTransferSocket_() {
+    if (!tm_.isActive())
+        return;
+    if (tm_.expired()) {
+        tm_.closeOffer();
+        return;
+    }
+    int listener = tm_.getListenerFd();
+    if (listener == -1)
+        return;
+    int           dataFd = tm_.getDataFd();
+    struct pollfd pfds[2];
+    int           n = 1;
+    pfds[0] = PollFd(listener, POLLIN).pfd;
+    if (dataFd != -1) {
+        pfds[1] = PollFd(dataFd, POLLOUT).pfd;
+        n = 2;
+    }
+    if (poll(pfds, n, 0) <= 0)
+        return;
+    if (pfds[0].revents & (POLLERR | POLLNVAL)) {
+        tm_.closeOffer();
+        return;
+    }
+    if (pfds[0].revents & POLLIN) {
+        dataFd = tm_.getDataFd();
+        if (dataFd < 0)
+            return;
+        pfds[1] = PollFd(dataFd, POLLOUT).pfd;
+        n = 2;
+        if (poll(pfds, n, 0) <= 0)
+            return;
+    }
+    if (n != 2)
+        return;
+    if (pfds[1].revents & (POLLERR | POLLNVAL)) {
+        tm_.closeOffer();
+        return;
+    }
+    if (!(pfds[1].revents & (POLLOUT | POLLHUP)))
+        return;
+    ssize_t sent = 0;
+    do {
+        sent = tm_.sendChunk();
+    } while (sent > 0);
+    std::string msg;
+    if (sent < 0)
+        msg = "transfer failed";
+    else if (tm_.transferDone())
+        msg = "transfer complete";
+    else
+        return;
+    Client *client = clients_.find(tm_.current()->clientFd);
+    if (client)
+        client->send(Reply::fromClient(bot_.getPrefix(serverName_), "PRIVMSG",
+                                       client->getNick(), msg));
+    tm_.closeOffer();
+}
+
+#endif

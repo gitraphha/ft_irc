@@ -6,6 +6,11 @@
 #include "Logger.hpp"           // for Logger
 #include "Socket.hpp"           // for Socket
 
+#ifdef BONUS
+#include "Bot.hpp" // for Bot
+#include "TransferManager.hpp"
+#endif
+
 #include <poll.h>   // for pollfd
 #include <stddef.h> // for size_t
 #include <string>   // for string, basic_string
@@ -29,6 +34,22 @@ class Server {
     ChannelManager   channels_;
     ClientManager    clients_;
     CommandProcessor cmds_;
+
+#ifdef BONUS
+    struct PollFd {
+        struct pollfd pfd;
+
+        PollFd(int fd, short events) {
+            pfd.fd = fd;
+            pfd.events = events;
+            pfd.revents = 0;
+        }
+    };
+
+    TransferManager tm_;
+    Bot             bot_;
+    void            processTransferSocket_();
+#endif
 
     size_t                     numServerSockets_;
     std::vector<struct pollfd> pollFds_;
@@ -60,4 +81,9 @@ class Server {
     ClientManager     &getClientManager();
 
     void sendMsg(int const fd, std::string const &msg);
+
+#ifdef BONUS
+    TransferManager &getTransferManager();
+    Bot             &getBot();
+#endif
 };
