@@ -1,6 +1,7 @@
 #include "Server.hpp"
 
 #include "Client.hpp"        // for Client
+#include "Reply.hpp"         // for fromClient
 #include "ServerHelper.hpp"  // for getAdressFamilyStr, composeAddrfamAddrP...
 #include "SignalHandler.hpp" // for SignalHandler
 
@@ -131,14 +132,12 @@ void Server::processClientSockets_() {
 
         /* POLLHUP is deliberately not treated as an error, a client that sends
          * and closes at once (e.g. printf ... | nc) still has data in the receive
-         * buffer, so it is read normally; recv() returning 0 closes it afterwards. */
-        if (pfd.revents & POLLERR) {
+         * buffer, so it is read normally; recv() returning 0 closes it afterwards.
+         * POLLERR is counted in Socket::checkSocket4Recv (called by updateBuffer_).  */
+        if (!(sockets_.checkSocketData(pfd.fd) &&
+              sockets_.updateBuffer_(pfd))) {
             closeData.closeSocket = true;
-            closeData.closeMsg = "Socket POLLERR.";
-        } else if (!(sockets_.checkSocketData(pfd.fd) &&
-                     sockets_.updateBuffer_(pfd))) {
-            closeData.closeSocket = true;
-            closeData.closeMsg = "Socket error while updating buffer.";
+            closeData.closeMsg = "Connection closed";
         }
 
         bool buffHasMoreCmds = true;
@@ -148,8 +147,7 @@ void Server::processClientSockets_() {
                 pfd.fd, buffHasMoreCmds, msgTooLong);
             if (sockets_.socketCloseMarker(pfd.fd)) {
                 closeData.closeSocket = true;
-                closeData.closeMsg =
-                    "Error while composing command line from buffer.";
+                closeData.closeMsg = "Input too long";
             }
 
             Client *client = clients_.find(pfd.fd);
@@ -189,8 +187,14 @@ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
-            if (client)
+            if (client) {
+                // Client left without QUIT (killed, error limit) so tell its channels
+                if (client->isRegistered())
+                    channels_.broadcastToPeers(
+                        *client, Reply::fromClient(client->getPrefix(), "QUIT",
+                                                   "", msg));
                 client->sendClosingMsg(msg);
+            }
         }
         clients_.remove(fd, channels_);
     }
@@ -285,7 +289,7 @@ ClientManager &Server::getClientManager() {
 */
 void Server::run() {
     if (!setupServerSockets_())
-        return;
+        throw std::runtime_error("Server could not start.");
 
     while (!SignalHandler::stopLoopSignalReceived()) {
         // Closing socket in Server::sendMsg messes up processClientSockets_'s loop.

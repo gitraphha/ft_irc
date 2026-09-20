@@ -15,7 +15,9 @@ bool Socket::checkSocketData(int const fd) {
     return (getSockIOData(fd) != NULL);
 }
 
-// TODO: not used anymore as POLLERR closes socket nad updateBuffer is not called
+// POLLERR counts as one receive error, and the socket is closed on the third
+// consecutive one. So a client is not dropped on the first POLLERR, there has
+// to be three in a row without a valid line in between.
 bool Socket::checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD) {
     if ((pfd.revents & POLLERR)) {
         ++sIOD.recvErrorCount;
@@ -59,6 +61,10 @@ bool Socket::updateBuffer_(struct pollfd &pfd) {
     return true;
 }
 
+// A line ends at '\n' and any '\r' in front of it is dropped. RFC 2812 wants
+// "\r\n", but the modern IRC spec (modern.ircdocs.horse) says servers should
+// handle a single '\n' as if it were "\r\n", to support clients that send it.
+// ergo and InspIRCd do the same.
 std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                           bool &msgTooLong) {
     buffHasMoreCmds = false;
@@ -68,28 +74,30 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
         return "";
     SocketIOData &sIOD = *sIODptr;
 
-    size_t      lfcrPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+    size_t      eol = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
     std::string cmdLine;
-    if (lfcrPos != std::string::npos) {
-        cmdLine = sIOD.readBuffer.substr(0, lfcrPos);
+    if (eol != std::string::npos) {
+        cmdLine = sIOD.readBuffer.substr(0, eol);
+        while (!cmdLine.empty() && *cmdLine.rbegin() == '\r')
+            cmdLine.erase(cmdLine.size() - 1);
         sIOD.recvErrorCount = 0;
-        sIOD.readBuffer = sIOD.readBuffer.substr(lfcrPos + 2);
+        sIOD.readBuffer = sIOD.readBuffer.substr(eol + 1);
     }
     buffHasMoreCmds = ((sIOD.readBuffer.size() > MAXMSGLEN) ||
-                       (sIOD.readBuffer.find("\r\n") != std::string::npos));
+                       (sIOD.readBuffer.find('\n') != std::string::npos));
     return cmdLine;
 }
 
 size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
                                            bool         &msgTooLong) {
     std::string &rdBuffer = sIOD.readBuffer;
-    size_t       lfcrPos = rdBuffer.find("\r\n");
+    size_t       eol = rdBuffer.find('\n');
 
     msgTooLong = false;
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
-            (lfcrPos != std::string::npos && lfcrPos <= MAXMSGLEN - 2)) {
-            return lfcrPos;
+            (eol != std::string::npos && eol < MAXMSGLEN)) {
+            return eol;
         } else {
             sIOD.discardMode = true;
             msgTooLong = true;
@@ -100,8 +108,8 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         sIOD.closeFd = true;
         return std::string::npos;
     }
-    if (lfcrPos != std::string::npos) {
-        rdBuffer.erase(0, lfcrPos + 2);
+    if (eol != std::string::npos) {
+        rdBuffer.erase(0, eol + 1);
         sIOD.discardMode = false;
         return std::string::npos;
     }
@@ -155,7 +163,9 @@ bool Socket::socketCloseMarker(int const fd) {
 void Socket::closeSocket(int const fd) {
     SocketIOData *sIODptr = getSockIOData(fd);
     if (!sIODptr) {
-        close(fd);
+        std::ostringstream oss;
+        oss << "closeSocket: no data for fd:" << fd << ", not closing it";
+        logger_.logMsg(oss.str(), Logger::lmWarn);
         return;
     }
     // call sockAddrFamily only on known fd

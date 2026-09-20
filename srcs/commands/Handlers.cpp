@@ -77,6 +77,8 @@ bool Handlers::join(Server &server, Client &client,
     for (size_t i = 0; i < channels.size(); i++) {
         if (channels[i].empty())
             continue;
+        if (cm.isMember(client, channels[i]))
+            continue;
         try {
             const std::string &key = i < keys.size() ? keys[i] : "";
             cm.join(client, channels[i], key);

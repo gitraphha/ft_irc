@@ -100,6 +100,10 @@ static bool checkExtractCmdLnArgs(int const argc, char *const argv[], int &port,
                CRed);
         return false;
     }
+    if (password.empty()) {
+        toCerr("Error: password cannot be empty.", CRed);
+        return false;
+    }
 
     return true;
 }
