@@ -76,8 +76,6 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     std::string cmdLine;
     if (eol != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, eol);
-        if (!cmdLine.empty() && *cmdLine.rbegin() == '\r')
-            cmdLine.erase(cmdLine.size() - 1);
         sIOD.recvErrorCount = 0;
         sIOD.readBuffer = sIOD.readBuffer.substr(eol + 1);
     }
@@ -89,18 +87,19 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
 size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
                                            bool         &msgTooLong) {
     std::string &rdBuffer = sIOD.readBuffer;
-    size_t       eol = rdBuffer.find('\n');
+    size_t const eolMaxPos = MAXMSGLEN - 2;
+    size_t       eolPos = rdBuffer.find('\n');
 
-    size_t eolMaxIdxPos = MAXMSGLEN - 2;
-    if ((eol > 0) && (eol != std::string::npos) &&
-        (rdBuffer.at(eol - 1) == '\r'))
-        eolMaxIdxPos = MAXMSGLEN - 1;
+    if ((eolPos > 0) && (eolPos != std::string::npos) &&
+        (rdBuffer.at(eolPos - 1) == '\r')) {
+        eolPos -= 1;
+    }
 
     msgTooLong = false;
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
-            (eol != std::string::npos && (eol <= eolMaxIdxPos))) {
-            return eol;
+            ((eolPos != std::string::npos) && (eolPos <= eolMaxPos))) {
+            return eolPos;
         } else {
             sIOD.discardMode = true;
             msgTooLong = true;
@@ -111,8 +110,8 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         sIOD.closeFd = true;
         return std::string::npos;
     }
-    if (eol != std::string::npos) {
-        rdBuffer.erase(0, eol + 1);
+    if (eolPos != std::string::npos) {
+        rdBuffer.erase(0, eolPos + 1);
         sIOD.discardMode = false;
         return std::string::npos;
     }
