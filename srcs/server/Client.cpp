@@ -86,12 +86,15 @@ void Client::setOperator(bool value) {
     oper_ = value;
 }
 
-bool Client::isInvitedTo(const std::string &name) const {
-    return invitedTo_.find(Utils::foldCase(name)) != invitedTo_.end();
+bool Client::isInvitedTo(const std::string &name,
+                         std::time_t        createdTime) const {
+    std::map<std::string, std::time_t>::const_iterator it =
+        invitedTo_.find(Utils::foldCase(name));
+    return it != invitedTo_.end() && it->second == createdTime;
 }
 
-void Client::addInvite(const std::string &name) {
-    invitedTo_.insert(Utils::foldCase(name));
+void Client::addInvite(const std::string &name, std::time_t createdTime) {
+    invitedTo_[Utils::foldCase(name)] = createdTime;
 }
 
 void Client::removeInvite(const std::string &name) {

@@ -8,23 +8,24 @@
 #include "Reply.hpp"
 
 #include <cstddef>
-#include <set>
+#include <ctime>
+#include <map>
 #include <string>
 
 class Server;
 
 class Client {
-    Server               *server_;
-    int                   fd_;
-    std::string           nick_;
-    std::string           nickCaseFolded_;
-    std::string           username_;
-    std::string           hostname_;
-    std::string           realname_;
-    bool                  registered_;
-    bool                  passAccepted_;
-    bool                  oper_;
-    std::set<std::string> invitedTo_;
+    Server                            *server_;
+    int                                fd_;
+    std::string                        nick_;
+    std::string                        nickCaseFolded_;
+    std::string                        username_;
+    std::string                        hostname_;
+    std::string                        realname_;
+    bool                               registered_;
+    bool                               passAccepted_;
+    bool                               oper_;
+    std::map<std::string, std::time_t> invitedTo_;
 
   public:
     Client()
@@ -59,8 +60,11 @@ class Client {
     void setPassAccepted(bool value);
     void setOperator(bool value);
 
-    bool isInvitedTo(const std::string &name) const;
-    void addInvite(const std::string &name);
+    // invites are bound to channel incarnation time.
+    // an invite from a channel channel that was destoyed and recreated does
+    // not admit anyone into the new channel
+    bool isInvitedTo(const std::string &name, std::time_t createdTime) const;
+    void addInvite(const std::string &name, std::time_t createdTime);
     void removeInvite(const std::string &name);
 
     // all send routed to `Server::sendMsg()`
