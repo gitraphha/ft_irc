@@ -27,6 +27,11 @@
 #include "Server.hpp"
 #include "Utils.hpp"
 
+#ifdef BONUS
+#include "Bot.hpp"
+#include "CTCP.hpp"
+#endif
+
 #include <string>
 #include <vector>
 
@@ -46,20 +51,10 @@ void deliverTo(Server &server, Client &from, const std::string &target,
     server.getClientManager().at(target).send(line); // throws 401
 }
 
+// call checkMinParam() before calling deliver()
 bool deliver(Server &server, Client &client,
              const std::vector<std::string> &params, const std::string &cmd,
              bool silent) {
-    if (params.empty() || params[0].empty()) {
-        if (!silent)
-            client.sendReply(Reply::reply(Reply::ERR_NORECIPIENT, "",
-                                          "No recipient given (" + cmd + ")"));
-        return false;
-    }
-    if (params.size() < 2 || params[1].empty()) {
-        if (!silent)
-            client.sendReply(Reply::reply(Reply::ERR_NOTEXTTOSEND));
-        return false;
-    }
     const std::vector<std::string> targets = Utils::split(params[0], ',');
     for (size_t i = 0; i < targets.size(); i++) {
         if (targets[i].empty())
@@ -76,14 +71,45 @@ bool deliver(Server &server, Client &client,
     return false;
 }
 
+// Checks min parameters. Sends error message and returns false on error.
+bool checkMinParam(Client &client, const std::vector<std::string> &params,
+                   bool silent) {
+    if (params.empty() || params[0].empty()) {
+        if (!silent)
+            client.sendReply(Reply::reply(Reply::ERR_NORECIPIENT, "",
+                                          "No recipient given (PRIVMSG)"));
+        return false;
+    }
+    if (params.size() < 2 || params[1].empty()) {
+        if (!silent)
+            client.sendReply(Reply::reply(Reply::ERR_NOTEXTTOSEND, ""));
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 bool Handlers::privmsg(Server &server, Client &client,
                        const std::vector<std::string> &params) {
+    if (!checkMinParam(client, params, false))
+        return false;
+#ifdef BONUS
+    Bot &bot = server.getBot();
+    if (bot.isForBot(server, params)) {
+        if (CTCP::isCTCP(params[1]))
+            bot.handleCTCP(server.getServerName(), client, params[1]);
+        else
+            bot.handleMessage(server, client, params[1]);
+        return false;
+    }
+#endif
     return deliver(server, client, params, "PRIVMSG", false);
 }
 
 bool Handlers::notice(Server &server, Client &client,
                       const std::vector<std::string> &params) {
+    if (!checkMinParam(client, params, true))
+        return false;
     return deliver(server, client, params, "NOTICE", true);
 }

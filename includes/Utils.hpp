@@ -57,4 +57,15 @@ static inline std::string join3(const std::string &a, const std::string &b,
     return a + " " + b + " " + (c.empty() ? "" : " " + c);
 }
 
+#ifdef BONUS
+
+static inline std::string trimPrefix(const std::string &s,
+                                     const std::string &prefix) {
+    if (s.compare(0, prefix.size(), prefix) == 0)
+        return s.substr(prefix.size());
+    return s;
+}
+
+#endif
+
 } // namespace Utils

@@ -20,7 +20,7 @@ void Channel::join(Client &client, const std::string &key) {
     if (hasMember(client))
         return;
     bool inviteOnly = modes_.hasMode(Mode::InviteOnly);
-    if (inviteOnly && !client.isInvitedTo(nameCaseFolded_))
+    if (inviteOnly && !client.isInvitedTo(nameCaseFolded_, createdTime_))
         throw Error::reply(Reply::ERR_INVITEONLYCHAN, name_);
     if (!this->key_.empty() && this->key_ != key)
         throw Error::reply(Reply::ERR_BADCHANNELKEY, name_);
@@ -86,6 +86,10 @@ const std::string &Channel::getNameCaseFolded() const {
 
 int Channel::getUserLimit() const {
     return userLimit_;
+}
+
+std::time_t Channel::getCreatedTime() const {
+    return createdTime_;
 }
 
 const std::string &Channel::getTopic() const {
@@ -259,7 +263,8 @@ bool Channel::applyModeToMember_(Server &server, Client &client,
         client.sendReply(Reply::reply(Reply::ERR_USERNOTINCHANNEL,
                                       change.arg + " " + name_));
     } catch (Error &e) {
-        client.sendReply(e.reply());
+        if (e.hasReply())
+            client.sendReply(e.reply());
     }
     return false;
 }
