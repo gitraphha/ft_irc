@@ -33,7 +33,7 @@ Server::Server(int const port, std::string const &password)
 	* going backwards through pollFds to ensure server sockets are closed last
  */
 Server::~Server() {
-	sendServerGoodBye("Server shutdown - goodbye");
+    sendServerGoodBye("Server shutdown - goodbye");
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
         removeClientSocketPfd_(fd, "");
