@@ -61,8 +61,6 @@ bool Socket::updateBuffer_(struct pollfd &pfd) {
 // ergo and InspIRCd do the same.
 std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                           bool &msgTooLong) {
-    buffHasMoreCmds = false;
-
     SocketIOData &sIOD = getSockIOData(fd);
 
     size_t      eolSize = 0;
@@ -71,7 +69,7 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     if (eolPos != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, eolPos);
         sIOD.recvErrorCount = 0;
-        sIOD.readBuffer = sIOD.readBuffer.substr(eolPos + 1);
+        sIOD.readBuffer = sIOD.readBuffer.substr(eolPos + eolSize);
     }
     buffHasMoreCmds = ((sIOD.readBuffer.size() > MAXMSGLEN) ||
                        (sIOD.readBuffer.find('\n') != std::string::npos));
