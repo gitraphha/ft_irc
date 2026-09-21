@@ -59,6 +59,7 @@ class Server {
     void processServerSocketData_();
     void acceptClient_(int const serverFd);
     void processClientSockets_();
+    void sendServerGoodBye(std::string const &msg);
     void removeClientSocketPfd_(int const fd, std::string const &msg);
     void storePollFd_(int const socketFd, bool srvSocket);
     void removePollFd_(int const fd);

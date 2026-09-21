@@ -33,9 +33,10 @@ Server::Server(int const port, std::string const &password)
 	* going backwards through pollFds to ensure server sockets are closed last
  */
 Server::~Server() {
+	sendServerGoodBye("Server shutdown - goodbye");
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
-        removeClientSocketPfd_(fd, "Server shutdown - goodbye");
+        removeClientSocketPfd_(fd, "");
     }
 }
 
@@ -197,6 +198,23 @@ void Server::processClientSockets_() {
             removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
             --idx;
         }
+    }
+}
+
+void Server::sendServerGoodBye(std::string const &msg) {
+    if (msg.empty())
+        return;
+    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+        struct pollfd const &pfd = pollFds_.at(idx);
+        Client              *client = clients_.find(pfd.fd);
+        if (client)
+            client->sendClosingMsg(msg);
+    }
+    poll(pollFds_.data(), pollFds_.size(), 1000);
+    for (size_t idx = numServerSockets_; idx < pollFds_.size(); ++idx) {
+        struct pollfd const &pfd = pollFds_.at(idx);
+        if (pfd.revents & (POLLOUT))
+            sockets_.flushWriteBuffer(pfd.fd);
     }
 }
 
