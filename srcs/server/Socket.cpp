@@ -121,10 +121,37 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong,
     return std::string::npos;
 }
 
+bool Socket::hasPendingWrite(int const fd) {
+    SocketIOData *sIODptr = getSockIOData(fd);
+    return sIODptr && !sIODptr->closeFd && !sIODptr->writeBuffer.empty();
+}
+
+// return true if nothing to write
+// returns false on error
+bool Socket::flushWriteBuffer(int const fd) {
+    SocketIOData *sIODptr = getSockIOData(fd);
+    if (!sIODptr)
+        return true;
+    SocketIOData &sIOD = *sIODptr;
+    while (!sIOD.writeBuffer.empty() && !sIOD.closeFd) {
+        ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
+                                 sIOD.writeBuffer.length(), MSG_NOSIGNAL);
+        if (bytesSent > 0) {
+            sIOD.writeBuffer.erase(0, static_cast<size_t>(bytesSent));
+            continue;
+        }
+        // No errror count to make sure slow clients are not killed.
+        // Errors EAGAIN/EWOULDBLOCK are acceptable
+        return false;
+    }
+    return sIOD.writeBuffer.empty();
+}
+
 /*
     sendMsg
     * send string msg to a network socket
     * uses i/o buffers and error counters in SocketIOData
+    * only queue no send. sent in poll loop after checking POLLOUT
 */
 void Socket::sendMsg(int const fd, std::string const &msg) {
     SocketIOData *sIODptr = getSockIOData(fd);
@@ -132,26 +159,14 @@ void Socket::sendMsg(int const fd, std::string const &msg) {
         return;
 
     SocketIOData &sIOD = *sIODptr;
+    if (sIOD.closeFd)
+        return;
     if (msg.length() >
         sIOD.writeBuffer.max_size() - sIOD.writeBuffer.length()) {
         sIOD.closeFd = true;
         return;
     }
     sIOD.writeBuffer += msg;
-    ssize_t bytesSent = send(fd, sIOD.writeBuffer.c_str(),
-                             sIOD.writeBuffer.length(), MSG_NOSIGNAL);
-    if (bytesSent <= 0) {
-        ++sIOD.sendErrorCount;
-        if (sIOD.sendErrorCount >= SOCKETERRORLIMIT)
-            sIOD.closeFd = true;
-        return;
-    }
-
-    sIOD.sendErrorCount = 0;
-    if (static_cast<size_t>(bytesSent) < sIOD.writeBuffer.length())
-        sIOD.writeBuffer.erase(0, bytesSent);
-    else
-        sIOD.writeBuffer.clear();
 }
 
 bool Socket::socketCloseMarker(int const fd) {
