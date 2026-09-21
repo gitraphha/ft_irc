@@ -216,9 +216,9 @@ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
         clients_.remove(fd, channels_);
     }
     // TODO: socket is closed without flush. So loop cannot send the message
-	// Fix line below :
-	// sockets_.flushWriteBuffer(fd);
-	// But, is it okay to flush without checking POLLOUT here?
+    // Fix line below :
+    // sockets_.flushWriteBuffer(fd);
+    // But, is it okay to flush without checking POLLOUT here?
     sockets_.closeSocket(fd);
     removePollFd_(fd);
 }
