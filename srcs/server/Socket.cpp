@@ -94,7 +94,7 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
     msgTooLong = false;
     if (!sIOD.discardMode) {
         if ((rdBuffer.length() < MAXMSGLEN) ||
-            (eol != std::string::npos && eol < MAXMSGLEN)) {
+            (eol != std::string::npos && eol <= MAXMSGLEN - 2)) {
             return eol;
         } else {
             sIOD.discardMode = true;
