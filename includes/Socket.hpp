@@ -33,7 +33,8 @@ class Socket {
     std::map<int, SocketIOData> sockIODataStore_;
     Logger const               &logger_;
 
-    size_t bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong);
+    size_t bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong,
+                                       size_t &eolSize);
     bool   checkSocket4Recv(struct pollfd &pfd, SocketIOData &sIOD); // NOLINT
 
   public:

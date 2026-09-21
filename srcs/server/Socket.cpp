@@ -64,7 +64,9 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     buffHasMoreCmds = false;
 
     SocketIOData &sIOD = getSockIOData(fd);
-    size_t        eolPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+
+	size_t      eolSize = 0;
+    size_t      eolPos = bufferLengthAndSanityCheck_(sIOD, msgTooLong, eolSize);
     std::string   cmdLine;
     if (eolPos != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, eolPos);
@@ -76,15 +78,17 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
     return cmdLine;
 }
 
-size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
-                                           bool         &msgTooLong) {
+size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong,
+                                           size_t &eolSize) {
     std::string &rdBuffer = sIOD.readBuffer;
     size_t const eolMaxPos = MAXMSGLEN - 2;
     size_t       eolPos = rdBuffer.find('\n');
 
+    eolSize = 1;
     if ((eolPos > 0) && (eolPos != std::string::npos) &&
         (rdBuffer.at(eolPos - 1) == '\r')) {
         eolPos -= 1;
+        eolSize += 1;
     }
 
     msgTooLong = false;
@@ -101,14 +105,11 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
     if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
         sIOD.closeFd = true;
         sIOD.closeMsg = "SOCKETERRORLIMIT exceeded (discard mode)";
-        return std::string::npos;
-    }
+    } else
     if (eolPos != std::string::npos) {
-        rdBuffer.erase(0, eolPos + 1);
+        rdBuffer.erase(0, eolPos + eolSize);
         sIOD.discardMode = false;
-        return std::string::npos;
-    }
-    if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+    } else if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
     else
         rdBuffer.clear();
