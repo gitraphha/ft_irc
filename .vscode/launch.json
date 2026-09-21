@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+	{
+        "name": "Debug with LLDB",
+        "type": "lldb",
+        "request": "launch",
+        "args": ["6667", "pass"],
+        "program": "${workspaceFolder}/ircserv_debug",
+        "cwd": "${workspaceFolder}",
+        "stopOnEntry": false,
+		"preLaunchTask": "42 build with Makefile",
+           "initCommands": [
+                "process handle SIGINT -s false -p true"
+            ]
+	},	
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": ["6667", "pass"],
+//   "stopAtEntry": true,
+      "externalConsole": false,
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/ircserv_debug",
+	  "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+	//   "miDebuggerArgs": "-ex 'set debuginfod enabled off'",
+	  //"preLaunchTask": "42 C build bonus test.c",
+	  "preLaunchTask": "42 build with Makefile",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+		{
+          "description": "Pass SIGINT to program",
+          "text": "handle SIGINT pass nostop",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Pass SIGQUIT to program",
+          "text": "handle SIGQUIT pass nostop",
+          "ignoreFailures": true
+        }		
+      ]
+    }
+  ]
+}

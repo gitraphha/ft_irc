@@ -135,84 +135,69 @@ void Server::processClientSockets_() {
 
         if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
             continue;
-
-        struct {
-            bool        closeSocket;
-            std::string closeMsg;
-        } closeData = {false, ""};
-
         /* POLLHUP is deliberately not treated as an error, a client that sends
          * and closes at once (e.g. printf ... | nc) still has data in the receive
          * buffer, so it is read normally; recv() returning 0 closes it afterwards. */
-        if (pfd.revents & POLLERR) {
-            closeData.closeSocket = true;
-            closeData.closeMsg = "Socket POLLERR.";
-        } else if (!(sockets_.checkSocketData(pfd.fd) &&
-                     sockets_.updateBuffer_(pfd))) {
-            closeData.closeSocket = true;
-            closeData.closeMsg = "Connection closed";
-        }
 
-        bool buffHasMoreCmds = true;
-        while (buffHasMoreCmds && !closeData.closeSocket) {
-            bool        msgTooLong = false;
-            std::string cmdLine = sockets_.getCRLFLineFromBuffer(
-                pfd.fd, buffHasMoreCmds, msgTooLong);
-            if (sockets_.socketCloseMarker(pfd.fd)) {
-                closeData.closeSocket = true;
-                closeData.closeMsg = "Connection closed";
-            }
+        try {
+            sockets_.updateBuffer_(pfd);
+            bool buffHasMoreCmds = true;
+            while (buffHasMoreCmds && !sockets_.socketCloseMarker(pfd.fd)) {
+                bool        msgTooLong = false;
+                std::string cmdLine = sockets_.getCRLFLineFromBuffer(
+                    pfd.fd, buffHasMoreCmds, msgTooLong);
+                Client &client = clients_.at(pfd.fd);
+                if (msgTooLong)
+                    cmds_.inputTooLong(client);
+                if (cmdLine.empty())
+                    continue;
 
-            Client *client = clients_.find(pfd.fd);
-            if (!client) {
-                std::ostringstream oss;
-                oss << "Internal error: No client data for fd:" << pfd.fd;
-                log_(oss.str(), Logger::lmError);
-                closeData.closeSocket = true;
-                closeData.closeMsg = oss.str();
-                break;
-            }
+                {
+                    std::ostringstream oss;
+                    oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": "
+                        << cmdLine;
+                    logger_.logMsg(oss.str(), Logger::lmIn);
+                }
 
-            if (msgTooLong)
-                cmds_.inputTooLong(*client);
-            if (cmdLine.empty())
-                continue;
-
-            {
-                std::ostringstream oss;
-                oss << "RecvMsg event:\nFrom FD " << pfd.fd << ": " << cmdLine;
-                logger_.logMsg(oss.str(), Logger::lmIn);
-            }
-
-            // returns true if connection is to be closed
-            closeData.closeSocket = cmds_.run(*this, *client, cmdLine);
-            closeData.closeMsg = "";
-        };
-
-        if (closeData.closeSocket) {
-            removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
+                // returns true if connection is to be closed
+                bool const doClose = cmds_.run(*this, client, cmdLine);
+                sockets_.setSocketCloseState(pfd.fd, doClose);
+            };
+        } catch (std::exception const &e) {
+            logger_.logMsg(e.what(), Logger::lmExcept);
+            // In this case, we may not have SocketIOData anymore, so remove directly
+            // sockets_.setSocketCloseState(pfd.fd, true, e.what());
+            removeClientSocketPfd_(pfd.fd, e.what(), true);
             --idx;
         }
     }
+
+    for (size_t idx = numServerSockets_;
+         !SignalHandler::stopLoopSignalReceived() && idx < pollFds_.size();
+         ++idx) {
+        if (removeClientSocketPfd_(pollFds_.at(idx).fd))
+            --idx;
+    }
 }
 
-void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
-    if (!sockets_.isServerSocket(fd)) {
-        if (!msg.empty()) {
-            Client *client = clients_.find(fd);
-            if (client) {
-                // Client left without QUIT (killed, error limit) so tell its channels
-                if (client->isRegistered())
-                    channels_.broadcastToPeers(
-                        *client, Reply::fromClient(client->getPrefix(), "QUIT",
-                                                   "", msg));
-                client->sendClosingMsg(msg);
-            }
-        }
-        clients_.remove(fd, channels_);
+bool Server::removeClientSocketPfd_(int const fd, std::string const &msg,
+                                    bool force) throw() {
+    bool sIODwasRemoved = sockets_.removeSockIOData(fd);
+
+    if (!sIODwasRemoved && !force)
+        return false;
+
+    if (!msg.empty()) {
+        // ClientManager::find never throws
+        // Also for a server socket, there is no client
+        Client *client = clients_.find(fd);
+        if (client)
+            client->sendClosingMsg(msg);
     }
+    clients_.remove(fd, channels_);
     sockets_.closeSocket(fd);
     removePollFd_(fd);
+    return true;
 }
 
 void Server::acceptClient_(int const serverFd) {
