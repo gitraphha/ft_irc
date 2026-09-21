@@ -43,6 +43,8 @@ class Socket {
     bool        checkSocketData(int const fd);
     std::string getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
                                       bool &msgTooLong);
+    bool        hasPendingWrite(int const fd);
+    bool        flushWriteBuffer(int const fd);
     void        sendMsg(int const fd, std::string const &msg);
     bool        socketCloseMarker(int const fd);
     void        closeSocket(int const fd);

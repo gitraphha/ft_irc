@@ -62,6 +62,7 @@ class Server {
     void removeClientSocketPfd_(int const fd, std::string const &msg);
     void storePollFd_(int const socketFd, bool srvSocket);
     void removePollFd_(int const fd);
+    void setPolloutInterest_(int const fd);
     void log_(std::string const &msg, Logger::logMode const lm);
 
     Server(Server const &other);

@@ -133,6 +133,10 @@ void Server::processClientSockets_() {
             continue;
         }
 
+        if (pfd.revents & (POLLOUT))
+            sockets_.flushWriteBuffer(pfd.fd);
+        setPolloutInterest_(pfd.fd);
+
         if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
             continue;
 
@@ -211,6 +215,10 @@ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
         }
         clients_.remove(fd, channels_);
     }
+    // TODO: socket is closed without flush. So loop cannot send the message
+    // Fix line below :
+    // sockets_.flushWriteBuffer(fd);
+    // But, is it okay to flush without checking POLLOUT here?
     sockets_.closeSocket(fd);
     removePollFd_(fd);
 }
@@ -343,6 +351,17 @@ void Server::sendMsg(int const fd, std::string const &msg) {
         logger_.logMsg(oss.str(), Logger::lmOut);
     }
     sockets_.sendMsg(fd, msg);
+    setPolloutInterest_(fd);
+}
+
+void Server::setPolloutInterest_(int const fd) {
+    std::vector<pollfd>::iterator it =
+        std::find_if(pollFds_.begin(), pollFds_.end(), srvHelp::PfdHasFd(fd));
+    if (it == pollFds_.end())
+        return;
+    short const pollout = static_cast<short>(POLLOUT);
+    short const interest = sockets_.hasPendingWrite(fd) ? pollout : 0;
+    it->events = static_cast<short>((it->events & ~pollout) | interest);
 }
 
 #ifdef BONUS
