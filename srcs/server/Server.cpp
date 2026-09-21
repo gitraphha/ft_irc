@@ -35,7 +35,7 @@ Server::Server(int const port, std::string const &password)
 Server::~Server() {
     while (!pollFds_.empty()) {
         int const fd = pollFds_.back().fd;
-        removeClientSocketPfd_(fd, "Server shutdown - goodbye");
+        removeClientSocketPfd_(fd);
     }
 }
 
