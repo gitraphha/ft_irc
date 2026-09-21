@@ -72,27 +72,30 @@ std::string Socket::getCRLFLineFromBuffer(int const fd, bool &buffHasMoreCmds,
         return "";
     SocketIOData &sIOD = *sIODptr;
 
-    size_t      eol = bufferLengthAndSanityCheck_(sIOD, msgTooLong);
+    size_t      eolSize = 0;
+    size_t      eol = bufferLengthAndSanityCheck_(sIOD, msgTooLong, eolSize);
     std::string cmdLine;
     if (eol != std::string::npos) {
         cmdLine = sIOD.readBuffer.substr(0, eol);
         sIOD.recvErrorCount = 0;
-        sIOD.readBuffer = sIOD.readBuffer.substr(eol + 1);
+        sIOD.readBuffer = sIOD.readBuffer.substr(eol + eolSize);
     }
     buffHasMoreCmds = ((sIOD.readBuffer.size() > MAXMSGLEN) ||
                        (sIOD.readBuffer.find('\n') != std::string::npos));
     return cmdLine;
 }
 
-size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
-                                           bool         &msgTooLong) {
+size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD, bool &msgTooLong,
+                                           size_t &eolSize) {
     std::string &rdBuffer = sIOD.readBuffer;
     size_t const eolMaxPos = MAXMSGLEN - 2;
     size_t       eolPos = rdBuffer.find('\n');
 
+    eolSize = 1;
     if ((eolPos > 0) && (eolPos != std::string::npos) &&
         (rdBuffer.at(eolPos - 1) == '\r')) {
         eolPos -= 1;
+        eolSize += 1;
     }
 
     msgTooLong = false;
@@ -106,16 +109,12 @@ size_t Socket::bufferLengthAndSanityCheck_(SocketIOData &sIOD,
         }
     }
     // discard mode
-    if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT) {
+    if (++sIOD.recvErrorCount >= SOCKETERRORLIMIT)
         sIOD.closeFd = true;
-        return std::string::npos;
-    }
-    if (eolPos != std::string::npos) {
-        rdBuffer.erase(0, eolPos + 1);
+    else if (eolPos != std::string::npos) {
+        rdBuffer.erase(0, eolPos + eolSize);
         sIOD.discardMode = false;
-        return std::string::npos;
-    }
-    if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
+    } else if (!rdBuffer.empty() && '\r' == *rdBuffer.rbegin())
         rdBuffer = "\r";
     else
         rdBuffer.clear();
