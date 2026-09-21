@@ -201,9 +201,7 @@ bool TransferManager::fileSize_(const std::string &path, off_t &size) const {
 }
 
 void TransferManager::setNonBlocking_(int fd) {
-    int flags = ::fcntl(fd, F_GETFL, 0);
-    if (flags != -1)
-        ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    ::fcntl(fd, F_SETFL, O_NONBLOCK);
 }
 
 #endif
