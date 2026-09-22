@@ -34,18 +34,20 @@ def server_alive():
         return False
 
 
-print("== Trigger 1: MODE on a channel that does not exist ==")
-print("   server up:", "YES" if server_alive() else "NO")
+def ok(cond, text):
+    print("  %s %s" % ("ok  " if cond else "FAIL", text))
+
+
+print("[MODE on a channel that does not exist]")
+ok(server_alive(), "server up before")
 a = reg("t1", "u1")
 a.sendall(b"MODE #doesnotexist +o x\r\n")
 time.sleep(0.8)
-print("   server still up:",
-      "YES (no crash; #doesnotexist may be handled without throwing)"
-      if server_alive() else "NO -> CRASH reproduced (server died)")
+ok(server_alive(), "server still up after MODE #doesnotexist +o x")
 a.close()
 
-print("== Trigger 2: non-op issues +o to an op (two connections) ==")
-print("   server up:", "YES" if server_alive() else "NO")
+print("[a member who is not operator sends MODE #c +o]")
+ok(server_alive(), "server up before")
 op = reg("op", "u2")
 op.sendall(b"JOIN #c\r\n")
 time.sleep(0.2)
@@ -54,7 +56,6 @@ mem.sendall(b"JOIN #c\r\n")
 time.sleep(0.2)
 mem.sendall(b"MODE #c +o op\r\n")   # member, not op -> Channel.cpp throws 482
 time.sleep(0.8)
-print("   server still up:",
-      "YES (crash fixed)" if server_alive() else "NO -> CRASH reproduced (server died)")
+ok(server_alive(), "server still up after the 482 path")
 op.close()
 mem.close()

@@ -62,30 +62,22 @@ def drain(s):
     s.setblocking(True)
 
 
-print("=== Test A: 600-byte line then NAMES, single packet ===")
-print("   expect: 417 YES + 366 YES  ")
+def ok(cond, text):
+    print("  %s %s" % ("ok  " if cond else "FAIL", text))
+
+
+print("[a 600-byte line and NAMES in one packet]")
 s, reg = connect("ovlA", "u1")
 drain(s)
 s.sendall(b"A" * 600 + b"\r\nNAMES\r\n")
 data, eof = read_until_quiet(s, 2.0)
 got417 = b"417" in data
 got366 = b"366" in data
-print("  417 (input too long)       :", "YES" if got417 else "no")
-print("  366 (End of NAMES)         :", "YES" if got366 else "no")
-print("  -> PASS (drained at once)  " if (got417 and got366) else
-      "  -> FAIL (NAMES stuck until next poll -> apply fix #5)  ")
-if got417 and not got366:
-    print("  poke: sending PING to wake the poll loop...")
-    s.sendall(b"PING :wake\r\n")
-    data2, eof2 = read_until_quiet(s, 1.0)
-    print("   366 after the poke        :",
-          "YES (confirms NAMES was stuck in readBuffer)" if b"366" in data2
-          else "no")
+ok(got417, "417 for the over-long line")
+ok(got366, "366 for the NAMES that followed in the same packet")
 s.close()
 
-print()
-print("=== Test B: overflow with no CRLF ever: 417, then close ===")
-print("   expect: 417 YES + closed YES (one 417, then close after the grace limit)")
+print("[600 bytes three times, never a CRLF]")
 s, reg = connect("ovlB", "u2")
 drain(s)
 all_data = b""
@@ -103,16 +95,6 @@ all_data += d
 any_closed = any_closed or e
 
 got417 = b"417" in all_data
-print("  417 seen                     :", "YES" if got417 else "no")
-print("  connection closed            :", "YES" if any_closed else "no")
-if got417 and any_closed:
-    print("  -> PASS (one 417, then closed by the discard-limit)")
-elif not got417:
-    print("  -> FAIL (no 417 ever sent)")
-    print("  close message from server: %r" % all_data[:160])
-else:
-    print("  -> FAIL (server kept connection open)")
+ok(got417, "417 was sent")
+ok(any_closed, "connection closed after the third over-long chunk")
 s.close()
-print()
-print("note: close message like '[Error while composing command line from buffer.]'")
-print("is the generic label of the discard-limit close; the 417 precedes it.")
