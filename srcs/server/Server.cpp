@@ -120,10 +120,9 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 #ifdef BONUS
-        // Transfer listener/data fds are never registered in pollfds_, so this
-        // never fires today. Kept as future-proofing: if transfer_fd is ever added
-        // to pollfds_
-        if (tm_.ownsFd(pfd.fd))
+        // Transfer listener/data fds are in pollFds_ too (syncTransferPollFds_)
+        // but are not clients: processTransferSocket_ handles their revents.
+        if (!sockets_.checkSocketData(pfd.fd) || tm_.ownsFd(pfd.fd))
             continue;
 #endif
 
@@ -220,6 +219,10 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
+    if (!sockets_.checkSocketData(fd)) {
+        removePollFd_(fd);
+        return;
+    }
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
@@ -336,6 +339,7 @@ void Server::run() {
         // so wake it up every 1000.
         int timeout = 1000;
 #ifdef BONUS
+        syncTransferPollFds_();
         if (tm_.isActive())
             timeout = 100;
 #endif
@@ -388,6 +392,27 @@ Bot &Server::getBot() {
     return bot_;
 }
 
+// Keeps the transfer listener/data fds inside the single poll() set:
+// drops the ones the TransferManager already closed, adds the live ones.
+void Server::syncTransferPollFds_() {
+    for (size_t i = numServerSockets_; i < pollFds_.size();) {
+        int const fd = pollFds_.at(i).fd;
+        if (!sockets_.checkSocketData(fd) && !tm_.ownsFd(fd))
+            pollFds_.erase(pollFds_.begin() + i);
+        else
+            ++i;
+    }
+    if (!tm_.isActive())
+        return;
+    int const   fds[2] = {tm_.getListenerFd(), tm_.current()->dataFd};
+    short const events[2] = {POLLIN, POLLOUT};
+    for (int i = 0; i < 2; ++i)
+        if (fds[i] != -1 &&
+            std::find_if(pollFds_.begin(), pollFds_.end(),
+                         srvHelp::PfdHasFd(fds[i])) == pollFds_.end())
+            pollFds_.push_back(PollFd(fds[i], events[i]).pfd);
+}
+
 void Server::processTransferSocket_() {
     if (!tm_.isActive())
         return;
@@ -398,7 +423,7 @@ void Server::processTransferSocket_() {
     int listener = tm_.getListenerFd();
     if (listener == -1)
         return;
-    int           dataFd = tm_.getDataFd();
+    int           dataFd = tm_.current()->dataFd;
     struct pollfd pfds[2];
     int           n = 1;
     pfds[0] = PollFd(listener, POLLIN).pfd;
@@ -406,8 +431,14 @@ void Server::processTransferSocket_() {
         pfds[1] = PollFd(dataFd, POLLOUT).pfd;
         n = 2;
     }
-    if (poll(pfds, n, 0) <= 0)
-        return;
+    for (int i = 0; i < n; ++i) { // revents from the main poll()
+        std::vector<pollfd>::iterator it = std::find_if(
+            pollFds_.begin(), pollFds_.end(), srvHelp::PfdHasFd(pfds[i].fd));
+        if (it == pollFds_.end())
+            pfds[i].revents = 0;
+        else
+            pfds[i].revents = it->revents;
+    }
     if (pfds[0].revents & (POLLERR | POLLNVAL)) {
         tm_.closeOffer();
         return;
@@ -416,10 +447,9 @@ void Server::processTransferSocket_() {
         dataFd = tm_.getDataFd();
         if (dataFd < 0)
             return;
-        pfds[1] = PollFd(dataFd, POLLOUT).pfd;
-        n = 2;
-        if (poll(pfds, n, 0) <= 0)
-            return;
+        // pfds[1] = PollFd(dataFd, POLLOUT).pfd;
+        // n = 2;
+        return; // the data fd joins the poll set on the next iteration
     }
     if (n != 2)
         return;
