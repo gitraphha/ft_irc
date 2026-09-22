@@ -34,6 +34,7 @@ spec() {
         longline)     echo "networking/longline.py|ircserv|10 KB without CRLF from three clients while a fourth stays responsive" ;;
         churn)        echo "networking/churn.py|ircserv|20 members: broadcast storm, JOIN/PART churn, RST disconnects, a stalled member" ;;
         closing)      echo "networking/closing.py|ircserv|what the client gets before the server closes its link: 464, ERROR" ;;
+        syscalls)     echo "networking/syscalls.sh|SELF|close/accept/send/recv return codes traced through every close path, both binaries (a fd closed twice, a failed accept)" ;;
         parser)       echo "client/parser.cpp||message grammar: prefix, command, params, trailing" ;;
         reply)        echo "client/reply.cpp||numeric reply formatting" ;;
         state)        echo "client/state.cpp|SRV|client state: nick casefolding, invites, identity, prefix, flags" ;;
@@ -46,7 +47,7 @@ spec() {
     esac
 }
 G_BASIC="basic"
-G_NET="socket flood probe throw overlong longline churn closing"
+G_NET="socket flood probe throw overlong longline churn closing syscalls"
 G_CLIENT="parser reply state registration messaging operator"
 G_BONUS="bot transfer"
 ALL="$G_BASIC $G_NET $G_CLIENT $G_BONUS"
@@ -105,6 +106,13 @@ for name in "${names[@]}"; do
     IFS='|' read -r file kind desc <<< "$line"
     file="$HERE/$file"; dir="$(dirname "$file")"
     echo; echo "${B}${C}[ $name ]${N}  ${D}${desc}${N}"
+    if [ "$kind" = SELF ]; then                          # the script starts (and traces) its own servers
+        build_server ircserv || { echo "  ${R}[FAIL]${N} make failed"; failed+=("$name"); continue; }
+        build_server ircserv_bonus || true
+        bash "$file" "$ROOT" "$PASSWORD" 2>&1 | render; rc=${PIPESTATUS[0]}
+        [ "$rc" -eq 0 ] && passed+=("$name") || failed+=("$name")
+        continue
+    fi
     case "$file" in
         *.cpp)
             objs=()

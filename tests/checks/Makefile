@@ -10,12 +10,12 @@
 #                                     commands and numerics, parser, replies (C++, no sockets) (client/)
 #   make -C tests/checks bonus        bot dialogue, real DCC transfer (bash, fresh ircserv_bonus) (bonus/)
 #   make -C tests/checks socket       one test by name: basic socket flood probe throw overlong longline
-#                                     churn closing parser reply state registration messaging operator bot transfer
+#                                     churn closing syscalls parser reply state registration messaging operator bot transfer
 #
 # By hand: bash tests/checks/run.sh <group|name...>   (no argument = usage)
 
 SHELL := /bin/bash
-NAMES := basic socket flood probe throw overlong longline churn closing parser reply state registration messaging operator bot transfer
+NAMES := basic socket flood probe throw overlong longline churn closing syscalls parser reply state registration messaging operator bot transfer
 
 .PHONY: all basic networking client bonus $(NAMES) clean help
 
@@ -23,7 +23,7 @@ all networking bonus $(NAMES):
 	@bash "$(CURDIR)/run.sh" $@
 
 clean:
-	@rm -f "$(CURDIR)"/.*.test "$(CURDIR)"/bonus/received.bin
+	@rm -f "$(CURDIR)"/.*.test "$(CURDIR)"/bonus/received.bin "$(CURDIR)"/networking/.syscalls.so
 
 help:
 	@sed -n '2,15p' "$(CURDIR)/Makefile" | sed 's/^# \{0,1\}//'

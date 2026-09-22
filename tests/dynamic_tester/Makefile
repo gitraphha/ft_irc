@@ -2,6 +2,7 @@
 #
 #   make              everything -> artifacts/report.html
 #   make live         everything, watching server + client windows live
+#   make step         same, paused after every scenario (Enter = next, c = continue)
 #   make mandatory | robustness | load | bonus | compare
 #   make live-load    the slow-reader load test with the live view
 #   make lab          interactive: client windows + server log + help + /walk
@@ -31,7 +32,7 @@ SETS         = $(foreach kv,$(SET),--set $(kv))
 COMMON = --binary $(BINARY) --bonus-binary $(BONUS_BINARY) --host $(HOST) --port $(PORT) \
          --password $(PASSWORD) --outdir $(OUTDIR) --report $(REPORT) --no-intro $(SETS)
 
-.PHONY: all mandatory robustness load bonus compare terminal external debug live live-load \
+.PHONY: all mandatory robustness load bonus compare terminal external debug live live-load step \
         lab irssi nc clients monitor monitor-bonus attach config open clean help
 
 all:
@@ -57,6 +58,8 @@ live:
 	@$(PYTHON) test_irc.py --mode all --live $(COMMON)
 live-load:
 	@$(PYTHON) test_irc.py --mode load --live $(COMMON)
+step:
+	@$(PYTHON) test_irc.py --mode all --live --step $(COMMON)
 
 N ?= 3
 lab:

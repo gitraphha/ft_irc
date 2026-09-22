@@ -288,6 +288,9 @@ class Report(object):
         self.t_start = time.time()
         self.lock = threading.Lock()
         self.planned = []           # (key, title, group) for the live scenario list
+        self.step = False           # live view: pause after every scenario until told to go on
+        self.waiting = False
+        self.go = threading.Event()
 
     def begin(self, key, title, group, blurb):
         sc = Scenario(key, title, group, blurb)
@@ -310,6 +313,9 @@ class Report(object):
         sc.state = "done"
         with self.lock:
             self.current = None
+        if self.step:               # live view step mode: hold here until the viewer says next / continue
+            self.go.clear(); self.waiting = True
+            self.go.wait(); self.waiting = False
 
     def record(self, name, status, what="", why="", expect="", got="", fix="", dur_ms=0.0):
         ch = Check(name, status, what, why, expect, got, fix, dur_ms)
@@ -2534,7 +2540,7 @@ class LiveUI(object):
             hdr = " ft_irc tester  mode=%s  port %s  pid %s  RSS %d MB  CPU %.1f%%   %d pass  %d fail  %d note  %d skip%s" % (
                 self.mode, REPORT.args.port, (srv.proc.pid if (srv and srv.proc) else "-"),
                 mon.rss_mb if mon else 0, mon.cpu if mon else 0.0, t[PASS], t[FAIL], t[NOTE], t[SKIP],
-                "   DONE - press q" if self.done else "")
+                "   DONE - press q" if self.done else ("   PAUSED - Enter: next scenario, c: continue" if REPORT.waiting else ("   step mode: pausing after this scenario" if REPORT.step else "")))
             put(0, 0, hdr.ljust(w - 1), curses.A_REVERSE | BOLD)
             listeners = max(0, self.socks - len(clients)) if self.socks >= 0 else -1
             stalled = sum(1 for c in clients if c.sendq >= 32768)
@@ -2625,7 +2631,7 @@ class LiveUI(object):
                     log_lines.append((attr, printable("%s %s" % (time.strftime("%H:%M:%S", time.localtime(tt)), re.sub(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \S+\s+", "", txt)))))
                 for i, (attr, line) in enumerate(rows_of(log_lines, npanes, ih, iw)):
                     put(iy + i, ix, line, attr)
-            put(h - 1, 0, (" q quit (after DONE)   Tab / Shift-Tab pick a pane   Up/Down Left/Right PgUp/PgDn scroll it   red frame = stalled client   %s"
+            put(h - 1, 0, (" p pause after each scenario   Enter/space next   c continue   q quit (after DONE)   Tab pick a pane   arrows/PgUp/PgDn scroll   red frame = stalled   %s"
                            % (self.error or "")).ljust(w - 1), curses.A_REVERSE | (C_R if self.error else 0))
             stdscr.refresh()
             try:
@@ -2634,6 +2640,14 @@ class LiveUI(object):
                 k = -1
             if k in (ord("q"), ord("Q")) and self.done:
                 break
+            elif k in (ord("p"), ord("P")):              # pause after every scenario from now on
+                REPORT.step = True
+            elif k in (10, 13, curses.KEY_ENTER, ord(" ")):   # next scenario (stays in step mode)
+                if not REPORT.step:
+                    REPORT.step = True
+                REPORT.go.set()
+            elif k in (ord("c"), ord("C")):              # continue without pausing
+                REPORT.step = False; REPORT.go.set()
             elif k == 9:
                 focus = (focus + 1) % (npanes + 1)
             elif k == curses.KEY_BTAB:
@@ -2651,11 +2665,12 @@ class LiveUI(object):
 
 LAB_HELP = [
     ("Keys", None),
-    ("Tab / Shift-Tab",   "next / previous pane; a client pane is also where typed lines go"),
+    ("Tab / Shift-Tab",   "next / previous pane: clients, server log, help, menu bar; a client pane is where typed lines go"),
+    ("menu bar",          "Left/Right pick an option, Enter or Up/Down change it, b back: what windows show, order, per row, log rows, log filter, help, eol, walkthrough, new client, quit"),
     ("Up/Down  Left/Right", "scroll the focused pane (vertical / horizontal)"),
     ("PgUp / PgDn",       "scroll the focused pane by a page"),
     ("Ctrl-L",            "layout: help+log / windows only / help only"),
-    ("Enter",             "send the input line to the active client (empty Enter = next walkthrough step)"),
+    ("Enter",             "send the input line to the active client (empty Enter = run the walkthrough step shown)"),
     ("", None),
     ("Lab commands", None),
     ("/new [nick|N|a,b]", "1 client, N clients, or these nicks (auto PASS/NICK/USER)"),
@@ -2667,7 +2682,7 @@ LAB_HELP = [
     ("/raw <text>",       "send exactly this (+ current eol)"),
     ("/pause | /resume",  "stop / restart reading (the ^Z test of the eval sheet)"),
     ("/close",            "close the active client abruptly (like kill -9 on nc)"),
-    ("/walk",             "guided walkthrough, one step per Enter (all commands + bot + transfer)"),
+    ("/walk",             "walkthrough: the next step is shown first, Enter runs it; type your own line to try something else; /skip /back /stop"),
     ("/help /cols N /log N /helpw N", "hide help / windows per row / log rows / help width"),
     ("/quit",             "leave the lab (or Ctrl-D)"),
     ("", None),
@@ -2947,6 +2962,12 @@ class Lab(object):
                 c.closed = True; c.note("closed abruptly (no QUIT)")
             elif cmd in ("/walk", "/demo"):
                 self.start_demo()
+            elif cmd == "/skip" and self.demo is not None:
+                self.demo_i = min(len(self.demo), self.demo_i + 1); self.msg = "skipped"
+            elif cmd == "/back" and self.demo is not None:
+                self.demo_i = max(0, self.demo_i - 1); self.msg = "back one step"
+            elif cmd == "/stop" and self.demo is not None:
+                self.demo = None; self.msg = "walkthrough stopped"
             elif cmd == "/irssi" and len(parts) > 1 and parts[1].isdigit():
                 k = max(1, min(5, int(parts[1])))
                 self.msg = open_client_windows("irssi", list(NICKS[:k]), self.args.host, self.args.port, self.args.password, "windows")
@@ -2965,7 +2986,7 @@ class Lab(object):
             self.msg = "no client: /new first"; return
         self.send_line(c, text)
 
-    # ---- demo ----
+    # ---- walkthrough: the next step is shown first; Enter runs it ----
     def start_demo(self):
         want = ["alice", "bob", "carol"]
         have = dict((cl.nick, cl) for cl in self.clients)
@@ -2973,21 +2994,30 @@ class Lab(object):
             if n not in have:
                 self.new_client(n)
         self.demo = [(w, l.replace("DCCBOT", self.bot), n) for (w, l, n) in DEMO_STEPS]; self.demo_i = 0
-        self.msg = "walkthrough ready: press Enter to run each step (%d steps)" % len(self.demo)
+        self.msg = "walkthrough: the next step is shown above this line. Enter runs it; type a line to send something else first; /skip /back /stop"
+
+    def walk_bar(self):
+        """One line describing the pending step, or '' when no walkthrough is running."""
+        if self.demo is None:
+            return ""
+        if self.demo_i >= len(self.demo):
+            return "WALK  done (%d steps).  /stop to close, /back to repeat the last one" % len(self.demo)
+        who, line, what = self.demo[self.demo_i]
+        return "WALK %d/%d  next:  %s > %s     %s" % (self.demo_i + 1, len(self.demo), who, line, what)
 
     def demo_step(self):
         if self.demo_i >= len(self.demo):
-            self.msg = "walkthrough finished"; self.demo = None; return
+            self.msg = "walkthrough finished (/stop to close it)"; return
         who, line, what = self.demo[self.demo_i]; self.demo_i += 1
         c = next((cl for cl in self.clients if cl.nick == who), None)
         if c is None:
-            self.msg = "demo: no client %s" % who; return
-        self.active = c.idx
+            self.msg = "walkthrough: no client %s" % who; return
+        self.active = c.idx; self.focus_request = c.idx
         if line == "@dcc":
             time.sleep(0.3); self.pump(); self.dcc_receive(c)
         else:
             self.send_line(c, line)
-        self.msg = "step %d/%d  %s: %s  --  %s" % (self.demo_i, len(self.demo), who, line, what)
+        self.msg = "ran %d/%d  %s > %s" % (self.demo_i, len(self.demo), who, line)
 
     # ---- UI ----
     def run(self, stdscr):
@@ -3011,10 +3041,52 @@ class Lab(object):
                 self.new_client(n)
             self.active = 0
             self.msg = ("%d clients registered (%s). Tab moves between panes and picks the client you type to; "
-                        "Up/Down and Left/Right scroll the focused pane; /walk for the walkthrough"
+                        "the last Tab stop is the menu bar; /walk for the walkthrough"
                         % (len(self.clients), ", ".join(c.nick for c in self.clients)))
-        focus = 0                                   # 0..n-1 client panes, n = server log, n+1 = help
+        # focus: 0..n-1 client panes, LOG, HELP, MENU (the last three are constants below n is added)
+        LOG, HELP, MENU = "log", "help", "menu"
+        focus = 0
         self.hscroll_log = 0; self.help_h = 0
+        # ---- view options, edited from the menu bar (same keys as the monitor) ----
+        SHOWS = ("all", "sent", "received", "notes")
+        SORTS = ("number", "nick", "unread")
+        LOGFS = ("all", "in", "out", "errors")
+        opts = {"show": 0, "sort": 0, "logf": 0}
+        MENU_ITEMS = [  # (key, label, kind)
+            ("show", "windows show", "cycle"), ("sort", "order", "cycle"), ("cols", "per row", "int"),
+            ("log", "log rows", "int"), ("logf", "log shows", "cycle"), ("help", "help", "toggle"),
+            ("eol", "eol", "cycle"), ("walk", "walkthrough", "action"), ("new", "new client", "action"),
+            ("quit", "quit", "action"),
+        ]
+        menu_i = 0
+
+        def menu_value(key):
+            if key == "show":
+                return SHOWS[opts["show"]]
+            if key == "sort":
+                return SORTS[opts["sort"]]
+            if key == "cols":
+                return str(self.grid_cols) if self.grid_cols else "auto"
+            if key == "log":
+                return str(self.log_rows) if self.log_rows else "off"
+            if key == "logf":
+                return LOGFS[opts["logf"]]
+            if key == "help":
+                return "on" if self.help_on else "off"
+            if key == "eol":
+                return self.eol
+            if key == "walk":
+                return "next" if self.demo is not None else "start"
+            return ""
+
+        def visible_panes():
+            v = list(range(len(self.clients)))
+            if self.log_rows:
+                v.append(LOG)
+            if self.help_on:
+                v.append(HELP)
+            v.append(MENU)
+            return v
 
         def put(y, x, s, attr=0):
             h, w = stdscr.getmaxyx()
@@ -3053,21 +3125,37 @@ class Lab(object):
             fr = getattr(self, "focus_request", None)
             if fr is not None:
                 focus = fr; self.focus_request = None
-            focus = min(focus, n + 1)
-            if focus < n:
+            vis = visible_panes()
+            if focus not in vis:
+                focus = vis[0]
+            if isinstance(focus, int):
                 self.active = focus
             act = self.clients[self.active] if self.clients else None
-            put(0, 0, (" LAB   server 127.0.0.1:%s  pid %s  RSS %d MB   clients %d   eol=%s   typing goes to: %s   focus: %s" % (
-                self.args.port, srv.proc.pid if (srv and srv.proc) else "-", rss, n, self.eol,
-                act.nick if act else "-", (self.clients[focus].nick if focus < n else ("server log" if focus == n else "help")))).ljust(w - 1),
-                curses.A_REVERSE | BOLD)
+            fname = {LOG: "server log", HELP: "help", MENU: "menu"}.get(focus, self.clients[focus].nick if isinstance(focus, int) and focus < n else "-")
+            put(0, 0, (" LAB   server 127.0.0.1:%s  pid %s  RSS %d MB   clients %d   typing goes to: %s   focus: %s" % (
+                self.args.port, srv.proc.pid if (srv and srv.proc) else "-", rss, n,
+                act.nick if act else "-", fname)).ljust(w - 1), curses.A_REVERSE | BOLD)
+            # ---- menu bar (row 1) ----
+            x = 0
+            put(1, 0, " " * (w - 1), C_DIM)
+            for i, (key, label, kind) in enumerate(MENU_ITEMS):
+                val = menu_value(key)
+                txt = " %s%s " % (label, (": " + val) if val else "")
+                sel = (focus == MENU and i == menu_i)
+                put(1, x, txt, (curses.A_REVERSE | BOLD) if sel else (C_FOCUS if focus == MENU else C_DIM))
+                x += len(txt) + 1
+            tail = ("  %s/%s pick   Enter or Up/Down change   b back" % (G["inn"], G["out"])) if focus == MENU else "  Tab: panes, log, help, menu"
+            put(1, min(x, max(0, w - len(tail) - 1)), tail, C_SENT if focus == MENU else C_DIM)
 
+            top = 2
+            walk = self.walk_bar()
+            bottom = 2 + (1 if walk else 0)          # msg + input (+ walk bar)
             # ---- help pane (left) ----
-            hw = self.help_w if self.help_on else 0; top = 1
+            hw = self.help_w if self.help_on else 0
             log_rows = self.log_rows
             if self.help_on:
-                hh_ = h - top - 2 - (log_rows + 2 if log_rows else 0)
-                iy, ix, ih, iw = box(top, 0, hh_, hw, "HELP", C_FRAME, focus == n + 1)
+                hh_ = h - top - bottom - (log_rows + 2 if log_rows else 0)
+                iy, ix, ih, iw = box(top, 0, hh_, hw, "HELP", C_FRAME, focus == HELP)
                 self.help_scroll = max(0, min(self.help_scroll, max(0, len(LAB_HELP) - ih)))
                 for i, (k, d) in enumerate(LAB_HELP[self.help_scroll: self.help_scroll + ih]):
                     if d is None:
@@ -3076,25 +3164,31 @@ class Lab(object):
                         line = ("%-22s %s" % (k, d))[self.help_h:]
                         put(iy + i, ix, line[:iw], C_DIM)
                         put(iy + i, ix, line[: min(iw, max(0, 22 - self.help_h))], C_RECV)
-            # ---- client panes (grid, right) ----
+            # ---- client panes (grid, right), in the chosen order ----
             gx = hw; gw = w - gx; nn = max(1, n)
             cols = self.grid_cols or (3 if gw >= 105 else (2 if gw >= 70 else 1))
             cols = max(1, min(nn, cols)); rws = (nn + cols - 1) // cols
-            area_h = h - top - 2 - (log_rows + 2 if log_rows else 0); win_h = max(4, area_h // rws); win_w = gw // cols
-            for c in self.clients:
-                r, col = divmod(c.idx, cols)
+            area_h = h - top - bottom - (log_rows + 2 if log_rows else 0); win_h = max(4, area_h // rws); win_w = gw // cols
+            order = list(self.clients)
+            if SORTS[opts["sort"]] == "nick":
+                order.sort(key=lambda cl: cl.nick.lower())
+            elif SORTS[opts["sort"]] == "unread":
+                order.sort(key=lambda cl: -cl.sendq)
+            show = SHOWS[opts["show"]]
+            for pos, c in enumerate(order):
+                r, col = divmod(pos, cols)
                 x = gx + col * win_w; y = top + r * win_h
-                if col == cols - 1:
-                    ww = w - x
-                else:
-                    ww = win_w
+                ww = (w - x) if col == cols - 1 else win_w
                 title = "%d %s  sent %dB  unread-by-it %s%s%s%s" % (
                     c.idx + 1, c.nick, c.last_len, human_bytes(c.sendq),
                     "  PAUSED" if c.paused else "", "  CLOSED" if c.closed else "",
                     "  <- typing here" if c.idx == self.active else "")
                 frame = C_R if (c.sendq >= 32768 or c.closed) else GRAD[c.idx % len(GRAD)]
                 iy, ix, ih, iw = box(y, x, win_h, ww, title, frame, focus == c.idx)
-                rows = [(d, ("%s %s" % ({">>": G["out"], "<<": G["inn"]}.get(d, G["dot"]), t))) for (d, t) in c.lines]
+                lines = [(d, t) for (d, t) in c.lines
+                         if show == "all" or (show == "sent" and d == ">>") or (show == "received" and d == "<<")
+                         or (show == "notes" and d not in (">>", "<<"))]
+                rows = [(d, ("%s %s" % ({">>": G["out"], "<<": G["inn"]}.get(d, G["dot"]), t))) for (d, t) in lines]
                 c.scroll = max(0, min(c.scroll, max(0, len(rows) - ih)))
                 shown = rows[max(0, len(rows) - c.scroll - ih): max(0, len(rows) - c.scroll)]
                 for i, (d, text) in enumerate(shown):
@@ -3104,11 +3198,16 @@ class Lab(object):
                     put(y + win_h - 1, x + ww - 14, " %s%d more " % (G["up"], c.scroll), C_DIM)
             # ---- server log (bottom) ----
             if log_rows:
-                ly = h - log_rows - 4
-                iy, ix, ih, iw = box(ly, 0, log_rows + 2, w, "SERVER LOG  (Tab here, then Up/Down Left/Right)", C_FRAME, focus == n)
+                ly = h - log_rows - 2 - bottom
+                lf = LOGFS[opts["logf"]]
+                iy, ix, ih, iw = box(ly, 0, log_rows + 2, w, "SERVER LOG%s" % ("" if lf == "all" else "  (%s only)" % lf), C_FRAME, focus == LOG)
                 if srv:
                     with srv.lock:
                         entries = list(srv.buffer)
+                    if lf != "all":
+                        entries = [(tt, txt) for (tt, txt) in entries
+                                   if (lf == "in" and "from fd" in txt.lower()) or (lf == "out" and "sendto fd" in txt.lower())
+                                   or (lf == "errors" and ("error" in txt.lower() or "closing" in txt.lower()))]
                     self.log_scroll = max(0, min(self.log_scroll, max(0, len(entries) - ih)))
                     end = len(entries) - self.log_scroll
                     for i, (tt, txt) in enumerate(entries[max(0, end - ih): max(0, end)]):
@@ -3116,7 +3215,9 @@ class Lab(object):
                         attr = C_RECV if "from fd" in low else (C_SENT if "sendto fd" in low else (C_R if ("error" in low or "closing" in low) else C_DIM))
                         line = printable("%s %s" % (time.strftime("%H:%M:%S", time.localtime(tt)), re.sub(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \S+\s+", "", txt)))
                         put(iy + i, ix, line[self.hscroll_log: self.hscroll_log + iw].ljust(iw), attr)
-            # ---- message + input ----
+            # ---- walk bar + message + input ----
+            if walk:
+                put(h - 3, 0, walk[: w - 1].ljust(w - 1), C_FOCUS | BOLD)
             put(h - 2, 0, (self.msg or "")[: w - 1].ljust(w - 1), C_NOTE | BOLD)
             prompt = "[%s]> " % (act.nick if act else "-")
             counter = " len=%d (+%d eol) " % (len(self.input), len(self.eol_bytes()))
@@ -3147,22 +3248,54 @@ class Lab(object):
                 stdscr.timeout(120)
                 k = {"[D": curses.KEY_LEFT, "OD": curses.KEY_LEFT, "[C": curses.KEY_RIGHT, "OC": curses.KEY_RIGHT,
                      "[A": curses.KEY_UP, "OA": curses.KEY_UP, "[B": curses.KEY_DOWN, "OB": curses.KEY_DOWN,
-                     "[Z": curses.KEY_BTAB, "[5~": curses.KEY_PPAGE, "[6~": curses.KEY_NPAGE}.get(seq, -1)
+                     "[Z": curses.KEY_BTAB, "[5~": curses.KEY_PPAGE, "[6~": curses.KEY_NPAGE}.get(seq, 27 if not seq else -1)
                 if k == -1:
                     continue
             if k == 4:                                   # Ctrl-D
                 self.quit = True; continue
+            vis = visible_panes()
+            if k == 9:                                   # Tab: next visible pane (clients, log, help, menu)
+                focus = vis[(vis.index(focus) + 1) % len(vis)]; continue
+            if k == curses.KEY_BTAB:                     # Shift-Tab: previous
+                focus = vis[(vis.index(focus) - 1) % len(vis)]; continue
+            if focus == MENU:                            # menu bar: Left/Right pick, Enter/Up/Down change, b/Esc back
+                key, label, kind = MENU_ITEMS[menu_i]
+                if k == curses.KEY_LEFT:
+                    menu_i = (menu_i - 1) % len(MENU_ITEMS)
+                elif k == curses.KEY_RIGHT:
+                    menu_i = (menu_i + 1) % len(MENU_ITEMS)
+                elif k in (ord("b"), ord("B"), 27):
+                    focus = vis[0]
+                elif k in (10, 13, curses.KEY_ENTER, curses.KEY_UP, curses.KEY_DOWN, ord(" ")):
+                    step = -1 if k == curses.KEY_DOWN else 1
+                    if key in ("show", "sort", "logf"):
+                        size = {"show": len(SHOWS), "sort": len(SORTS), "logf": len(LOGFS)}[key]
+                        opts[key] = (opts[key] + step) % size
+                    elif key == "cols":
+                        self.grid_cols = (self.grid_cols + step) % 6
+                    elif key == "log":
+                        self.log_rows = max(0, min(20, self.log_rows + 4 * step))
+                    elif key == "help":
+                        self.help_on = not self.help_on
+                    elif key == "eol":
+                        e = ("crlf", "lf", "none"); self.eol = e[(e.index(self.eol) + step) % 3]
+                    elif key == "walk":
+                        if self.demo is None:
+                            self.start_demo()
+                        else:
+                            self.demo_step()
+                        self.focus_request = None; focus = MENU
+                    elif key == "new":
+                        used = set(cl.nick for cl in self.clients)
+                        self.new_client(next((nk for nk in NICKS if nk not in used), None)); focus = MENU; self.focus_request = None
+                    elif key == "quit":
+                        self.quit = True
+                continue
             if k in (10, 13, curses.KEY_ENTER):
                 text = self.input; self.input = ""; self.msg = ""
                 self.handle(text)
-                if focus >= n and self.clients:          # typing while the log/help is focused: keep going
-                    pass
             elif k in (curses.KEY_BACKSPACE, 127, 8):
                 self.input = self.input[:-1]
-            elif k == 9:                                 # Tab: next pane
-                focus = (focus + 1) % (n + 2)
-            elif k == curses.KEY_BTAB:                   # Shift-Tab: previous pane
-                focus = (focus - 1) % (n + 2)
             elif k == 12:                                # Ctrl-L: cycle layouts
                 if self.help_on and self.log_rows:
                     self.help_on = False; self.log_rows = 0; self.msg = "layout: client windows only (Ctrl-L again to cycle)"
@@ -3173,10 +3306,10 @@ class Lab(object):
             elif k in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_LEFT, curses.KEY_RIGHT):
                 step = {curses.KEY_UP: 1, curses.KEY_DOWN: -1, curses.KEY_PPAGE: 10, curses.KEY_NPAGE: -10}.get(k, 0)
                 hstep = {curses.KEY_LEFT: -8, curses.KEY_RIGHT: 8}.get(k, 0)
-                if focus < n:
+                if isinstance(focus, int):
                     c = self.clients[focus]
                     c.scroll = max(0, c.scroll + step); c.hscroll = max(0, c.hscroll + hstep)
-                elif focus == n:
+                elif focus == LOG:
                     self.log_scroll = max(0, self.log_scroll + step); self.hscroll_log = max(0, self.hscroll_log + hstep)
                 else:
                     self.help_scroll = max(0, self.help_scroll - step); self.help_h = max(0, self.help_h + hstep)
@@ -3377,6 +3510,7 @@ def parse_args():
     p.add_argument("--bonus-binary", dest="bonus_binary", default=os.getenv("IRC_TEST_BONUS_BINARY", "../../ircserv_bonus"))
     p.add_argument("--mode", choices=("menu", "mandatory", "robustness", "load", "bonus", "all", "compare", "lab", "irssi", "clients", "nc", "terminal"), default="menu")
     p.add_argument("--live", action="store_true", help="watch the server window and client windows while the suite runs")
+    p.add_argument("--step", action="store_true", help="with --live: pause after every scenario (Enter = next, c = continue)")
     p.add_argument("--no-start", action="store_true", help="use an already-running server on --host/--port")
     p.add_argument("--no-intro", action="store_true"); p.add_argument("--fast", action="store_true")
     p.add_argument("--debug", action="store_true", help="print every line sent/received live")
@@ -3445,6 +3579,7 @@ def run_mode(mode, args):
         if args.live and HAVE_CURSES and sys.stdout.isatty():
             sys.stdout = io.StringIO()
             ui = LiveUI(mode, extra_files)
+            REPORT.step = bool(args.step)
             try:
                 curses.wrapper(ui.run)
             finally:

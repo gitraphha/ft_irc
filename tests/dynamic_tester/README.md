@@ -16,6 +16,7 @@ make -C tests/dynamic_tester load           30 clients reading one byte at a tim
 make -C tests/dynamic_tester bonus          bot commands, file offer, the transfer, DCC relayed between clients
 make -C tests/dynamic_tester compare        the same bot dialogue against ircserv_bonus and ircserv, saved to two files
 make -C tests/dynamic_tester live           everything, with the server and client windows on screen while it runs
+make -C tests/dynamic_tester step           same, paused after every scenario: Enter runs the next one, c continues, p pauses again
 make -C tests/dynamic_tester debug          everything, every line sent and received printed
 make -C tests/dynamic_tester open           open the report (macOS)
 make -C tests/dynamic_tester clean          remove artifacts/
@@ -65,24 +66,36 @@ and edit to match the server. A wrong entry appears as NOTE or FAIL in the affec
 ## Lab
 
 `make -C tests/dynamic_tester lab` asks how many clients and their nicks, registers them and
-shows each as a pane, the help on the left, the server log at the bottom and one input line.
+shows each as a pane, the help on the left, the server log at the bottom, a menu bar under the
+title and one input line. Whatever you type goes to the focused client as an IRC line.
 
 | keys | |
 |---|---|
-| Tab / Shift-Tab | next / previous pane; typed lines go to the focused client |
+| Tab / Shift-Tab | next / previous stop: client panes, server log, help, menu bar (hidden panes are skipped) |
 | Up/Down, Left/Right, PgUp/PgDn | scroll the focused pane |
-| Ctrl-L | layout: help+log / windows only / help only |
-| Enter | send the input line (empty Enter: next walkthrough step) |
+| Enter | send the input line to the focused client; with an empty line, run the walkthrough step shown |
+| Ctrl-L | layout: help + log / windows only / help only |
+| Ctrl-D | leave |
+
+Menu bar (Tab to it, then Left/Right pick, Enter or Up/Down change, b back): what the client
+windows show (all / sent / received / notes), their order (number / nick / unread), windows per
+row, server-log rows, what the log shows (all / in / out / errors), help on or off, line ending,
+start or step the walkthrough, add a client, quit.
+
+Walkthrough (`/walk` or the menu): the next step is shown on the line above the input, with the
+client that will send it and what to expect. Enter runs it. Typing your own line sends that
+first and leaves the step pending, so you can try an alternative before or instead of it.
+`/skip` skips the step, `/back` goes back one, `/stop` ends it. The steps cover JOIN, messages,
+TOPIC, +t, +o, KICK, +i and INVITE, +k, +l, the query, the bot and a transfer, QUIT.
 
 | command | |
 |---|---|
-| `/new 2`, `/new dave,eve` | more clients |
-| `/use N` | make client N active |
+| `/new 2`, `/new dave,eve` | more clients (five at most) |
+| `/use N` | make client N the one you type to |
 | `/msg <target> <text>`, `/join #chan` | PRIVMSG / JOIN |
 | `/eol crlf\|lf\|none`, `/long 510`, `/noeol <text>`, `/raw <text>` | line endings, exact lengths, partial sends |
 | `/pause`, `/resume` | the client stops and restarts reading |
-| `/close` | close the active client abruptly |
-| `/walk` | guided walkthrough, one step per Enter: join, topic, +t, +o, kick, +i and invite, +k, +l, bot, transfer |
+| `/close` | close the focused client abruptly |
 | `/send bob <path>` then `/dcc` in bob's window | file transfer without the bot |
 | `PRIVMSG DCCBot :!send bob <file>`, `PRIVMSG DCCBot :!accept`, then `/dcc` | file transfer with the bot |
 | `/help`, `/cols N`, `/log N`, `/quit` | hide help, windows per row, log rows, leave |

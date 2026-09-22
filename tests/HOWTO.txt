@@ -12,7 +12,24 @@ Notation
 Defaults, set once for everything below: host 127.0.0.1, port 6667 (the subject's
 port; also the one irssi is told to use), password pass. Files for the bonus
 transfer are names under files/ (files/test.txt -> test.txt).
-Run every command from the repo root.
+
+Where to run
+------------
+Every command below is written to be typed from the repo root: the ft_irc folder,
+the one that contains the Makefile, srcs/ and tests/.
+  cd <path to>/ft_irc
+"make -C tests X" means "run make X inside tests/". The same command from inside
+the folder is just "make X":
+  from the repo root          from inside the folder
+  make -C tests               cd tests && make
+  make -C tests/checks bonus  cd tests/checks && make bonus
+  make -C tests/dynamic_tester lab    cd tests/dynamic_tester && make lab
+Do not combine both ("cd tests" then "make -C tests"): there is no tests/tests.
+Nothing needs to be built by hand first: the tests run make and make bonus
+themselves. Run them in a normal terminal window (Terminal, iTerm), at least
+100 columns by 30 rows; an editor's built-in terminal is fine for the checks
+and the tester, but the lab, live, step, monitor and clients modes draw a
+full-screen text interface and want a real terminal. Ctrl-C stops any of them.
 
 Requirements (macOS and Linux)
 ------------------------------
@@ -56,6 +73,8 @@ the server sources; scripts get their own fresh server on a free port.
               longline      10 KB without CRLF from three clients, a fourth stays responsive
               churn         20 members, broadcast storm, JOIN/PART churn, RST disconnects
               closing       what the client gets before its link is closed: 464, ERROR
+              syscalls      close/accept/send/recv return codes traced through every close
+                            path, ircserv and ircserv_bonus (a fd closed twice, a failed accept); needs cc
   client      parser        message grammar: prefix, command, params, trailing
               reply         numeric reply formatting
               state         client state: nick casefolding, invites, prefix, flags
@@ -74,6 +93,7 @@ the server sources; scripts get their own fresh server on a free port.
   Against a server you started yourself (./ircserv <port> <password>):
   bash tests/checks/networking/session.sh [host] [port] [password] [nick]                  raw IRC session, already registered
   python3 tests/checks/networking/<probe|throw|overlong|longline|churn|closing>.py [port] [password]
+  bash tests/checks/networking/syscalls.sh [repo root] [password]                        starts its own traced servers
   bash tests/checks/bonus/bot.sh [host] [port] [password] [file]                          ./ircserv_bonus
   bash tests/checks/bonus/transfer.sh [host] [port] [password] [nick] [file] [botnick]    ./ircserv_bonus
 
@@ -86,6 +106,7 @@ writes artifacts/report.html.
   make -C tests/dynamic_tester                               menu; Enter runs everything
   make -C tests/dynamic_tester <mandatory|robustness|load|bonus|compare>
   make -C tests/dynamic_tester live                          everything, server and client windows shown while it runs
+  make -C tests/dynamic_tester step                          same, paused after every scenario: Enter next, c continue, p pause
   make -C tests/dynamic_tester debug                         everything, every line sent and received printed
   make -C tests/dynamic_tester open                          open the report (macOS)
   make -C tests/dynamic_tester <suite> [PORT=<port>] [PASSWORD=<password>]
@@ -111,7 +132,7 @@ writes artifacts/report.html.
 ==============================================================================
   Interactive
 ==============================================================================
-  make -C tests/dynamic_tester lab          # client windows in one terminal, server log, walkthrough
+  make -C tests/dynamic_tester lab          # client windows in one terminal, server log, menu bar, walkthrough
   make -C tests/dynamic_tester clients      # irssi or nc client windows on a launched server
   make -C tests/dynamic_tester <irssi|nc>   # same, program preselected
   make -C tests/dynamic_tester monitor      # live dashboard; starts the server itself
@@ -126,8 +147,12 @@ writes artifacts/report.html.
     terminal 2:  make -C tests/dynamic_tester
     										# or any suite
 
-  Keys in the monitor: Tab moves clients -> log -> menu bar; in the menu bar Left/Right pick,
-  Enter or Up/Down change, b back; Up/Down Left/Right scroll the focused pane; q quits.
+  Keys in the monitor and the lab: Tab moves between the panes and ends on the menu bar;
+  in the menu bar Left/Right pick, Enter or Up/Down change, b back; Up/Down Left/Right
+  scroll the focused pane. Monitor: q quits.
+  Lab: typing goes to the focused client; Enter on an empty line runs the walkthrough step
+  shown above the input; type your own line to try something else first; /skip /back /stop;
+  the menu bar sets what the windows show, their order, log rows and filter, eol; Ctrl-D leaves.
 
 ------------------------------------------------------------------------------
   Details: tests/dynamic_tester/README.md
