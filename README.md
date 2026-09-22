@@ -1,25 +1,20 @@
 *This project has been created as part of the 42 curriculum by blnunez-, kmurugan, rhaas.*
 
-# ft_irc - IRC server
+# ft_irc - IRC Server
 
 ## Description
 
 ### 42 Project | Internet Relay Chat in C++98
 
 ### Objective
-Build an IRC server in C++98 that implements...
-
+Build an IRC server in C++98 that handles multiple concurrent clients over TCP, implementing the core IRC protocol (registration, channels, modes, private messaging, and operator commands) over an event-driven sockets layer.
 
 ### Overview
-...
+**ft_irc** is a 42 project that teaches event-driven I/O, the poll multiplexing model, and the IRC protocol. The server listens on a given port and password, accepts multiple clients via non-blocking sockets, registers them with PASS/NICK/USER, and lets them join channels, exchange private and channel messages, and manage channels with KICK/INVITE/TOPIC/MODE and operator privileges.
 
 ---
 
 ## Instructions
-
-### Requirements
-
--
 
 ### Compile & Run
 
@@ -31,23 +26,353 @@ make && ./ircserv <port> <password>
 make bonus && ./ircserv_bonus <port> <password>
 ```
 
+**NOTE:** The server binds an IPv4 and an IPv6 listening socket (`IPV6_V6ONLY`) and multiplexes them with `poll`. Connect with any IRC client (e.g. `irssi`) or a raw `nc` session.
+
+```sh
+# connect with netcat and register
+nc -C <host> <port>   # -C sends CRLF line endings (on macOS use -c)
+PASS <password>
+NICK <nick>
+USER <user> 0 * :<realname>
+JOIN #channel
+```
+
+Port must be in the range `1-65535`, a password (no spaces) must be supplied.\
+Please note that you may need system admin permissions to use privileged ports (usually 1–1023).
+
+### Tests
+
+```sh
+make -C tests                                    # the fixed checks, then the dynamic tester; totals and the report link at the end
+make -C tests/checks <basic|networking|client|bonus>   # one group, or one test by name: make -C tests/checks socket
+make -C tests lab                                # interactive lab: client windows in one terminal, server log, walkthrough
+make -C tests/dynamic_tester attach              # live monitor of the server, in a second terminal while the tester runs
+```
+
+The dynamic tester writes `tests/dynamic_tester/artifacts/report.html`. Every command, with its options, is in `tests/HOWTO.txt`.
+
+---
+
+## Architecture
+
+### Overview
+
+```mermaid
+flowchart LR
+    subgraph CLIENT["client connection"]
+        IRC["irc client"]
+        DCCP["DCC peer"]
+    end
+
+    subgraph CONN["connection"]
+        LISTENER["IRC listener"]
+        SOCKET["Socket"]
+    end
+
+    subgraph CORE["server core"]
+        SERVER["Server"]
+        CMD["CommandProcessor"]
+        CM["ClientManager"]
+        CHM["ChannelManager"]
+    end
+
+    IRC --> LISTENER --> SOCKET --> SERVER
+    SERVER --> CMD
+    SERVER --> CM
+    SERVER --> CHM
+    CM --> CHM
+    DCCP -. "direct peer transfer" .-> SERVER
+
+    class IRC,DCCP,LISTENER,SOCKET,SERVER,CMD,CM,CHM node;
+```
+
+### Core Server
+
+```mermaid
+flowchart TB
+    subgraph SRV["Server"]
+        direction TB
+        LSTN["IRC listeners\n (bind + listen)"]
+        ACCEPT["Accept client"]
+        LOOP["Event loop\n (poll(), non-blocking)"]
+        SOCK["Socket\n (buffered reads, overlong-line discard)"]
+        SIG["SignalHandler"]
+        LOG["Logger"]
+    end
+
+    subgraph DRIVES["owned and driven by the loop"]
+        direction TB
+        CMD["CommandProcessor"]
+        CM["ClientManager"]
+        CHM["ChannelManager"]
+        TM["TransferManager (bonus)"]
+    end
+
+    LSTN --> ACCEPT --> SOCK --> LOOP
+    LOOP --> CMD
+    LOOP --> CM
+    LOOP --> CHM
+    LOOP --> TM
+
+    class LSTN,ACCEPT,LOOP,SOCK,SIG,LOG node;
+    class CMD,CM,CHM,TM node;
+```
+
+### Client System
+```mermaid
+flowchart TB
+    subgraph CORE["server core"]
+        SRV["Server"]
+        CMD["CommandProcessor"]
+    end
+
+    subgraph CLISYS["client system"]
+        CLI["Client"]
+        CLM["ClientManager\n (lookup by nick)"]
+        REG["Registration\n (PASS NICK USER)"]
+        QUIT["QUIT/disconnect\n (part all channels)"]
+    end
+
+    SRV -->|"accepted connection"| CLM --> CLI
+    CMD -->|"commands by nick"| CLM
+	CLM --> QUIT -. "leave all channels" .-> CHM["ChannelManager"]
+    CLI --> REG -->|"send welcome message"| CLIENT["client"]
+
+    class SRV,CMD,CLIENT node;
+    class CLISYS,CLI,CLM,REG,QUIT node;
+```
+
+### Channel System
+
+```mermaid
+flowchart TB
+    subgraph CORE["server core"]
+        SRV["Server"]
+        CM["ClientManager"]
+    end
+
+    subgraph CHSYS["channel system"]
+        CHM["ChannelManager"]
+        CH["Channel"]
+        MEM["MemberSet\n (Client pointers, per-member ModeSet)"]
+        MS["ModeSet"]
+        MOD["Mode"]
+    end
+
+    SRV --> CHM --> CH
+    CM --> |"provides client objects"| CH
+    CH -->|contains| MEM
+    CH -->|has| MS
+    CH -->|uses| MOD
+    MEM -->|stores per-member| MS
+    MS -->|uses| MOD
+
+    class SRV,CM node;
+    class CHSYS,CHM,CH,MEM,MS,MOD node;
+```
+
+### Command Processing
+
+```mermaid
+flowchart TB
+
+    CI["client input"]
+    SOCKIN["socket"]
+    RB["response buffer"]
+    SO["socket output"]
+
+    subgraph CP["Command Processing"]
+        PA["command parser"]
+        VA["command validation"]
+        H["command handler"]
+        INV["invalid"]
+    end
+
+    CI --> SOCKIN --> PA
+    PA --> VA
+    VA --> H
+    VA -.-> INV
+    H --> RB
+    INV --> RB
+    RB --> SO
+
+    class CI,SOCKIN,RB,SO node;
+    class CP,PA,VA,H,INV node;
+```
+
+### Bonus
+
+```mermaid
+flowchart TB
+    PRIVMSG["PRIVMSG"]
+	NORMAL["Client"]
+	BOT["DCCBot"]
+
+    subgraph FT["file transfer"]
+        VAL["Validate filename in files/"]
+        LSN["Open listener - OS-picked port"]
+        BUILD["Build DCC SEND CTCP offer"]
+        OFFER["Send offer to target client"]
+        ACC["!accept - only the target"]
+        STREAM["connect + stream - 1 KiB chunks"]
+        DONE["transfer complete"]
+        EXPIRE["rejected or 60 s expiry"]
+    end
+
+    PARSE["Parse CTCP (VERSION / PING)"]
+    REPLY["NOTICE reply to client"]
+    OTHER["!help !version !whoami !accept !reject"]
+
+    PRIVMSG -->|"target is bot"| BOT
+    PRIVMSG -->|"target is client"| NORMAL
+    BOT -->|"CTCP"| PARSE --> REPLY
+    BOT -->|"other command"| OTHER
+    BOT -->|"!send"| VAL --> LSN --> BUILD --> OFFER
+    OFFER -->|"client accepts"| ACC --> STREAM --> DONE
+    OFFER -->|"!reject / timeout"| EXPIRE
+
+    class PRIVMSG,NORMAL,BOT,REPLY,OTHER node;
+    class FT,VAL,LSN,BUILD,OFFER,ACC,STREAM,DONE,EXPIRE node;
+```
+
+---
+
+## IRC Command & Message Reference
+
+### Registration
+- `PASS <password>` — authenticate during registration.
+- `NICK <nickname>` — set/change the nick.
+- `USER <user> <mode> <unused> <realname>` — complete registration credentials.
+
+### Channels
+- `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
+- `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
+- `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
+- `INVITE <nick> <#channel>` — invite a user (may require operator rank).
+- `TOPIC <#channel> [<topic>]` — view/set the topic (may require operator rank).
+- `NAMES <#channel>` — list current members.
+- `MODE <#channel> [modes]` — view/set channel modes.
+
+### Messaging
+- `PRIVMSG <target> <message>` — send a message. The bonus bot answers PRIVMSG addressed to it.
+- `NOTICE <target> <message>` — send a notice (no auto-reply / CTCP handling).
+
+### Channel Modes
+| Mode | Argument | Meaning |
+|------|----------|---------|
+| `i`  | no  | Invite-only channel (`JOIN` requires an invite) |
+| `t`  | no  | Only operators may set the topic |
+| `k`  | yes | Channel key (password) required to join |
+| `o`  | yes | Grant/revoke operator privilege to a member |
+| `l`  | yes | User limit — max concurrent members |
+
+### Channel User Modes
+`o` Operator · none
+
+Modes act on the target `nick` and are shown as `@` for operator or none for regular users. Privileges are checked on every call to a command that needs elevated privileges (this may also depend on the state of a channel, e.g. whether changing the TOPIC is restricted or not).
+
+### Other
+- `QUIT [<msg>]` — leave the server, members of shared channels see the QUIT and the client gets ERROR :Closing link.
+- `PING`/`PONG` — the server answers `PING`, `PONG` is accepted silently (the server sends no `PING`).
+- Also implemented: `CAP` (empty capability list, for irssi), `VERSION`.
+- Recognised but without effect: `WHO`, `WHOIS`, `OPER`, `RENAME`, and `KILL`/`REHASH` (481, no one can become IRC operator).
+
+---
+
+## Bonus: DCC Bot & File Transfer
+
+Built with `make bonus` → `./ircserv_bonus <port> <password>`.
+
+### DCCBot
+
+| Abbr.| Meaning   |
+|------|---------------------------|
+| CTCP | Client-To-Client Protocol |
+| DCC  | Direct Client-to-Client   |
+
+A bot named `DCCBot` (also reached as `bot` / `BOT` / `#bot`, or by sending a bot command to any channel) that intercepts `PRIVMSG`: bot commands are answered with `PRIVMSG`, CTCP queries with `NOTICE`.
+
+| Command          | Action |
+|------------------|--------|
+| `!help`          | List the available bot commands |
+| `!version`       | Report the bot/server version |
+| `!whoami`        | Show the requester's nick |
+| `!send <nick> <file>` | Start a DCC SEND offer of `files/<file>` |
+| `!accept`        | Accept the pending transfer offer |
+| `!reject`        | Reject the pending transfer offer |
+
+CTCP queries (`\x01VERSION\x01`, `\x01PING <token>\x01`) sent to the bot via `PRIVMSG` are answered by the bot with `NOTICE`.
+
+### File transfer (DCC SEND)
+
+#### Using irssi
+
+Sender:
+```sh
+/dcc send <receiver_nick> <filepath>
+```
+
+Receiver receives:
+
+`DCC SEND from <sender_nick> [<ip_to_recv> port <port_to_recv>]: <filename> <filesize>`
+
+Receiver:
+```sh
+# set filepath
+/set dcc_download_path <folder_path>
+
+# receive file
+/dcc get <sender_nick> <filename>
+```
+
+#### Using nc
+
+Sender:
+```sh
+PRIVMSG <receiver_nick> :\x01DCC SEND <filepath> <ip_to_connect_to> <port> <size>\x01
+```
+
+Receiver receives:
+
+`:sender!sender@127.0.0.1 PRIVMSG receiver :\x01DCC SEND <filepath> <ip_to_connect_to> <port> <size>\x01`
+
+Receiver in another terminal must open nc to receive:
+```sh
+nc <ip_to_connect_to> <port> > <filepath_to_save>
+```
+
+#### Using the BOT
+
+`!send` opens a listener on an OS-picked port and hands the target a CTCP `DCC SEND <file> 127.0.0.1 <port> <size>` line, so the receiver must be on the same machine as the server. The receiver replies with `!accept`, connects to the advertised address/port and receives the file in 1 KiB chunks. Only one transfer is active at a time (`bot busy` otherwise). Offers expire after 60 seconds without activity. Offered files must live in a `files/` directory next to the server; filenames containing `/` or `..` are rejected.
+
+Sender:
+```sh
+/msg bot !send <receiver_nick> <filename_for_file_in_files_folder>
+```
+
+Receiver:
+```sh
+/msg bot !accept
+
+# Receiver in another terminal must open nc to receive:
+nc 127.0.0.1 <port> > <filepath_to_save>
+```
+
 ---
 
 ## Clang tool commands
 
 ```sh
-# Run clang-format before PR (use clang-format version 21)
+# clang-format all headers and sources
 make format
-```
 
-```sh
-# Run clang-tidy on individual file
+# clang-tidy one file
 make tidy FILE=srcs/<filename>
 
-# Run clang-tidy on multiple files (filenames without spaces)
+# clang-tidy on multiple files (filenames without spaces)
 make tidy FILE="srcs/<a.cpp> srcs/<b.cpp>"
 
-# Run clang-tidy on all .cpp/.hpp under srcs and includes
+# clang-tidy every source and header
 make tidy-all
 ```
 
@@ -57,46 +382,85 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 ## Key Challenges & Solutions
 
-### Topic
+### Protocol-Correct Error Replies
 
-**Challenge:** 
+**Challenge:** Every command can fail in several ways (wrong channel, no such nick, missing params, insufficient privileges) and each failure must produce the correct RFC 2812 numeric to the client.
 
-**Solution:** 
+**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text, and an `Error` carries a pre-built `Reply::Message`. `CommandProcessor::run` validates the command name, registration state,
+operator requirement and parameter count up front. On the first bad condition it sends the error to the offending client via `sendError_` and stops that command line without throwing. Lower-level helpers (`Channel`, `ChannelManager`, `ClientManager`) still throw `Error`, and each handler wraps its calls in a small local `try/catch (Error)` that forwards `e.reply()` to the client. Every failure therefore produces exactly one well-formed `:server <code> <nick> <params> :<text>\r\n`, and no exception escapes into the event loop.
+
+### Usage of `poll` and buffers
+
+**Challenge:** Apart from setting up sockets correctly for receiving data streams, caching and handling of incomplete or overlong messages needed to be implemented. Additionally, a certain amount of fault tolerance was desired, e.g. for not disconnecting a client on the first too long message.
+
+**Solution:** Before passing on any data to command parsers and processors, the validity of a full line is checked. No incomplete or overlong data is ever forwarded to the internal handlers. Additionally an error counter is installed separately for each client, which limits the amount of consecutive errors and is reset on every valid input.
+
+On the write side nothing is sent directly: every reply is appended to the client's write buffer and flushed only when `poll` reports `POLLOUT` for that socket. A client that stops reading is therefore never blocking the loop and is not dropped for being slow; its data waits in the buffer until it reads again.
+
+### One `poll` for everything, including the bonus transfer
+
+**Challenge:** The subject allows a single `poll` call. The DCC file transfer adds two more sockets (the listener the receiver connects to and the data connection), and the first version polled them with a second `poll` inside the transfer code.
+
+**Solution:** Before each `poll` the transfer sockets are added to the same `pollfd` vector as the clients (and removed again once the offer is closed), so the main loop reports their events and the transfer code only reads the results. `accept` on the transfer listener and `send` on the data socket now happen only after `poll` said so.
+
+### Event Loop and Socket Layer Not Split Early
+
+**Challenge:** The loop and the socket handling grew together in one place, so every change touched it all at once and nothing could be changed in isolation. `Server` and `Socket` were not separated into distinct jobs, and the work arrived as one PR with 30-50 commits, making every review unsafe.
+
+**Solution:** If redone: separate `Socket` (fd, buffer, limits) from `Server` (pollfd vector, close decisions) from day one, and ship changes as small, one-behaviour PRs.
+
+### Channel Lifetime & Ownership
+
+**Challenge:** Channels are created on join, destroyed when the last member parts, and must never hold a pointer to a freed `Client`.
+
+**Solution:** `ChannelManager` owns `Channel` objects in a case-folded map and cleans up empty channels after PART/KICK/leaveAll. `MemberSet` stores `Client*` + `ModeSet`. `ClientManager::remove` first parts the client from every channel (via `ChannelManager::leaveAll`) before freeing the `Client`, so channel member vectors never dangle.
+
+### Over-Length Input Handling
+
+**Challenge:** Not disconnecting on the first over-length message forced a discard-mode state machine, a per-client error counter and deferred-close markers into the loop — where the hard-to-find bugs lived.
+
+**Solution:** If redone: close on the first over-length line. That deletes the discard state, the error counter and the close markers. The loop becomes just "lines in, close on error".
+
+### Bonus: CTCP & DCC SEND through the Bot
+
+**Challenge:** The CTCP mechanic used by DCC is barely documented anywhere. Between two clients a CTCP is just a `PRIVMSG` whose text is wrapped in `\x01`, so the server forwards it untouched. But to actually run a file transfer the server needs to hand the receiver a `\x01DCC SEND <file> <ip> <port> <size>\x01` line, open a listener the receiver can connect to, and stream the file. Wiring the two bonuses together (bot + transfer manager) with the bot as the middleman got complicated as the design evolved, and real clients silently abstract all of this away so there was no reference.
+
+**Solution:** Make the bot the DCC sender. `!send` asks the `TransferManager` to validate the filename, open a listener on an OS-picked port, and return the offer port/size. The bot then builds the `DCC SEND ... 127.0.0.1 <port> <size>` CTCP and delivers it wrapped in `\x01` to the target over `PRIVMSG`. The receiver just replies `!accept` and connects to the advertised address/port — which means the whole flow works over a plain `nc` session, no IRC client needed. Using the bot to construct and send the CTCP also makes the query path symmetric: the same `PRIVMSG` interception that answers `!help`/`!version` carries the DCC offer, and CTCP responses go back out as `NOTICE`. Transfer state (offer → accept/reject → stream → expire after 60 s) stayed in `TransferManager`, while the bot is a dumb messenger.
 
 ---
 
 ## Resources
 
 ### IRC protocol
-[RFC 2810 - IRC: Architecture](https://rfc-editor.org/rfc/rfc2810)
-[RFC 2811 - IRC: Channel Management](https://rfc-editor.org/rfc/rfc2811)
-[RFC 2812 - IRC: Client Protocol](https://rfc-editor.org/rfc/rfc2812)
-[RFC 2813 - IRC: Server Protocol](https://rfc-editor.org/rfc/rfc2813)
-[ircgod](https://ircgod.com)
-[Model IRC client protocol](https://modern.ircdocs.horse)
+- [RFC 2810 - IRC: Architecture](https://rfc-editor.org/rfc/rfc2810)
+- [RFC 2811 - IRC: Channel Management](https://rfc-editor.org/rfc/rfc2811)
+- [RFC 2812 - IRC: Client Protocol](https://rfc-editor.org/rfc/rfc2812)
+- [RFC 2813 - IRC: Server Protocol](https://rfc-editor.org/rfc/rfc2813)
+- [ircgod](https://ircgod.com)
+- [Modern IRC client protocol](https://modern.ircdocs.horse)
 
 ### rfc reading tips
-[Tips for Reading RFCs](https://www.rfc-editor.org/series/rfc-tips/)
+- [Tips for Reading RFCs](https://www.rfc-editor.org/series/rfc-tips/)
 
 ### Reference IRC client and server
-[Server: ergo chat (formerly Oragono)](https://github.com/ergochat/ergo)
-[Client: irssi](https://github.com/irssi/irssi)
+- [Server: ergo chat (formerly Oragono)](https://github.com/ergochat/ergo)
+- [Client: irssi](https://github.com/irssi/irssi)
 
 ### Sockets
-[Sockets & Networking](https://web.mit.edu/6.031/www/sp19/classes/23-sockets-networking/)
-[All about sockets](https://docs.oracle.com/javase/tutorial/networking/sockets/index.html)
-
-[CS107 Sockets Programming](https://web.stanford.edu/class/archive/cs/cs107/cs107.1238/lectures/20/)
-[Beej's Guide to Network Programming](https://beej.us/guide/bgnet/) - What is a
+- [Sockets & Networking](https://web.mit.edu/6.031/www/sp19/classes/23-sockets-networking/)
+- [All about sockets](https://docs.oracle.com/javase/tutorial/networking/sockets/index.html)
+- [CS107 Sockets Programming](https://web.stanford.edu/class/archive/cs/cs107/cs107.1238/lectures/20/)
+- [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/) - What is a
 	socket?, IP Addresses, structs, and Data Munging, Jumping from IPv4 to IPv6,
 	System Calls or Bust
 
 ### DCC protocol
-[Direct Client-to-Client protocol (DCC)](https://modern.ircdocs.horse/dcc.html)
+- [Direct Client-to-Client protocol (DCC)](https://modern.ircdocs.horse/dcc.html)
 
 ### Use of AI
 
-- 
-- 
+- Learning and verification: Clarifying IRC numeric replies, and the RFC 2812 grammar.
+- Documentation: Proofreading and refining the README and project descriptions.
+- Testing and debugging: Generating protocol-level test scenarios and reviewing edge cases; the tests under `tests/checks/` and the tester and live monitor under `tests/dynamic_tester/` were written with AI assistance and reviewed by the team.
 
 ---
