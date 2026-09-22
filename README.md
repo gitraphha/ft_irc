@@ -37,8 +37,19 @@ USER <user> 0 * :<realname>
 JOIN #channel
 ```
 
-Port must be in the range `1-65535`, a password must be supplied.\
+Port must be in the range `1-65535`, a password (no spaces) must be supplied.\
 Please note that you may need system admin permissions to use privileged ports (usually 1–1023).
+
+### Tests
+
+```sh
+make -C tests                                    # the fixed checks, then the dynamic tester; totals and the report link at the end
+make -C tests/checks <basic|networking|client|bonus>   # one group, or one test by name: make -C tests/checks socket
+make -C tests lab                                # interactive lab: client windows in one terminal, server log, walkthrough
+make -C tests/dynamic_tester attach              # live monitor of the server, in a second terminal while the tester runs
+```
+
+The dynamic tester writes `tests/dynamic_tester/artifacts/report.html`. Every command, with its options, is in `tests/HOWTO.txt`.
 
 ---
 
@@ -236,11 +247,11 @@ flowchart TB
 ### Channels
 - `JOIN <#channel> [<key>]` — join (or create) a channel, optional key for `+k`.
 - `PART <#channel> [<msg>]` — leave a channel (deleted when empty).
-- `KICK <#channel> <nick> [<msg>]` — remove a member (the issuer must outrank the target).
+- `KICK <#channel> <nick> [<msg>]` — remove a member (requires operator rank).
 - `INVITE <nick> <#channel>` — invite a user (may require operator rank).
 - `TOPIC <#channel> [<topic>]` — view/set the topic (may require operator rank).
 - `NAMES <#channel>` — list current members.
-- `MODE <#channel> [modes]` — view/set channel modes and user modes.
+- `MODE <#channel> [modes]` — view/set channel modes.
 
 ### Messaging
 - `PRIVMSG <target> <message>` — send a message. The bonus bot answers PRIVMSG addressed to it.
@@ -261,7 +272,10 @@ flowchart TB
 Modes act on the target `nick` and are shown as `@` for operator or none for regular users. Privileges are checked on every call to a command that needs elevated privileges (this may also depend on the state of a channel, e.g. whether changing the TOPIC is restricted or not).
 
 ### Other
-- `PING`/`PONG` — keepalive and latency check.
+- `QUIT [<msg>]` — leave the server, members of shared channels see the QUIT and the client gets ERROR :Closing link.
+- `PING`/`PONG` — the server answers `PING`, `PONG` is accepted silently (the server sends no `PING`).
+- Also implemented: `CAP` (empty capability list, for irssi), `VERSION`.
+- Recognised but without effect: `WHO`, `WHOIS`, `OPER`, `RENAME`, and `KILL`/`REHASH` (481, no one can become IRC operator).
 
 ---
 
@@ -329,7 +343,7 @@ nc <ip_to_connect_to> <port> > <filepath_to_save>
 
 #### Using the BOT
 
-`!send` opens a listener on an OS-picked port and hands the target a CTCP `DCC SEND <file> 127.0.0.1 <port> <size>` line. The receiver replies with `!accept`, connects to the advertised address/port and receives the file in 1 KiB chunks. Only one transfer is active at a time (`bot busy` otherwise). Pending offers expire after 60 seconds. Offered files must live in a `files/` directory next to the server; filenames containing `/` or `..` are rejected.
+`!send` opens a listener on an OS-picked port and hands the target a CTCP `DCC SEND <file> 127.0.0.1 <port> <size>` line, so the receiver must be on the same machine as the server. The receiver replies with `!accept`, connects to the advertised address/port and receives the file in 1 KiB chunks. Only one transfer is active at a time (`bot busy` otherwise). Offers expire after 60 seconds without activity. Offered files must live in a `files/` directory next to the server; filenames containing `/` or `..` are rejected.
 
 Sender:
 ```sh
@@ -372,7 +386,7 @@ NOTE: Review clang-tidy results and fix only what makes sense for this project.
 
 **Challenge:** Every command can fail in several ways (wrong channel, no such nick, missing params, insufficient privileges) and each failure must produce the correct RFC 2812 numeric to the client.
 
-**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text, and an `Error` carries a pre-built `Reply::Message`.`CommandProcessor::run` validates the command name, registration state,
+**Solution:** A `Reply` module maps each numeric code to its required parameter layout and trailing text, and an `Error` carries a pre-built `Reply::Message`. `CommandProcessor::run` validates the command name, registration state,
 operator requirement and parameter count up front. On the first bad condition it sends the error to the offending client via `sendError_` and stops that command line without throwing. Lower-level helpers (`Channel`, `ChannelManager`, `ClientManager`) still throw `Error`, and each handler wraps its calls in a small local `try/catch (Error)` that forwards `e.reply()` to the client. Every failure therefore produces exactly one well-formed `:server <code> <nick> <params> :<text>\r\n`, and no exception escapes into the event loop.
 
 ### Usage of `poll` and buffers
@@ -381,9 +395,17 @@ operator requirement and parameter count up front. On the first bad condition it
 
 **Solution:** Before passing on any data to command parsers and processors, the validity of a full line is checked. No incomplete or overlong data is ever forwarded to the internal handlers. Additionally an error counter is installed separately for each client, which limits the amount of consecutive errors and is reset on every valid input.
 
-### Single-Author Event Loop
+On the write side nothing is sent directly: every reply is appended to the client's write buffer and flushed only when `poll` reports `POLLOUT` for that socket. A client that stops reading is therefore never blocking the loop and is not dropped for being slow; its data waits in the buffer until it reads again.
 
-**Challenge:** One person owned the whole loop, so every change touched it all at once and nothing could be changed in isolation. `Server` and `Socket` were not separated into distinct jobs, and the work arrived as one PR with 30-50 commits, making every review unsafe.
+### One `poll` for everything, including the bonus transfer
+
+**Challenge:** The subject allows a single `poll` call. The DCC file transfer adds two more sockets (the listener the receiver connects to and the data connection), and the first version polled them with a second `poll` inside the transfer code.
+
+**Solution:** Before each `poll` the transfer sockets are added to the same `pollfd` vector as the clients (and removed again once the offer is closed), so the main loop reports their events and the transfer code only reads the results. `accept` on the transfer listener and `send` on the data socket now happen only after `poll` said so.
+
+### Event Loop and Socket Layer Not Split Early
+
+**Challenge:** The loop and the socket handling grew together in one place, so every change touched it all at once and nothing could be changed in isolation. `Server` and `Socket` were not separated into distinct jobs, and the work arrived as one PR with 30-50 commits, making every review unsafe.
 
 **Solution:** If redone: separate `Socket` (fd, buffer, limits) from `Server` (pollfd vector, close decisions) from day one, and ship changes as small, one-behaviour PRs.
 
@@ -401,7 +423,7 @@ operator requirement and parameter count up front. On the first bad condition it
 
 ### Bonus: CTCP & DCC SEND through the Bot
 
-**Challenge:** The CTCP mechanic used by DCC is barely documented anywhere. You can forward a CTCP by stripping the wrapping `\x01` bytes and re-sending what is inside. But to actually run a file transfer the server needs to hand the receiver a `\x01DCC SEND <file> <ip> <port> <size>\x01` line, open a listener the receiver can connect to, and stream the file. Wiring the two bonuses together (bot + transfer manager) with the bot as the middleman got complicated as the design evolved, and real clients silently abstract all of this away so there was no reference.
+**Challenge:** The CTCP mechanic used by DCC is barely documented anywhere. Between two clients a CTCP is just a `PRIVMSG` whose text is wrapped in `\x01`, so the server forwards it untouched. But to actually run a file transfer the server needs to hand the receiver a `\x01DCC SEND <file> <ip> <port> <size>\x01` line, open a listener the receiver can connect to, and stream the file. Wiring the two bonuses together (bot + transfer manager) with the bot as the middleman got complicated as the design evolved, and real clients silently abstract all of this away so there was no reference.
 
 **Solution:** Make the bot the DCC sender. `!send` asks the `TransferManager` to validate the filename, open a listener on an OS-picked port, and return the offer port/size. The bot then builds the `DCC SEND ... 127.0.0.1 <port> <size>` CTCP and delivers it wrapped in `\x01` to the target over `PRIVMSG`. The receiver just replies `!accept` and connects to the advertised address/port — which means the whole flow works over a plain `nc` session, no IRC client needed. Using the bot to construct and send the CTCP also makes the query path symmetric: the same `PRIVMSG` interception that answers `!help`/`!version` carries the DCC offer, and CTCP responses go back out as `NOTICE`. Transfer state (offer → accept/reject → stream → expire after 60 s) stayed in `TransferManager`, while the bot is a dumb messenger.
 
@@ -415,7 +437,7 @@ operator requirement and parameter count up front. On the first bad condition it
 - [RFC 2812 - IRC: Client Protocol](https://rfc-editor.org/rfc/rfc2812)
 - [RFC 2813 - IRC: Server Protocol](https://rfc-editor.org/rfc/rfc2813)
 - [ircgod](https://ircgod.com)
-- [Model IRC client protocol](https://modern.ircdocs.horse)
+- [Modern IRC client protocol](https://modern.ircdocs.horse)
 
 ### rfc reading tips
 - [Tips for Reading RFCs](https://www.rfc-editor.org/series/rfc-tips/)
@@ -439,6 +461,6 @@ operator requirement and parameter count up front. On the first bad condition it
 
 - Learning and verification: Clarifying IRC numeric replies, and the RFC 2812 grammar.
 - Documentation: Proofreading and refining the README and project descriptions.
-- Testing and debugging: Generating protocol-level test scenarios and reviewing edge cases.
+- Testing and debugging: Generating protocol-level test scenarios and reviewing edge cases; the tests under `tests/checks/` and the tester and live monitor under `tests/dynamic_tester/` were written with AI assistance and reviewed by the team.
 
 ---
