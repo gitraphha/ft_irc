@@ -122,7 +122,7 @@ void Server::processClientSockets_() {
 #ifdef BONUS
         // Transfer listener/data fds are in pollFds_ too (syncTransferPollFds_)
         // but are not clients: processTransferSocket_ handles their revents.
-        if (tm_.ownsFd(pfd.fd))
+        if (!sockets_.checkSocketData(pfd.fd) || tm_.ownsFd(pfd.fd))
             continue;
 #endif
 
