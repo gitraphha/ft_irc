@@ -137,6 +137,17 @@ void Server::processClientSockets_() {
             sockets_.flushWriteBuffer(pfd.fd);
         setPolloutInterest_(pfd.fd);
 
+        // Client already removed (QUIT, wrong password): its 464/ERROR was
+        // still queued. Close once it is sent, or if the peer is gone.
+        if (!clients_.find(pfd.fd)) {
+            if (!sockets_.hasPendingWrite(pfd.fd) ||
+                (pfd.revents & (POLLERR | POLLHUP))) {
+                removeClientSocketPfd_(pfd.fd);
+                --idx;
+            }
+            continue;
+        }
+
         if (!(pfd.revents & (POLLIN | POLLERR | POLLHUP)))
             continue;
 
@@ -194,8 +205,16 @@ void Server::processClientSockets_() {
         };
 
         if (closeData.closeSocket) {
-            removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
-            --idx;
+            if (closeData.closeMsg.empty() &&
+                sockets_.hasPendingWrite(pfd.fd)) {
+                // handler asked to close: keep the fd for POLLOUT only until
+                // its pending output is sent (see the top of this loop)
+                pfd.events = static_cast<short>(POLLOUT);
+                clients_.remove(pfd.fd, channels_);
+            } else {
+                removeClientSocketPfd_(pfd.fd, closeData.closeMsg);
+                --idx;
+            }
         }
     }
 }
@@ -215,10 +234,6 @@ void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
         }
         clients_.remove(fd, channels_);
     }
-    // TODO: socket is closed without flush. So loop cannot send the message
-    // Fix line below :
-    // sockets_.flushWriteBuffer(fd);
-    // But, is it okay to flush without checking POLLOUT here?
     sockets_.closeSocket(fd);
     removePollFd_(fd);
 }
