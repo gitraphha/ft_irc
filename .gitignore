@@ -92,4 +92,3 @@ reviewNotes.txt
 tests/dynamic_tester/artifacts/
 tests/checks/.*.test
 received.bin
-files/.syscalls_big.bin
