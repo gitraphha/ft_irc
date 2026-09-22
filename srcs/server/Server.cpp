@@ -219,6 +219,10 @@ void Server::processClientSockets_() {
 }
 
 void Server::removeClientSocketPfd_(int const fd, std::string const &msg) {
+    if (!sockets_.checkSocketData(fd)) {
+        removePollFd_(fd);
+        return;
+    }
     if (!sockets_.isServerSocket(fd)) {
         if (!msg.empty()) {
             Client *client = clients_.find(fd);
