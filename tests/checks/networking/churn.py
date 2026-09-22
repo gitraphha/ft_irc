@@ -52,7 +52,11 @@ time.sleep(0.5)
 for s in clients:
     drain(s)
 
-print("members in #big:", N, "(one member, usr%02d, stops reading; rest live)" % STALL_IDX)
+def ok(cond, text):
+    print("  %s %s" % ("ok  " if cond else "FAIL", text))
+
+
+print("[%d members in #big: broadcast storm, JOIN/PART churn, three RST disconnects, one member stops reading]" % N)
 
 # broadcast storm: 3 senders x 20 msgs -> each message goes to all members,
 # the stalled member's socket buffer fills and server send() starts failing
@@ -84,7 +88,7 @@ for i, s in enumerate(clients):
     drain(s)
     s.sendall(b"PING :final\r\n")
     s.settimeout(2.5)
-    ok = False
+    got = False
     got = b""
     try:
         while True:
@@ -93,11 +97,11 @@ for i, s in enumerate(clients):
                 break
             got += c
             if b"PONG" in got:
-                ok = True
+                got = True
                 break
     except (socket.timeout, OSError):
         pass
-    if not ok:
+    if not got:
         lost.append(i)
 
 alive = server_alive()
@@ -108,7 +112,6 @@ for s in clients:
     except Exception:
         pass
 
-print("  server alive     :", "YES" if alive else "NO (DIED)")
-print("  healthy members that lost their PING/PONG:", len(lost), (lost or "none"))
-print("  RESULT:",
-      "PASS" if (alive and not lost) else "FAIL - inspect state above")
+ok(alive, "server alive")
+ok(not lost, "every healthy member still gets PONG (%d lost%s)"
+   % (len(lost), (": " + ", ".join("usr%02d" % i for i in lost)) if lost else ""))

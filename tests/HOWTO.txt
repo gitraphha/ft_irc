@@ -1,0 +1,158 @@
+:::::::::::::::::::
+	ft_irc tests
+:::::::::::::::::::
+
+Notation
+--------
+<value>     required, replace it
+[value]     optional
+ a | b       choose one
+<name>...   one or more, separated by spaces
+
+Defaults, set once for everything below: host 127.0.0.1, port 6667 (the subject's
+port; also the one irssi is told to use), password pass. Files for the bonus
+transfer are names under files/ (files/test.txt -> test.txt).
+
+Where to run
+------------
+Every command below is written to be typed from the repo root: the ft_irc folder,
+the one that contains the Makefile, srcs/ and tests/.
+  cd <path to>/ft_irc
+"make -C tests X" means "run make X inside tests/". The same command from inside
+the folder is just "make X":
+  from the repo root          from inside the folder
+  make -C tests               cd tests && make
+  make -C tests/checks bonus  cd tests/checks && make bonus
+  make -C tests/dynamic_tester lab    cd tests/dynamic_tester && make lab
+Do not combine both ("cd tests" then "make -C tests"): there is no tests/tests.
+Nothing needs to be built by hand first: the tests run make and make bonus
+themselves. Run them in a normal terminal window (Terminal, iTerm), at least
+100 columns by 30 rows; an editor's built-in terminal is fine for the checks
+and the tester, but the lab, live, step, monitor and clients modes draw a
+full-screen text interface and want a real terminal. Ctrl-C stops any of them.
+
+Requirements (macOS and Linux)
+------------------------------
+c++        # C++ tests are built with the project flags: -Wall -Wextra -Werror -pedantic -std=c++98
+python3    # 3.8 or newer, standard library only bash, make, nc
+optional   # tmux and irssi (client windows), strace on Linux (syscall figures in the monitor)
+Port 6667 must be free; the tester names the process using it otherwise.
+The server is built by the tests themselves (make, make bonus).
+macOS, before the load suite:ulimit -n 2048
+
+==============================================================================
+Everything
+==============================================================================
+  make -C tests                       checks, then the dynamic tester; totals and the report link at the end
+  make -C tests checks                the checks only
+  make -C tests tester                the dynamic tester only
+  make -C tests clean                 remove test binaries and artifacts
+
+==============================================================================
+tests/checks
+==============================================================================
+Fixed pass/fail tests. C++ tests are compiled with the project flags against
+the server sources; scripts get their own fresh server on a free port.
+
+  make -C tests/checks                             all groups
+  make -C tests/checks <basic|networking|client|bonus>
+  make -C tests/checks <name>                      one test
+  bash tests/checks/run.sh <name>...               several tests in one run (any number)
+  bash tests/checks/run.sh                         usage and all names
+
+  group       name          checks
+  ---------   -----------   -------------------------------------------------------------
+  basic       basic         Makefile rules and flags, no relink, only allowed functions,
+                            one poll(), no select/epoll/kqueue/fork/errno, fcntl form
+  networking  socket        line framing, 510-byte limit, POLLOUT send path
+              flood         a member stops reading while the channel is flooded: others
+                            still served, the member is kept, every line delivered later
+              probe         odd input: NUL, binary, CR CR LF, bare LF, 511 and 4096-byte lines
+              throw         MODE on a missing channel, +o by a non-operator: server stays up
+              overlong      417 on an over-length line, close after the third one in a row
+              longline      10 KB without CRLF from three clients, a fourth stays responsive
+              churn         20 members, broadcast storm, JOIN/PART churn, RST disconnects
+              closing       what the client gets before its link is closed: 464, ERROR
+              syscalls      close/accept/send/recv return codes traced through every close
+                            path, ircserv and ircserv_bonus (a fd closed twice, a failed accept); needs cc
+  client      parser        message grammar: prefix, command, params, trailing
+              reply         numeric reply formatting
+              state         client state: nick casefolding, invites, prefix, flags
+              registration  PASS/NICK/USER/CAP in every order, 431 432 433 461 462 464
+              messaging     PING/PONG, QUIT, NOTICE, PRIVMSG and their numerics
+              operator      482/442 for non-operators; KICK INVITE TOPIC MODE i t k o l
+  bonus       bot           bot dialogue: !help !version !whoami !send !reject !accept, CTCP
+              transfer      a DCC transfer through the bot, bytes compared with the file
+
+  Output      [ name ]  what it checks
+              [section]
+                [PASS] check          [FAIL] check
+              one PASS/FAIL line per test and "Results: N pass / M fail / T total" at the end.
+              Exit status 1 if anything failed.
+  ----------------------------------------------------------------------------
+  Against a server you started yourself (./ircserv <port> <password>):
+  bash tests/checks/networking/session.sh [host] [port] [password] [nick]                  raw IRC session, already registered
+  python3 tests/checks/networking/<probe|throw|overlong|longline|churn|closing>.py [port] [password]
+  bash tests/checks/networking/syscalls.sh [repo root] [password]                        starts its own traced servers
+  bash tests/checks/bonus/bot.sh [host] [port] [password] [file]                          ./ircserv_bonus
+  bash tests/checks/bonus/transfer.sh [host] [port] [password] [nick] [file] [botnick]    ./ircserv_bonus
+
+==============================================================================
+tests/dynamic_tester
+==============================================================================
+Starts the server on port 6667, drives it with real clients over TCP and
+writes artifacts/report.html.
+
+  make -C tests/dynamic_tester                               menu; Enter runs everything
+  make -C tests/dynamic_tester <mandatory|robustness|load|bonus|compare>
+  make -C tests/dynamic_tester live                          everything, server and client windows shown while it runs
+  make -C tests/dynamic_tester step                          same, paused after every scenario: Enter next, c continue, p pause
+  make -C tests/dynamic_tester debug                         everything, every line sent and received printed
+  make -C tests/dynamic_tester open                          open the report (macOS)
+  make -C tests/dynamic_tester <suite> [PORT=<port>] [PASSWORD=<password>]
+  make -C tests/dynamic_tester external [PORT=<port>] [PASSWORD=<password>]     a server you started yourself
+  make -C tests/dynamic_tester config                        the expectations in tester.conf and their values
+  make -C tests/dynamic_tester <suite> SET="<key>=<value> [<key>=<value>]..."   override an expectation for one run
+
+-----------------------------------------------------------------------------
+  Result      [PASS] / [FAIL]   subject requirement
+              [NOTE]            behaviour the subject leaves open; the check says what the server does
+              [INFO]            a measurement
+              [SKIP]            could not run
+              "Results: N pass / N fail / N notes / N info / N skip / T total", then the report link.
+------------------------------------------------------------------------------
+  Report      artifacts/report.html: one page, every scenario with its checks (sent, received,
+              expected, why), the client windows and the server log. Scenarios with a FAIL or
+              NOTE are expanded. artifacts/transcripts/<scenario>.txt: the raw lines.
+------------------------------------------------------------------------------
+  tester.conf what the tester expects where the subject leaves a choice (line endings,
+              over-long lines, a client that never reads, MODE numerics ...). Edit it to match
+              the server; a wrong entry shows as NOTE or FAIL in the affected checks.
+
+==============================================================================
+  Interactive
+==============================================================================
+  make -C tests/dynamic_tester lab          # client windows in one terminal, server log, menu bar, walkthrough
+  make -C tests/dynamic_tester clients      # irssi or nc client windows on a launched server
+  make -C tests/dynamic_tester <irssi|nc>   # same, program preselected
+  make -C tests/dynamic_tester monitor      # live dashboard; starts the server itself
+  make -C tests/dynamic_tester attach [PORT=<port>] [PASSWORD=<password>]
+  											# live dashboard on a running server
+
+==============================================================================
+  Monitor while the tester runs: two terminals from the repo root.
+==============================================================================
+    terminal 1:  make -C tests/dynamic_tester attach
+    										# waits for port 6667, follows every server restart
+    terminal 2:  make -C tests/dynamic_tester
+    										# or any suite
+
+  Keys in the monitor and the lab: Tab moves between the panes and ends on the menu bar;
+  in the menu bar Left/Right pick, Enter or Up/Down change, b back; Up/Down Left/Right
+  scroll the focused pane. Monitor: q quits.
+  Lab: typing goes to the focused client; Enter on an empty line runs the walkthrough step
+  shown above the input; type your own line to try something else first; /skip /back /stop;
+  the menu bar sets what the windows show, their order, log rows and filter, eol; Ctrl-D leaves.
+
+------------------------------------------------------------------------------
+  Details: tests/dynamic_tester/README.md

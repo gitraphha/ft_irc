@@ -26,11 +26,14 @@ def reg(nick, i):
     return s
 
 
-print("opening 3 dumpers and 1 normal client...")
+def ok(cond, text):
+    print("  %s %s" % ("ok  " if cond else "FAIL", text))
+
+
+print("[three clients dump 10 KB without CRLF, a fourth stays normal]")
 dumpy = [reg("dump%d" % i, i) for i in range(3)]
 norm = reg("norm", 100)
 
-print("3 dumpers hold a 10k-no-CRLF line (3 chunks each)...")
 for s in dumpy:
     s.sendall(b"X" * 4000)
 time.sleep(0.05)
@@ -40,25 +43,22 @@ time.sleep(0.05)
 for s in dumpy:
     s.sendall(b"Z" * 2000)   # 3rd event -> discard limit closes them
 
-print("now the normal client PINGs - must be answered promptly:")
 t0 = time.time()
 norm.sendall(b"PING :hi\r\n")
 norm.settimeout(2)
-ok = False
+got_pong = False
 try:
     while True:
         c = norm.recv(2048)
         if not c:
             break
         if b"PONG" in c:
-            ok = True
+            got_pong = True
             break
 except socket.timeout:
     pass
 lat = time.time() - t0
-print("  PONG latency: %.3fs  %s" % (lat, "OK" if ok else "TIMED OUT"))
-
-print("do the dumpers get closed after their 3rd chunk?")
+ok(got_pong, "the normal client gets its PONG (%.3f s)" % lat)
 closed = []
 for i, s in enumerate(dumpy):
     s.settimeout(2)
@@ -70,10 +70,4 @@ for i, s in enumerate(dumpy):
                 break
     except socket.timeout:
         pass
-print("  closed dumpers:", len(closed), "(expect 3)",
-      "PASS" if len(closed) == 3 else "FAIL")
-
-if ok and len(closed) == 3:
-    print("RESULT: PASS - server stayed responsive and reaped the abusers")
-else:
-    print("RESULT: FAIL - server was blocked or did not close dumpers")
+ok(len(closed) == 3, "the three dumpers are closed after their third chunk (%d of 3)" % len(closed))

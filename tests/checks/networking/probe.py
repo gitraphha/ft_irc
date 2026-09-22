@@ -66,19 +66,16 @@ CASES = [
     ("50 noisy PRIVMSGs",       (b"PRIVMSG #ghost :" + b"y" * 480 + b"\r\n") * 50),
 ]
 
-print("case                        alive  closed  reply")
-print("-" * 70)
+def ok(cond, text):
+    print("  %s %s" % ("ok  " if cond else "FAIL", text))
+
+
+print("[the server must survive every odd input]")
 all_ok = True
 for i, (name, payload) in enumerate(CASES):
     alive, eof, data = probe(i, payload)
     first = repr(data[:40]) if data else "(nothing)"
-    if not alive:
-        all_ok = False
-        mark = "*** SERVER DIED ***"
-    else:
-        mark = "ok"
-    print("%-26s  %-5s  %-7s  %-45s %s"
-          % (name, "yes" if alive else "NO", "yes" if eof else "no",
-             first, mark))
-print("-" * 70)
-print("server survived every probe:", "YES" if all_ok else "NO - fix the crash")
+    all_ok = all_ok and alive
+    ok(alive, "%-26s %s  %s" % (name, "closed by server," if eof else "still open,   ", first))
+print("[summary]")
+ok(all_ok, "server alive after all %d cases" % len(CASES))

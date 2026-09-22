@@ -13,7 +13,7 @@
  * alone: no Server, no Client, no handler stubs. The whole IRC message
  * grammar is checked offline, before the poll loop exists.
  *
- * Run: ./tests/test_parser.sh
+ * Run: bash tests/run.sh parser
  */
 
 static int  failures = 0;
@@ -60,7 +60,6 @@ static void expect(const std::string &label, const std::string &line,
 }
 
 int main() {
-    std::cout << "Parser tests: \n\n";
 
     // An empty message is silently ignored per RFC 2812 section 2.3, so parse
     // reports failure and run() returns without sending anything back.
@@ -147,10 +146,5 @@ int main() {
         expect("[MODE]", "MODE #chan +o bob", true, "MODE", p);
     }
 
-    std::cout << "\n";
-    if (failures == 0)
-        std::cout << "all checks passed\n";
-    else
-        std::cout << failures << " check(s) failed\n";
     return (failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
