@@ -347,7 +347,10 @@ nc <ip_to_connect_to> <port> > <filepath_to_save>
 
 Sender:
 ```sh
-/msg bot !send <receiver_nick> <filename_for_file_in_files_folder>
+#irssi
+/msg bot :!send <receiver_nick> <filename_for_file_in_files_folder>
+#nc
+PRIVMSG bot :!send <receiver_nick> <filename_for_file_in_files_folder>
 ```
 
 Receiver:
