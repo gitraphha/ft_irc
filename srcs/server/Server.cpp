@@ -120,7 +120,7 @@ void Server::processClientSockets_() {
          ++idx) {
         pollfd &pfd = pollFds_.at(idx);
 #ifdef BONUS
-		// Transfer listener/data fds are in pollFds_ too (syncTransferPollFds_)
+        // Transfer listener/data fds are in pollFds_ too (syncTransferPollFds_)
         // but are not clients: processTransferSocket_ handles their revents.
         if (tm_.ownsFd(pfd.fd))
             continue;

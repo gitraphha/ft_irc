@@ -49,7 +49,8 @@ class Server {
     TransferManager tm_;
     Bot             bot_;
     void            processTransferSocket_();
-    void			syncTransferPollFds_();	//before poll call we put listener/data fd in pollFds_
+    void
+    syncTransferPollFds_(); //before poll call we put listener/data fd in pollFds_
 #endif
 
     size_t                     numServerSockets_;
